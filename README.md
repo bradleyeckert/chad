@@ -10,11 +10,17 @@ Chad tweaks the J1, but it's very similar.
 Chad protects your software investment by targeting Verilog
 (or its VHDL equivalent) directly.
 Modern computers are fast enough to simulate the CPU on the order of at-speed.
+Simulation speed on my computer depended on the compiler:
+
+- 150 MHz when compiled by Code::Blocks 17.12 (GCC).
+- 210 MHz when compiled by Visual Studio 2019.
+
+It's like having a real J1.
 Forth should execute the code it compiles.
 Cross compiling, such as targeting ARM with code running on x86,
 adds a lot of complexity which is completely unnecessary with Chad.
 
-You can add your functions easily. Just edit `chad.c` and `chaddefs.h`.
+You can add custom functions easily. Just edit `chad.c` and `chaddefs.h`.
 Recompile and your simulated computer and its language have the new features.
 Chad comes as C source. Once you compile it, you have a Forth that can extend
 itself in such a way that the binaries can be output for inclusion in a SOC.
@@ -38,3 +44,15 @@ The main source files are:
 
 To try it out, launch it with `chad include forth.f`.
 At the `ok>` prompt, type `0 here dasm` to disassemble everything.
+
+- `stats` lists the cycle count and maximum stack depths.
+- `words` lists words.
+- `see` disassembles a word.
+
+For example:
+ok>`include forth.fs`
+370 instructions used
+ok>`25 fib .`
+121393 ok>`stats`
+2792024 cycles, MaxSP=27, MaxRP=26, 155 MHz
+ok>

@@ -2,6 +2,34 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>
+
+#ifdef _MSC_VER
+
+#include <Windows.h>
+static uint64_t GetMicroseconds() {
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);
+	unsigned long long tt = ft.dwHighDateTime;
+	tt <<= 32;
+	tt |= ft.dwLowDateTime;
+	tt /= 10;
+	tt -= 11644473600000000ULL;
+	return tt;
+//	return PCcycleCount.QuadPart /= PCfrequency.QuadPart;
+//	QueryPerformanceCounter(&PCcycleCount);
+//	QueryPerformanceFrequency(&PCfrequency);
+//	PCcycleCount.QuadPart *= 1000000;
+
+}
+#else
+#include <sys/time.h> // GCC library
+static uint64_t GetMicroseconds() {
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec * (uint64_t)1000000 + tv.tv_usec;
+}
+#endif
+
 #include <string.h>
 #include <inttypes.h>
 #include <ctype.h>
@@ -10,8 +38,8 @@
 #include "iomap.h"
 #define NameOffset 0x20
 
-// EXPORTS: see chad.h
 
+////////////////////////////////////////////////////////////////////////////////
 // CPU simulator
 
 SI error;								// simulator and interpreter error code
@@ -539,7 +567,7 @@ SV SwallowBOM(FILE *fp) {				// swallow leading UTF8 BOM marker
 	}
 }
 
-SV OpenFile(char *name) {				// Push a new file onto the file stack
+SV OpenNewFile(char *name) {				// Push a new file onto the file stack
 	filedepth++;  fileID++;
 	strmove (File.FilePath, name, LineBufferSize);
 #ifdef MORESAFE
@@ -565,7 +593,9 @@ SI parseword (char delimiter) {
 	while (buf[toin] == delimiter) toin++;
 	int length = 0;	 char c;
 	while ((c = buf[toin++]) != delimiter) {
-		if (!c) break;					// assume trailing 0 is there
+		if (!c) {				        // assume trailing 0 is there
+            toin--;  break;				// step back to terminator
+		}
 		tok[length++] = c;
 	}
 	tok[length] = 0;					// tok is zero-delimited
@@ -579,7 +609,7 @@ SV doINCLUDE (void) {					// Nest into a source file
 	} else {
 		parseword(' ');					// or a filename with no spaces
 	}
-	OpenFile(tok);
+	OpenNewFile(tok);
 }
 
 int DefMark, DefMarkID;
@@ -670,9 +700,16 @@ SV doAssert  (void) {                   // for test code
     }
 }
 
+uint64_t elapsed_us;
+uint64_t elapsed_cycles;
+
 SV doStats	 (void) {
-    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d\n", cycles, spMax, rpMax);
-    cycles = 0;  spMax = sp;  rpMax = rp;
+    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d", elapsed_cycles, spMax, rpMax);
+    if (elapsed_us > 99) {
+        printf(", %" PRId64 " MHz", elapsed_cycles/elapsed_us);
+    }
+    printf("\n");
+    spMax = sp;  rpMax = rp;
 }
 
 SV doCODE    (void) { doColon(); state = 0; context |= 8;  Dpush(0);}
@@ -825,10 +862,6 @@ The QUIT loop processes a line at a time from either the keyboard or a file.
 The file handle is 0 for keyboard, other for file.
 */
 
-SV refilled (char * buffer, int maxlength) {
-	toin = 0;  buf = buffer;  maxlen = maxlength;
-}
-
 SV refill (void) {
 ask: toin = 0;
 	File.LineNumber++;
@@ -859,6 +892,7 @@ ask: toin = 0;
 }
 
 int chad(char * line, int maxlength) {
+    buf = line;  maxlen = maxlength;    // assign a working buffer
 	LoadKeywords();
 	filedepth = 0;
 	while (1) {
@@ -867,10 +901,12 @@ int chad(char * line, int maxlength) {
         cycles = spMax = rpMax = 0;     // CPU stats
         sp = rp = 0;                    // stacks
 		while (!error) {
-			refilled(line, maxlength);
+            toin = 0;
+			uint64_t time0 = GetMicroseconds();
+			uint64_t cycles0 = cycles;
 			while (parseword(' ')) {
 				if (NotKeyword(tok)) {	// try to convert to number
-					int i = 0;  char c;  int radix = base;
+					int i = 0;   int radix = base;   char c = 0;
 					int64_t x = 0;  int dp = 0;  int neg = 0;
 					switch (tok[0]) {   // leading digit
 					    case '-': i++;  neg = -1;    break;
@@ -929,13 +965,17 @@ bogus:                          error = UNRECOGNIZED;
 						fclose(File.fp);
 						filedepth--;
 					}
-					goto fill;
+					goto done;
 				}
 			}
-fill:		refill();
+done:       elapsed_us = GetMicroseconds() - time0;
+			elapsed_cycles = cycles - cycles0;
+            refill();
 		}
 	}
 }
+
+#define BYTES_PER_WORD ((CELLSIZE + 7) / 8)
 
 uint32_t chadGetSource (char delimiter) {
     int bytes;
@@ -949,12 +989,12 @@ uint32_t chadGetSource (char delimiter) {
         bytes = strlen(buf) - toin;
         doComment();
     }
-    int words = (bytes + (1<<CELLS) - 1) >> CELLS;
+    int words = (bytes + BYTES_PER_WORD - 1) / BYTES_PER_WORD;
     int addr = DataSize - words;
     cell *dest = &Data[addr];
     for (int i=0; i<words; i++) {       // pack string into data memory
         uint32_t w = 0;                 // little-endian packing
-        for (int j=0; j<(1<<CELLS); j++) {
+        for (int j=0; j<BYTES_PER_WORD; j++) {
             w |= (uint8_t)*src++ << (j*8);
         }
         *dest++ = w;

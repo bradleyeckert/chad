@@ -13,7 +13,7 @@
 #define StackSize  0x20                 /* Stacks */
 #define CodeFence 0x400                 /* Beginning of RAM-based Code space */
 
-#define CELLSIZE     16                 /* Width of a cell in bits */
+#define CELLSIZE     24                 /* Width of a cell in bits */
 
 #define LineBufferSize 256              /* Size of line buffer */
 #define MaxKeywords 1024

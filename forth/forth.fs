@@ -186,5 +186,15 @@ depth 0 assert
 123 4 !  456 8 !  4 @ 123 assert  8 @ 456 assert
 depth 0 assert
 
+\ Use colorForth style of recursion
+
+: fib ( n1 -- n2 )
+    dup 2 < if drop 1 exit then
+    dup  1 - fib
+    swap 2 - fib  + ;
+
+\ Try 25 fib, then stats
+
+
 here . .( instructions used) cr
 \ 0 here dasm
