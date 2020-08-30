@@ -50,9 +50,11 @@ At the `ok>` prompt, type `0 here dasm` to disassemble everything.
 - `see` disassembles a word.
 
 For example:
-ok>`include forth.fs`
+```
+ok>include forth.fs
 370 instructions used
-ok>`25 fib .`
-121393 ok>`stats`
+ok>25 fib .
+121393 ok>stats
 2792024 cycles, MaxSP=27, MaxRP=26, 155 MHz
 ok>
+```
