@@ -19,7 +19,7 @@ static uint8_t SPIresult;
 static int termKey(void);
 
 uint32_t readIOmap (uint32_t addr) {
-	printf("Reading from iomap[%x]\n", addr);
+    printf("Reading from iomap[%x]\n", addr);
     switch (addr) {
     case 0: return termKey();       // Get the next incoming stream char
     case 1: // terminal type (control and function keys differ)
@@ -35,7 +35,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 0x8002: return header_data;
     default: chadError(BAD_IOADDR);
     }
-	return 0;
+    return 0;
 }
 
 // The `iow` field in an ALU instruction strobes io_wr.
@@ -87,18 +87,18 @@ static char buf[LineBufferSize];
 static int toin = 0;
 static int len = 0;
 
-static int termKey(void) {			    // Get the next byte in the input stream
+static int termKey(void) {              // Get the next byte in the input stream
     if (toin < len) {
         return buf[toin++];
     }
     toin = 0;
     len = 0;
-	if (fgets(buf, LineBufferSize, stdin) != NULL) {
-		len = strlen(buf);
-	}
-	if (len) {                  // the string ends in newline
+    if (fgets(buf, LineBufferSize, stdin) != NULL) {
+        len = strlen(buf);
+    }
+    if (len) {                  // the string ends in newline
         return buf[toin++];
-	}
-	return -1;                  // so this shouldn't happen unless bad gets
+    }
+    return -1;                  // so this shouldn't happen unless bad gets
 }
 

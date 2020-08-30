@@ -7,39 +7,39 @@ empty decimal
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
-CODE noop    T              		RET alu  END-CODE macro
+CODE noop    T                      RET alu  END-CODE macro
 CODE xor     T^N            d-1     RET alu  END-CODE macro
 CODE and     T&N            d-1     RET alu  END-CODE macro
 CODE +       T+N    CO      d-1     RET alu  END-CODE macro
-CODE - 	     N-T    CO      d-1     RET alu  END-CODE macro
-CODE dup 	 T      T->N    d+1     RET alu  END-CODE macro
+CODE -       N-T    CO      d-1     RET alu  END-CODE macro
+CODE dup     T      T->N    d+1     RET alu  END-CODE macro
 CODE drop    N              d-1     RET alu  END-CODE macro
 CODE invert  ~T                     RET alu  END-CODE macro
 CODE swap    N      T->N                 RET alu  END-CODE macro
 CODE over    N      T->N    d+1     RET alu  END-CODE macro
-CODE nip 	 T              d-1     RET alu  END-CODE macro
-CODE 0= 	 T0=                    RET alu  END-CODE macro
-CODE 0< 	 T0<                    RET alu  END-CODE macro
-CODE >r  	 N      T->R    d-1 r+1     alu  END-CODE macro
-CODE r>  	 R      T->N    d+1 r-1     alu  END-CODE macro
-CODE r@  	 R      T->N    d+1         alu  END-CODE macro
+CODE nip     T              d-1     RET alu  END-CODE macro
+CODE 0=      T0=                    RET alu  END-CODE macro
+CODE 0<      T0<                    RET alu  END-CODE macro
+CODE >r      N      T->R    d-1 r+1     alu  END-CODE macro
+CODE r>      R      T->N    d+1 r-1     alu  END-CODE macro
+CODE r@      R      T->N    d+1         alu  END-CODE macro
 CODE 2*      T2*    CO              RET alu  END-CODE macro
 CODE 2*c     T2*c   CO              RET alu  END-CODE macro
 CODE 2/      T2/    CO              RET alu  END-CODE macro
 CODE 2/c     cT2/   CO              RET alu  END-CODE macro
-CODE carry   C 		T->N    d+1     RET alu  END-CODE macro
+CODE carry   C      T->N    d+1     RET alu  END-CODE macro
 CODE rshift  N>>T           d-1     RET alu  END-CODE macro
 CODE lshift  N<<T           d-1     RET alu  END-CODE macro
-CODE @       T 	                        alu
-			 [T]                    RET alu  END-CODE macro
-CODE !       T 		N->[T]  d-1         alu
-			 N              d-1     RET alu  END-CODE macro
-CODE io@     T 		_IORD_                   alu
-			 T                          alu
-			 io[T]                  RET alu  END-CODE
-CODE io!     T 		N->io[T] d-1        alu
-			 T 							alu
-			 N 				d-1 	RET alu  END-CODE
+CODE @       T                          alu
+             [T]                    RET alu  END-CODE macro
+CODE !       T      N->[T]  d-1         alu
+             N              d-1     RET alu  END-CODE macro
+CODE io@     T      _IORD_                   alu
+             T                          alu
+             io[T]                  RET alu  END-CODE
+CODE io!     T      N->io[T] d-1        alu
+             T                          alu
+             N              d-1     RET alu  END-CODE
 
 \ Elided words
 \ These words are supported by the hardware but are not
@@ -76,31 +76,31 @@ CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
 
 \ Multiplication using shift-and-add, about 190 cycles at 16-bit.
 : um*  \ u1 u2 -- ud
-	0 [ cellsize ] literal
-	for 2* >r 2*c carry
-		if  over r> + >r carry +
-		then  r>
-	next
+    0 [ cellsize ] literal
+    for 2* >r 2*c carry
+        if  over r> + >r carry +
+        then  r>
+    next
     >r nip r> swap
 ;
 
 \ Long division takes about 310 cycles at 16-bit.
 : um/mod  \ ud u -- ur uq               \ 6.1.2370
     over over- drop carry
-    if	drop drop dup xor
-		dup invert  exit				\ overflow = 0 -1
-	then
-	[ cellsize ] literal
-	for >r  swap 2*c swap 2*c    		\ 2dividend | divisor
-		carry if
-			r@ -   0 2* drop        	\ clear carry
-		else
-			dup r@  - drop          	\ test subtraction
-			carry 0= if  r@ -  then 	\ keep it
-		then
-		r>
-	next
-	drop swap 2*c invert				\ finish quotient
+    if  drop drop dup xor
+        dup invert  exit                \ overflow = 0 -1
+    then
+    [ cellsize ] literal
+    for >r  swap 2*c swap 2*c           \ 2dividend | divisor
+        carry if
+            r@ -   0 2* drop            \ clear carry
+        else
+            dup r@  - drop              \ test subtraction
+            carry 0= if  r@ -  then     \ keep it
+        then
+        r>
+    next
+    drop swap 2*c invert                \ finish quotient
 ;
 
 : d2*  swap 2* swap 2*c ;

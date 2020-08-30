@@ -19,8 +19,8 @@
 #define MaxNameSize     16      /* Number of chars in a name (less 1)       */
 #define MaxFiles        20      /* Max depth of file nesting                */
 
-#ifdef _MSC_VER				    /* Visual Studio wants "safe" functions.    */
-#define MORESAFE				/* Compiler supports them (C11, C17, etc).  */
+#ifdef _MSC_VER                 /* Visual Studio wants "safe" functions.    */
+#define MORESAFE                /* Compiler supports them (C11, C17, etc).  */
 #endif
 
 #if ((CodeSize-1) & CodeSize)

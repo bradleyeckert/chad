@@ -128,14 +128,14 @@ struct Keyword {
 #endif
 
 // 0uvppppp Rwwwrrss = ALU op
-// 	x = unused
-// 	u = use tail pointer instead of head pointer for return stack
-// 	v = use tail pointer instead of head pointer for data stack
-// 	p = 5-bit ALU operation select
-// 	R = return
-// 	w = strobe select {-, TN, TR, wr, iow, ior, co, ?}
-// 	r = return stack displacement
-// 	s = data stack displacement
+//  x = unused
+//  u = use tail pointer instead of head pointer for return stack
+//  v = use tail pointer instead of head pointer for data stack
+//  p = 5-bit ALU operation select
+//  R = return
+//  w = strobe select {-, TN, TR, wr, iow, ior, co, ?}
+//  r = return stack displacement
+//  s = data stack displacement
 // 100nnnnn nnnnnnnn = jump
 // 101nnnnn nnnnnnnn = conditional jump
 // 110nnnnn nnnnnnnn = call
