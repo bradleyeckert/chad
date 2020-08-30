@@ -10,25 +10,25 @@
 
 void ErrorMessage (int error, char *s); // defined in errors.c
 
-#if (CELLSIZE > 16)
+#if (CELLSIZE == 32)
     #define cell     uint32_t
-    #define CELLS         1                 /* log2(bytes per cell) */
-#elif (CELLSIZE == 32)
+    #define CELLS         2                 /* log2(bytes per cell) */
+    #define CELLMASK 0xFFFFFFFF
+    #define MSB      0x80000000
+#elif (CELLSIZE > 16)
     #define cell     uint32_t
-    #define CELLS         2
+    #define CELLS         1
 #else
     #define cell     uint16_t
     #define CELLS         1
 #endif
 
-#define File FileStack[filedepth]
 #if (CELLSIZE < 32)
 #define CELLMASK (~((~0)<<CELLSIZE))
 #define MSB      (1 << (CELLSIZE-1))
-#else
-#define CELLMASK 0xFFFFFFFF
-#define MSB      0x80000000
 #endif
+
+#define File FileStack[filedepth]
 #define RPMASK   (StackSize-1)
 #define RDEPTH   (rp & RPMASK)
 #define SPMASK   (StackSize-1)

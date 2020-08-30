@@ -34,3 +34,6 @@ The main source files are:
 - `main.c` Inputs the command line
 - `chad.c` Simulates the CPU and implements a text interpreter
 - `iomap.c` Simulates the I/O of the CPU
+
+To try it out, launch it with `chad include forth.f`.
+At the `ok>` prompt type `0 here dasm` to disassemble everything.
