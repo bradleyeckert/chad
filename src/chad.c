@@ -270,11 +270,12 @@ SV extended_lit (int k12) {
 SV Literal (cell x) {
 #if (CELLSIZE > 23)
 	if (x & 0xFF800000) {
-		extended_lit(x>>23);
-		if (x & 0x007FF800) extended_lit(x >> 11);
+		extended_lit(x >> 23);
+		extended_lit(x >> 11);
 	}
 #else
-	if (x & 0x007FF800) extended_lit(x>>11);
+	if (x & 0x007FF800)
+        extended_lit(x>>11);
 #endif
 	x &= 0x7FF;
 	comma (lit | (x & 0x7F) | (x & 0x780) << 1);
@@ -500,10 +501,9 @@ cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
 }
 
 SV doDASM (void) { // ( addr len -- )
-	int length = Dpop();
+	int length = Dpop() & 0x0FFF;
 	int addr = Dpop();
     char* name;
-	if (length > 1000) length = 1000;	// in case you screw up
 	for (int i=0; i<length; i++) {
 		int a = addr++ & (CodeSize-1);
 		int x = Code[a];
@@ -515,7 +515,7 @@ SV doDASM (void) { // ( addr len -- )
 	}
 }
 
-SV PrintStack (void) { // ( ... -- ... )
+SV PrintStack (void) {                  // ( ... -- ... )
 	int depth = SDEPTH;
 	for (int i=0; i<depth; i++) {
 		if (i == (depth-1)) {
@@ -526,16 +526,16 @@ SV PrintStack (void) { // ( ... -- ... )
 	}
 }
 
-SV dotESS (void) { // ( ... -- ... )
+SV dotESS (void) {                      // ( ... -- ... )
 	PrintStack();
 	printf("<-Top\n");
 }
 
-SV dot (void) { // ( n -- )
+SV dot (void) {                         // ( n -- )
 	Cdot(Dpop());
 }
 
-SV ddot (void) { // ( d -- )
+SV ddot (void) {                        // ( d -- )
     cell hi = Dpop();
     cell lo = Dpop();
     uint64_t x = ((uint64_t)hi << CELLSIZE) | lo;
@@ -567,7 +567,7 @@ SV SwallowBOM(FILE *fp) {				// swallow leading UTF8 BOM marker
 	}
 }
 
-SV OpenNewFile(char *name) {				// Push a new file onto the file stack
+SV OpenNewFile(char *name) {			// Push a new file onto the file stack
 	filedepth++;  fileID++;
 	strmove (File.FilePath, name, LineBufferSize);
 #ifdef MORESAFE
@@ -619,7 +619,7 @@ SV doColon (void) {
 	if (header(tok)) {					// define a word that simulates
 		SetFns(dp, Def_Exec, Def_Comp);
 		Header[hp].target = dp;
-		DefMarkID = hp++;         // save for later reference
+		DefMarkID = hp++;               // save for later reference
 		DefMark = dp;  state = 1;
 		fence = dp;                     // code starts here
 		ConSP = 0;
@@ -661,7 +661,7 @@ SV doNoTail (void) {
 
 SV Marker_Exec (void) {                 // execution semantics of a marker
     dp = my();
-    hp = Header[me].w2;         // also forgets the marker
+    hp = Header[me].w2;                 // also forgets the marker
 }
 
 SV doMARKER (void) {
@@ -702,14 +702,23 @@ SV doAssert  (void) {                   // for test code
 
 uint64_t elapsed_us;
 uint64_t elapsed_cycles;
+CELL tablebits = CELLSIZE;
 
 SV doStats	 (void) {
     printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d", elapsed_cycles, spMax, rpMax);
     if (elapsed_us > 99) {
-        printf(", %" PRId64 " MHz", elapsed_cycles/elapsed_us);
+        printf(", %" PRId64 " MIPS", elapsed_cycles/elapsed_us);
     }
     printf("\n");
     spMax = sp;  rpMax = rp;
+}
+
+SV doTableEntry (void) {
+    int bits = tablebits;
+    cell x = Dpop();
+    if (bits > 23) extended_lit(x >> 23);
+    if (bits > 11) extended_lit(x >> 11);
+	comma (ret | lit | (x & 0x7F) | (x & 0x780) << 1);
 }
 
 SV doCODE    (void) { doColon(); state = 0; context |= 8;  Dpush(0);}
@@ -734,6 +743,7 @@ SV doDROP	 (void) { Dpop(); }
 SV doComma	 (void) { comma(Dpop()); }
 SV doWrProt	 (void) { writeprotect = CodeFence; }
 SV doSemi	 (void) { compExit();  SaveLength();  state = 0;  sane();}
+SV doSetBits (void) { tablebits = Dpop(); }
 
 // Keywords are visible based on bits in context.
 // Set the same bits in current while loading hp.
@@ -788,6 +798,8 @@ SV LoadKeywords(void) {
 	AddKeyword ("macro", doMACRO, noCompile);
 	AddKeyword ("immediate", doIMMEDIATE, noCompile);
 	AddKeyword ("notail", doNoTail, noCompile);
+	AddKeyword ("|bits|", doSetBits, noCompile);
+	AddKeyword ("|", doTableEntry, noCompile);
 	AddKeyword ("begin", noExecute, doBegin);
 	AddKeyword ("again", noExecute, doAgain);
 	AddKeyword ("until", noExecute, doUntil);
@@ -866,10 +878,6 @@ SV refill (void) {
 ask: toin = 0;
 	File.LineNumber++;
 	if (File.fp == stdin) {
-        if (SDEPTH) {
-            printf("# ");
-            PrintStack();
-        }
 		printf("ok>");
 	}
 	if (fgets(buf, maxlen, File.fp) == NULL) {
@@ -954,6 +962,8 @@ bogus:                          error = UNRECOGNIZED;
                         }
 					}
 				}
+				if (sp == (StackSize-1)) error = BAD_STACKUNDER;
+				if (rp == (StackSize-1)) error = BAD_RSTACKUNDER;
 				if (error) {
 					switch (error) {
 					case BYE: return 0;
@@ -970,6 +980,12 @@ bogus:                          error = UNRECOGNIZED;
 			}
 done:       elapsed_us = GetMicroseconds() - time0;
 			elapsed_cycles = cycles - cycles0;
+            if (File.fp == stdin) {
+                if (SDEPTH) {
+                    printf("\\ ");
+                    PrintStack();
+                }
+            }
             refill();
 		}
 	}

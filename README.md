@@ -10,10 +10,10 @@ Chad tweaks the J1, but it's very similar.
 Chad protects your software investment by targeting Verilog
 (or its VHDL equivalent) directly.
 Modern computers are fast enough to simulate the CPU on the order of at-speed.
-Simulation speed on my computer depended on the compiler:
+Simulation speed on my computer (one AMD Rizen core) depends on the compiler:
 
-- 150 MHz when compiled by Code::Blocks 17.12 (GCC).
-- 210 MHz when compiled by Visual Studio 2019.
+- 150 MIPS when compiled by Code::Blocks 17.12 (GCC).
+- 210 MIPS when compiled by Visual Studio 2019.
 
 It's like having a real J1.
 Forth should execute the code it compiles.

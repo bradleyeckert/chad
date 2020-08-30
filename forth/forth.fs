@@ -163,6 +163,9 @@ CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
 : */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- remainder n1*n2/n3
 : */     */mod swap drop ;              \ 6.1.0100  n1 n2 n3 -- n1*n2/n3
 
+: exec:  2* r> + >r ; \ for list of 2-cell literals
+
+: table  exec: [ 123 | 456 | 789 | 321 ] literal ;
 
 \ Now let's get some I/O set up
 

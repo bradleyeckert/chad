@@ -6,22 +6,21 @@
 #define __CONFIG_H__
 #include <stdint.h>
 
+#define CELLSIZE        18      /* Width of a cell in bits, 16 to 32        */
 // Sizes of memories in cells, should be an exact power of 2
-#define CodeSize  0x800                 /* Code ROM */
-#define DataSize  0x400                 /* Data RAM */
-#define AppSize  0x2000                 /* Application ROM */
-#define StackSize  0x20                 /* Stacks */
-#define CodeFence 0x400                 /* Beginning of RAM-based Code space */
+#define CodeSize      2048      /* Code memory cells                        */
+#define DataSize      1024      /* Data memory cells                        */
+#define StackSize       32      /* Stack cells                              */
+#define CodeFence     1024      /* Beginning of RAM-based Code space        */
 
-#define CELLSIZE     24                 /* Width of a cell in bits */
 
-#define LineBufferSize 256              /* Size of line buffer */
-#define MaxKeywords 1024
-#define MaxNameSize 16
-#define MaxFiles    20
+#define LineBufferSize 256      /* Size of line buffer                      */
+#define MaxKeywords   1024      /* Number of headers                        */
+#define MaxNameSize     16      /* Number of chars in a name (less 1)       */
+#define MaxFiles        20      /* Max depth of file nesting                */
 
-#ifdef _MSC_VER
-#define MORESAFE						// Visual Studio wants "safe" functions.
+#ifdef _MSC_VER				    /* Visual Studio wants "safe" functions.    */
+#define MORESAFE				/* Compiler supports them (C11, C17, etc).  */
 #endif
 
 #if ((CodeSize-1) & CodeSize)

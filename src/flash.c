@@ -96,6 +96,7 @@ int FlashMemSPI8 (int n) {
 								}	wen=0;  state=1;  /* 4K erase */   break;
                             case 0x0B: /* fast read */		 state++;  break;
                             case 0x02: if (wen) {state=11; break;}
+                                state=0;  return BAD_NOTENABLED;
                             default: 					     state = 0;
                         } break;
                     } else {                            // invalid address, ignore

@@ -12,15 +12,12 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 
 #if (CELLSIZE == 32)
     #define cell     uint32_t
-    #define CELLS         2                 /* log2(bytes per cell) */
     #define CELLMASK 0xFFFFFFFF
     #define MSB      0x80000000
 #elif (CELLSIZE > 16)
     #define cell     uint32_t
-    #define CELLS         1
 #else
     #define cell     uint16_t
-    #define CELLS         1
 #endif
 
 #if (CELLSIZE < 32)
