@@ -37,21 +37,21 @@ The ISA is modified to expedite that, to keep stacks small.
 
 ```
 0xxppppp Rwwwrrss = ALU instruction
-	x = unused
-	p = 5-bit ALU operation select
-	R = return
-	w = strobe select {-, TN, TR, wr, iow, ior, co, w}
-	r = return stack displacement
-	s = data stack displacement
+    x = unused
+    p = 5-bit ALU operation select
+    R = return
+    w = strobe select {-, TN, TR, wr, iow, ior, co, w}
+    r = return stack displacement
+    s = data stack displacement
 100nnnnn nnnnnnnn = jump
-	PC = (lex<<13) | n
+    PC = (lex<<13) | n
 101nnnnn nnnnnnnn = conditional jump
 110nnnnn nnnnnnnn = call, same as jump but pushes PC.
 1110nnnn nnnnnnnn = literal extension
-	lex = (lex<<12) | n;  Any other instruction clears lex.
+    lex = (lex<<12) | n;  Any other instruction clears lex.
 1111nnnn Rnnnnnnn = unsigned literal (imm)
-	T = (lex<<13) | n
-	R = return
+    T = (lex<<13) | n
+    R = return
 ```
 
 ### ALU detail
@@ -161,12 +161,12 @@ for: ...
 Bit field read is about 7 cycles:
 
 ```
-     T>>8  T->N  d+1	( count addr )
-	 T					\ wait for read to settle
-	 [T]				\ read the cell
-     "SWAP"				( data count )
-	 N>>T        d-1    \ value
-	 T&W        RET     \ bitfield
+     T>>8  T->N  d+1    ( count addr )
+     T                  \ wait for read to settle
+     [T]                \ read the cell
+     "SWAP"             ( data count )
+     N>>T        d-1    \ value
+     T&W        RET     \ bitfield
 ```
 
 This relies on `N>>T` ignoring the mask field of the bit address.
@@ -174,28 +174,28 @@ If the cell is wider than 16-bit, some extra work is required to mask it off.
 Or, T>>8 could be changed to T>>10 and the mask be taken from T[9:5].
 
 Bit field write is about 20 cycles:
-	
+    
 ```
      "SWAP"
-	 ">R"
-     T>>8  T->N  d+1	( count addr | n ) W = mask
-	 T     T->R  r+1
-	 [T]				( count data | n addr )
-	 "OVER"				( count data count | n addr )
-	 W     T->N  d+1	( count data count mask | n addr )
-	 "SWAP"
-	 N<<T				( count data mask' | n addr )
-	 ~T
-	 T&N         d-1	( count data' | n addr )
-	 "SWAP"				( data' count | n addr )
-	 "R>"				( data' count n | addr )
-	 T&W				( data' count n | addr )
-	 "SWAP"				( data' n count | addr )
-	 N<<T		 d-1	( data' n' | addr )
-	 T+N         d-1	( data' | addr )
-	 "R>"				( data' addr )
-	 T    N->[T] d-1
-	 N    RET    d-1
+     ">R"
+     T>>8  T->N  d+1    ( count addr | n ) W = mask
+     T     T->R  r+1
+     [T]                ( count data | n addr )
+     "OVER"             ( count data count | n addr )
+     W     T->N  d+1    ( count data count mask | n addr )
+     "SWAP"
+     N<<T               ( count data mask' | n addr )
+     ~T
+     T&N         d-1    ( count data' | n addr )
+     "SWAP"             ( data' count | n addr )
+     "R>"               ( data' count n | addr )
+     T&W                ( data' count n | addr )
+     "SWAP"             ( data' n count | addr )
+     N<<T        d-1    ( data' n' | addr )
+     T+N         d-1    ( data' | addr )
+     "R>"               ( data' addr )
+     T    N->[T] d-1
+     N    RET    d-1
 ```
 
 **Literal extension instruction** `litx` extends literals and jump destinations.
