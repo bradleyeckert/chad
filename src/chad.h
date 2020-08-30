@@ -25,4 +25,9 @@ void chadToCode (uint32_t addr, uint32_t x);
 // into data memory.
 uint32_t chadGetSource (char delimiter);
 
+// Get data from the header structure so that Forth can reconstruct headers.
+uint32_t chadGetHeader (uint32_t select);
+
+void chadError (int error); // Report an error
+
 #endif // __CHAD_H__

@@ -4,34 +4,36 @@
 #include "config.h"
 #include "iomap.h"
 #include "chad.h"
+#include "flash.h"
 
-// Unlike operations on data memory, I/O can insert wait states.
+// Host words start at I/O address 8000h.
 
-// The I/O controller is allowed to HOLD the CPU (clock enable off).
-// This causes the Code memory to get ahead of itself so I/O
-// should be followed by a NOP.
-
-// The `ior` field in an ALU instruction strobes io_rd.
+// The `_IORD_` field in an ALU instruction strobes io_rd.
 // In the J1, input devices sit on (mem_addr,io_din)
 
 static uint32_t source_addr;
 static uint32_t source_length;
+static uint32_t header_data;
+static uint8_t SPIresult;
+
 static int termKey(void);
 
 uint32_t readIOmap (uint32_t addr) {
 	printf("Reading from iomap[%x]\n", addr);
     switch (addr) {
-    case 0x000: return termKey();       // Get the next incoming stream char
-    case 0x001: // terminal type (control and function keys differ)
+    case 0: return termKey();       // Get the next incoming stream char
+    case 1: // terminal type (control and function keys differ)
 #ifdef __linux__
         return 1;
 #else
         return 0;
 #endif
-    case 0x002: return 0;               // UART tx is never busy
-    case 0x100: return source_addr;
-    case 0x101: return source_length;
-    default: break;
+    case 2: return 0;               // UART tx is never busy
+    case 4: return SPIresult;       // return SPI result
+    case 0x8000: return source_addr;
+    case 0x8001: return source_length;
+    case 0x8002: return header_data;
+    default: chadError(BAD_IOADDR);
     }
 	return 0;
 }
@@ -40,25 +42,33 @@ uint32_t readIOmap (uint32_t addr) {
 // In the J1B, output devices sit on (mem_addr,dout)
 
 // Code space is writable through this interface.
-
 void writeIOmap (uint32_t addr, uint32_t x) {
-    uint32_t y;
+    uint32_t y;  int r;
     switch (addr) {
-    case 0x000:
+    case 0:
         putchar((char)x);
 #ifdef __linux__
     fflush(stdout);
     usleep(1000);
 #endif
         break;
-    case 0x100: // host-only: Hardware should flag this.
+    case 4:
+        r = FlashMemSPI8 ((int)x);
+        SPIresult = (uint8_t)r;
+        if (r < 0) {chadError(r / 256);}
+        break;
+    case 0x8000: // host-only: Hardware should flag this.
         y = chadGetSource ((char)x);
         source_addr = y >> 8;
         source_length = y & 0xFF;
         break;
+    case 0x8001:
+        header_data = chadGetHeader (x);  break;
     default:
-        if (addr >= 0x200) { // write to code space
+        if (addr >= 0x100) { // write to code space
             chadToCode (addr, x);
+        } else {
+            chadError(BAD_IOADDR);
         }
     }
 }

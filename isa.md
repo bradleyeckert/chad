@@ -71,7 +71,7 @@ The `insn[12:8]` field of the ALU instruction is:
 - 1_0101: `~T` T = ~T
 - 0_0110: `T&N` T = N & T
 - 1_0110: `T&W` T = W & T
-- 0_0111: `T>>8` T = T >> 8; W = ~(-1<<T[7:4])
+- 0_0111: `T>>8` T = T >> 8; W = ~(-1<<T\[7:4])
 - 1_0111: `T<<8` T = T << 8;
 - 0_1000: `T+N` T = N + T
 - 1_1000: `T+Nc` T = N + T + carry
@@ -84,7 +84,7 @@ The `insn[12:8]` field of the ALU instruction is:
 - 1_1101: `R-1` T = R - 1
 - 0_1110: `[T]` T = mem_din
 - 1_1110: `io[T]` T = io_din
-- x_1111: `status` T = status: T[9:5] = Rdepth; T[4:0] = Depth, T[15:10] = ID
+- x_1111: `status` T = status: T\[9:5] = Rdepth; T\[4:0] = Depth, T\[15:10] = ID
 
 The `insn[7]` bit of the ALU instruction is:
 
@@ -95,8 +95,8 @@ The `insn[6:4]` field of the ALU instruction is:
 - 000:
 - 001: `T->N` Write T to N
 - 010: `T->R` Write T to R
-- 011: `N->[T]` Write T to mem[A]
-- 100: `N->io[T]` Write N to io[T], waiting for its ACK signal
+- 011: `N->[T]` Write T to mem\[A]
+- 100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
 - 101: `_IORD_` Trigger read from the I/O port, wait if not ready
 - 110: `CO` Write to carry: Adder or shifter carry out
 - 111: `T->W` Write T to W
@@ -153,7 +153,7 @@ for: ...
 **Bytes and bit fields** need shifters:
 
 - `mask` T = ~(-1 << MASK) & T
-- `T>>8` T = T >> 8; MASK = T[7:4]
+- `T>>8` T = T >> 8; MASK = T\[7:4]
 - `T<<8` T = T << 8;
 - `rshift` T = N >> T
 - `lshift` T = N << T
@@ -171,7 +171,7 @@ Bit field read is about 7 cycles:
 
 This relies on `N>>T` ignoring the mask field of the bit address.
 If the cell is wider than 16-bit, some extra work is required to mask it off.
-Or, T>>8 could be changed to T>>10 and the mask be taken from T[9:5].
+Or, T>>8 could be changed to T>>10 and the mask be taken from T\[9:5].
 
 Bit field write is about 20 cycles:
     

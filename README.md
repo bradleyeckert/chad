@@ -1,7 +1,8 @@
 # chad
 A self-hosting Forth for J1-style CPUs
 
-James Bowman's seminal paper on the J1 CPU was presented in 2010.
+James Bowman's seminal paper on the 
+[J1 CPU](https://excamera.com/sphinx/fpga-j1.html "J1 CPU") was presented in 2010.
 At under 200 lines of Verilog, the J1 was a real breakthrough in simplicity.
 It also happens to be a very powerful Forth processor.
 Chad tweaks the J1, but it's very similar.
@@ -36,4 +37,4 @@ The main source files are:
 - `iomap.c` Simulates the I/O of the CPU
 
 To try it out, launch it with `chad include forth.f`.
-At the `ok>` prompt type `0 here dasm` to disassemble everything.
+At the `ok>` prompt, type `0 here dasm` to disassemble everything.

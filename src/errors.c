@@ -81,6 +81,8 @@ void ErrorMessage (int error, char *s) {
        case  -66: msg = "PC is in non-existent code memory";            break;
        case  -67: msg = "Write to non-existent code memory";            break;
        case  -68: msg = "Test failure";                                 break;
+       case  -69: msg = "Page fault writing flash memory";              break;
+       case  -70: msg = "Bad I/O address";                              break;
        case  -80: msg = "Dictionary full";                              break;
        case  -99: msg = "Nesting overflow during include";              break;
        case -100: msg = "ALLOCATE failed";                              break;

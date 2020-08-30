@@ -148,6 +148,10 @@ struct Keyword {
 
 // THROW Codes
 
+#define BAD_STACKOVER    -3 // Stack overflow
+#define BAD_STACKUNDER   -4 // Stack underflow
+#define BAD_RSTACKOVER   -5 // Return stack overflow
+#define BAD_RSTACKUNDER  -6 // Return stack underflow
 #define BAD_DATA_WRITE  -64 // Write to non-existent data memory
 #define BAD_DATA_READ   -65 // Read from non-existent data memory
 #define BAD_PC          -66 // PC is in non-existent code memory

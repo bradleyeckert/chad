@@ -8,6 +8,7 @@
 #include "config.h"
 #include "chaddefs.h"
 #include "iomap.h"
+#define NameOffset 0x20
 
 // EXPORTS: see chad.h
 
@@ -18,7 +19,8 @@ CELL Dstack[StackSize];					// data stack
 CELL Rstack[StackSize];					// return stack
 CELL Code[CodeSize];					// code memory
 CELL Data[DataSize];					// data memory
-CELL sp, rp;						    // stack pointers
+int sp, rp;						        // stack pointers
+int spMax, rpMax;					    // stack depth tracking
 CELL t, pc, cy, lex, w;				    // registers
 static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;
@@ -175,10 +177,16 @@ once:	_pc = pc + 1;
 		}
 		pc = _pc;  lex = _lex;
 		cycles++;
+		if (sp > spMax) spMax = sp;
+		if (rp > rpMax) rpMax = rp;
 		if (pc & ~(CodeSize-1)) single = BAD_PC;
 	} while (single == 0);
 	return single;
 }
+#define BAD_STACKOVER    -3 // Stack overflow
+#define BAD_STACKUNDER   -4 // Stack underflow
+#define BAD_RSTACKOVER   -5 // Return stack overflow
+#define BAD_RSTACKUNDER  -6 // Return stack underflow
 
 SV RegDump (void) {
 	printf("PC=%x, SP=%x, RP=%x, ",pc, sp, rp);
@@ -264,19 +272,19 @@ CELL state = 0;
 // Dictionary
 // The dictionary is a simple linear list that uses a bit mask for context.
 
-SI keywords;							// # of keywords added at startup
-SI emptiness;                               // EMPTY sets keywords to this
-static struct Keyword HostWord[MaxKeywords];
+SI hp;							// # of hp added at startup
+SI emptiness;                               // EMPTY sets hp to this
+static struct Keyword Header[MaxKeywords];
 CELL me;								// index of keyword being executed
 CELL context = 15;
 CELL current = 1;
 
 SI findname (char *key) {				// return index of word, -1 if not fount
 	if (strlen(key) < MaxNameSize) {
-		int i = keywords;
+		int i = hp;
 		while (--i >= 0) {				// scan the list backwards
-			if (HostWord[i].context & context) {
-				if (strcmp(key, HostWord[i].name) == 0) {
+			if (Header[i].context & context) {
+				if (strcmp(key, Header[i].name) == 0) {
 					me = i;
 					return i;
 				}
@@ -291,9 +299,9 @@ SI NotKeyword (char *key) {				// do a command, return 0 if found
 	if (i < 0)
         return -1;                      // not found
     if (state)
-        HostWord[i].CompFn();
+        Header[i].CompFn();
     else
-        HostWord[i].ExecFn();
+        Header[i].ExecFn();
     return 0;
 }
 
@@ -310,12 +318,12 @@ SV sane (void) {
     ConSP = 0;
 }
 
-static uint32_t my (void) {return HostWord[me].w;}
+static uint32_t my (void) {return Header[me].w;}
 SV doLITERAL  (void) { Literal(Dpop()); }
 SV Equ_Comp	  (void) { Literal(my()); }
 SV Equ_Exec	  (void) { Dpush(my()); }
 SV Def_Exec	  (void) { Simulate(my()); }
-SV Def_Comp	  (void) { CompCall(my()); notail = HostWord[me].notail; }
+SV Def_Comp	  (void) { CompCall(my()); notail = Header[me].notail; }
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
 SV doLitOp    (void) { comma(Dpop() | my());  Dpush(0); }
 SV noCompile  (void) { error = BAD_NOCOMPILE; }
@@ -348,12 +356,12 @@ void strmove (char *dest, char *src, int maxlength) {
 
 SI header (char * s) {
 	int r = 1;
-	if (keywords < MaxKeywords) {
-		strmove(HostWord[keywords].name, s, MaxNameSize);
-		HostWord[keywords].context = current;
-		HostWord[keywords].length = 0;
-		HostWord[keywords].notail = 0;
-		HostWord[keywords].target = 0;
+	if (hp < MaxKeywords) {
+		strmove(Header[hp].name, s, MaxNameSize);
+		Header[hp].context = current;
+		Header[hp].length = 0;
+		Header[hp].notail = 0;
+		Header[hp].target = 0;
 	} else {
 		printf("Please increase MaxKeywords and rebuild.\n");
 		r = 0;	error = BYE;
@@ -362,22 +370,22 @@ SI header (char * s) {
 }
 
 SV SetFns (cell value, void (*exec)(), void (*comp)()) {
-	HostWord[keywords].w = value;
-	HostWord[keywords].ExecFn = exec;
-	HostWord[keywords].CompFn = comp;
+	Header[hp].w = value;
+	Header[hp].ExecFn = exec;
+	Header[hp].CompFn = comp;
 }
 
 SV AddKeyword (char *name, void (*xte)(), void (*xtc)()) {
 	if (header(name)) {
 		SetFns(NOTANEQU, xte, xtc);
-		keywords++;
+		hp++;
 	}
 }
 
 SV AddEquate (char *name, cell value) {
 	if (header(name)) {
 		SetFns(value, Equ_Exec, Equ_Comp);
-		keywords++;
+		hp++;
 	}
 }
 
@@ -385,7 +393,7 @@ SV AddEquate (char *name, cell value) {
 SV AddModifier (char *name, cell value) {
 	if (header(name)) {
 		SetFns(value, doInstMod, noCompile);
-		keywords++;
+		hp++;
 	}
 }
 
@@ -393,14 +401,14 @@ SV AddModifier (char *name, cell value) {
 SV AddLitOp (char *name, cell value) {
 	if (header(name)) {
 		SetFns(value, doLitOp, noCompile);
-		keywords++;
+		hp++;
 	}
 }
 
 SV doWORDS (void) {
-	for (int i=0; i<keywords; i++) {
-		if (HostWord[i].context & context) {
-			printf("%s ", HostWord[i].name);
+	for (int i=0; i<hp; i++) {
+		if (Header[i].context & context) {
+			printf("%s ", Header[i].name);
 		}
 	}
 	printf("\n");
@@ -410,9 +418,9 @@ SV doWORDS (void) {
 
 static char* TargetName (cell addr) {
     if (!addr) return NULL;
-	for (int i=0; i<keywords; i++) {
-		if (HostWord[i].target == addr) {
-			return HostWord[i].name;
+	for (int i=0; i<hp; i++) {
+		if (Header[i].target == addr) {
+			return Header[i].name;
 		}
 	}
 	return NULL;
@@ -580,8 +588,8 @@ SV doColon (void) {
 	parseword(' ');
 	if (header(tok)) {					// define a word that simulates
 		SetFns(dp, Def_Exec, Def_Comp);
-		HostWord[keywords].target = dp;
-		DefMarkID = keywords++;         // save for later reference
+		Header[hp].target = dp;
+		DefMarkID = hp++;         // save for later reference
 		DefMark = dp;  state = 1;
 		fence = dp;                     // code starts here
 		ConSP = 0;
@@ -594,11 +602,11 @@ SV doEQU (void) {
 }
 
 SV SaveLength (void) {                  // resolve length of definition
-    HostWord[DefMarkID].length = dp - DefMark;
+    Header[DefMarkID].length = dp - DefMark;
 }
 
 SV CompMacro (void) {
-    int len = HostWord[me].length;
+    int len = Header[me].length;
     int addr = my();
     for (int i=0; i<len; i++) {
         int inst = Code[addr++];
@@ -610,28 +618,28 @@ SV CompMacro (void) {
 }
 
 SV doMACRO (void) {
-    HostWord[DefMarkID].CompFn = CompMacro;
+    Header[DefMarkID].CompFn = CompMacro;
 }
 
 SV doIMMEDIATE (void) {
-    HostWord[DefMarkID].CompFn = HostWord[DefMarkID].ExecFn;
+    Header[DefMarkID].CompFn = Header[DefMarkID].ExecFn;
 }
 
 SV doNoTail (void) {
-    HostWord[DefMarkID].notail = 1;
+    Header[DefMarkID].notail = 1;
 }
 
 SV Marker_Exec (void) {                 // execution semantics of a marker
     dp = my();
-    keywords = HostWord[me].w2;         // also forgets the marker
+    hp = Header[me].w2;         // also forgets the marker
 }
 
 SV doMARKER (void) {
 	parseword(' ');
 	if (header(tok)) {					// define a word that simulates
 		SetFns(dp, Marker_Exec, noCompile);
-		HostWord[keywords].w2 = keywords;
-		keywords++;
+		Header[hp].w2 = hp;
+		hp++;
 	}
 }
 
@@ -647,7 +655,7 @@ SI tick (void) {                        // get the w field of the word
 SV doSEE (void) {                       // ( <name> -- )
     int addr;
     if ((addr = tick())) {
-        Dpush(addr);  Dpush(HostWord[me].length);  doDASM();
+        Dpush(addr);  Dpush(Header[me].length);  doDASM();
     }
 }
 
@@ -662,11 +670,15 @@ SV doAssert  (void) {                   // for test code
     }
 }
 
+SV doStats	 (void) {
+    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d\n", cycles, spMax, rpMax);
+    cycles = 0;  spMax = sp;  rpMax = rp;
+}
+
 SV doCODE    (void) { doColon(); state = 0; context |= 8;  Dpush(0);}
 SV doENDCODE (void) { SaveLength();        context &= ~8;  Dpop();  sane();}
-SV doEMPTY	 (void) { keywords = emptiness; }
+SV doEMPTY	 (void) { hp = emptiness; }
 SV doBYE	 (void) { error = BYE; }
-SV doCYCLES	 (void) { printf("%" PRId64 " ", cycles); }
 SV doHEX	 (void) { base = 16; }
 SV doDEC	 (void) { base = 10; }
 SV doComment (void) { toin = strlen(buf); }
@@ -687,11 +699,11 @@ SV doWrProt	 (void) { writeprotect = CodeFence; }
 SV doSemi	 (void) { compExit();  SaveLength();  state = 0;  sane();}
 
 // Keywords are visible based on bits in context.
-// Set the same bits in current while loading keywords.
+// Set the same bits in current while loading hp.
 // Current is 1 for host words, 2 for compiler, 4 for definitions
 
 SV LoadKeywords(void) {
-	keywords = 0;	// start empty
+	hp = 0;	// start empty
 	current = -1;	// visible everywhere
 	AddKeyword (">context", doToContx, noCompile);  // ( n -- )
 	AddKeyword ("assert", doAssert, noCompile);     // ( n1 n2 -- )
@@ -699,7 +711,7 @@ SV LoadKeywords(void) {
 	AddKeyword ("empty", doEMPTY, noCompile);
 	AddKeyword ("context>", doContext, noCompile);  // ( -- n )
 	AddKeyword (">current", doToCurrn, noCompile);  // ( n -- )
-	AddKeyword ("cycles?", doCYCLES, doToComp);
+	AddKeyword ("stats", doStats, doToComp);
 	AddKeyword ("hex", doHEX, noCompile);
 	AddKeyword ("decimal", doDEC, noCompile);
 	AddKeyword ("drop", doDROP, noCompile);
@@ -805,7 +817,7 @@ SV LoadKeywords(void) {
 	AddKeyword ("while",  doWhile, noCompile);
 	AddKeyword ("repeat",  doRepeat, noCompile);
 	current = 4;	// forth
-	emptiness = keywords;
+	emptiness = hp;
 }
 
 /*
@@ -851,8 +863,9 @@ int chad(char * line, int maxlength) {
 	filedepth = 0;
 	while (1) {
 		File.fp = stdin;				// keyboard input
-		fileID = error = state = 0;
-        cycles = sp = rp = 0;
+		fileID = error = state = 0;     // interpreter state
+        cycles = spMax = rpMax = 0;     // CPU stats
+        sp = rp = 0;                    // stacks
 		while (!error) {
 			refilled(line, maxlength);
 			while (parseword(' ')) {
@@ -939,7 +952,7 @@ uint32_t chadGetSource (char delimiter) {
     int words = (bytes + (1<<CELLS) - 1) >> CELLS;
     int addr = DataSize - words;
     cell *dest = &Data[addr];
-    for (int i=0; i<words; i++) {
+    for (int i=0; i<words; i++) {       // pack string into data memory
         uint32_t w = 0;                 // little-endian packing
         for (int j=0; j<(1<<CELLS); j++) {
             w |= (uint8_t)*src++ << (j*8);
@@ -947,4 +960,31 @@ uint32_t chadGetSource (char delimiter) {
         *dest++ = w;
     }
     return (addr<<8) + words;
+}
+
+uint32_t chadGetHeader (uint32_t select) {
+    int ID = select >> 6;
+    select &= 0x3F;
+    if (ID < hp) {                      // valid ID
+        switch (select) {
+        case 0: return (Header[ID].ExecFn == Def_Exec); // it's executable code
+        case 1: return (Header[ID].ExecFn == Header[ID].CompFn); // immediate
+        case 2: return Header[ID].target;
+        case 3: return Header[ID].length;
+        case 4: return Header[ID].w;
+        case 5: return Header[ID].w2;
+        case 6: return Header[ID].notail;
+        case 7: return dp;
+        default:
+            if ((select < NameOffset) || (select >= (NameOffset + MaxNameSize)))
+                {return 0;}
+            return Header[ID].name[select - NameOffset];
+        }
+    } else {
+        return hp;                      // next free Header structure
+    }
+}
+
+void chadError (int errorcode) {
+    error = errorcode;
 }

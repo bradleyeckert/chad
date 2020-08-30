@@ -7,11 +7,11 @@
 #include <stdint.h>
 
 // Sizes of memories in cells, should be an exact power of 2
-#define CodeSize  0x400                 /* Code ROM */
+#define CodeSize  0x800                 /* Code ROM */
 #define DataSize  0x400                 /* Data RAM */
 #define AppSize  0x2000                 /* Application ROM */
 #define StackSize  0x20                 /* Stacks */
-#define CodeFence 0x300                 /* Beginning of RAM-based Code space */
+#define CodeFence 0x400                 /* Beginning of RAM-based Code space */
 
 #define CELLSIZE     16                 /* Width of a cell in bits */
 
