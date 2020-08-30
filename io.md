@@ -15,7 +15,7 @@ The I/O devices supported are:
 ## Input Registers
 
 - 0: Read next byte from keyboard stream, -1 if empty. [^1]
-- 1: Terminal type: 0=Window, 1=Linux. [^2]
+- 1: Terminal type: 0=Windows, 1=Linux. [^2]
 - 2: UART transmit ready flag (always 1 on a PC)
 - 4: Read flash SPI result. Bit 8 = `busy`.
 
@@ -38,10 +38,17 @@ The I/O devices supported are:
 ## Notes:
 
 [^1]: Either waits for a character or reports empty.
-[~2]: Terminal type might not apply to cooked input: Arrow keys don't apply.
-[~3]: Wait until `busy` flag is 0 before starting another SPI operation.
-[~4]: Write the delimiter to 0x8000 before reading these.
-[~5]: Write a selector to 0x8001 before reading this.
-[~6]: Wait for (io\[2] <> 0) before writing to io\[0].
-[~7]: This is how Forth code reads the interpreter's input stream.
-[~8]: This is how Forth code reads the interpreter's header data.
+
+[^2]: Terminal type might not apply to cooked input: Arrow keys don't apply.
+
+[^3]: Wait until `busy` flag is 0 before starting another SPI operation.
+
+[^4]: Write the delimiter to 0x8000 before reading these.
+
+[^5]: Write a selector to 0x8001 before reading this.
+
+[^6]: Wait for (io\[2] <> 0) before writing to io\[0].
+
+[^7]: This is how Forth code reads the interpreter's input stream.
+
+[^8]: This is how Forth code reads the interpreter's header data.
