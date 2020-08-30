@@ -187,7 +187,7 @@ once:   _pc = pc + 1;
                 _t = Data[t & (DataSize-1)];                 break; /* [T]  */
             case 0x1E: _t = readIOmap(t);                    break; /* io[T] */
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
-            default:   _t = t;                                      /* T    */
+            default:   _t = t;  single = BAD_ALU_OP;
             }
             SP = SPMASK & (SP + dsx[insn & 3]);                 /* dstack+- */
             RP = RPMASK & (RP + rsx[(insn >> 2) & 3]);          /* rstack+- */

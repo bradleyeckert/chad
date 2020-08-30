@@ -161,4 +161,5 @@ struct Keyword {
 #define BAD_INCLUDING   -99 // Nesting overflow during include
 #define UNRECOGNIZED    -13 // Unrecognized word
 #define BAD_ASSERT      -68 // Test failure
+#define BAD_ALU_OP      -72 // Invalid ALU code
 
