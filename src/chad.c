@@ -959,6 +959,8 @@ ask: toin = 0;
         for (int i=0; i<len; i++) {
             if (buf[i] == '\t')         // replace tabs with blanks
                 buf[i] = ' ';
+            if (buf[i] == '\r')         // trim CR if present
+                buf[i] = '\0';
         }
     }
     // save the line for error reporting

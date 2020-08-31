@@ -5,6 +5,9 @@
 #include "iomap.h"
 #include "chad.h"
 #include "flash.h"
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 // Host words start at I/O address 8000h.
 

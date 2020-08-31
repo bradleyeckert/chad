@@ -4,10 +4,11 @@
 #include "config.h"
 #include "chad.h"
 
+static char command[LineBufferSize]; // a line buffer for Forth
+
 int main(int argc, char *argv[]) {
-    char command[LineBufferSize];
     command[0] = 0;
-    // concatenate everything on the command line to one long string
+    // concatenate everything on the command line to the line buffer
     for (int i=1; i < argc; i++) {
 #ifdef MORESAFE
         strncat_s(command, LineBufferSize, argv[i], LineBufferSize);

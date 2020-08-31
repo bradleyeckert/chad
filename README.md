@@ -12,8 +12,9 @@ Chad protects your software investment by targeting Verilog
 Modern computers are fast enough to simulate the CPU on the order of at-speed.
 Simulation speed on my computer (one AMD Rizen core) depends on the compiler:
 
-- 150 MIPS when compiled by Code::Blocks 17.12 (GCC).
-- 210 MIPS when compiled by Visual Studio 2019.
+- 150 MIPS on Code::Blocks 17.12 (GCC).
+- 210 MIPS on Visual Studio 2019 Community Edition.
+- 85 MIPS on Ubuntu/Windows10 GCC (-O3 flag).
 
 It's like having a real J1.
 Forth should execute the code it compiles.
@@ -42,7 +43,7 @@ The main source files are:
 - `chad.c` Simulates the CPU and implements a text interpreter
 - `iomap.c` Simulates the I/O of the CPU
 
-To try it out, launch it with `chad include forth.f`.
+To try it out, launch it with `chad include lib.fs`.
 At the `ok>` prompt, type `0 here dasm` to disassemble everything.
 
 - `stats` lists the cycle count and maximum stack depths.
