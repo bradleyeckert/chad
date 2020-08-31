@@ -67,7 +67,7 @@ The `insn[12:8]` field of the ALU instruction is:
 - 1_0101: `~T` T = ~T
 - 0_0110: `T&N` T = N & T
 - 1_0110: `T&W` T = W & T
-- x_0111: `maskW` if 16-bit cells: T = T >> 8; W = ~(-1<<T\[7:4]). 
+- x_0111: `mask` if 16-bit cells: T = T >> 8; W = ~(-1<<T\[7:4]). 
 Otherwise, T = T >> 10; W = ~(-1<<T\[9:5]). W is a bit mask.
 - 0_1000: `T+N` T = N + T
 - 1_1000: `T+Nc` T = N + T + carry
@@ -165,39 +165,40 @@ myvar b@ .    \ read and print it
 Bit field read is 6 cycles.
 
 ```
-    mask    T->N    d+1  alu    \ ( count baddr )
-    T                    alu    \ wait for read to settle
-    [T]                  alu    \ read the cell
-    N       T->N         alu    \ swap: ( data count )
-    N>>T            d-1  alu    \ value
-    T&W     RET         r-1 alu    \ bits
+b@: mask    T->N    d+1     alu \ ( count baddr )
+    T                       alu \ wait for read to settle
+    [T]                     alu \ read the cell
+    N       T->N            alu
+    N>>T            d-1     alu
+    T&W     RET         r-1 alu \ apply the mask
 ```
 
 Bit field write is 22 cycles. Is that so bad?
 You read them a lot more often than you write them.
+If it's too slow, use a `variable`.
     
 ```
-    N       T->N            alu \ swap: ( baddr n )
-    N       T->R    d-1 r+1 alu \ >r
-    mask    T->N    d+1     alu \ ( shift addr | n ) W = mask
-    N       T->N    d+1     alu \ over: ( shift addr shift | n )
-    R       T->N    d+1 r-1 alu \ r>
-    N       T->N            alu \ swap: ( shift addr n shift )
-    N<<T            d-1     alu \ lshift: ( shift addr n' )
-    N       T->R    d-1 r+1 alu \ >r: ( shift addr | n' )
-    N       T->N            alu \ swap
-    W       T->N    d+1     alu \ w: ( addr shift mask | n' )
-    N       T->N            alu \ swap
-    N<<T            d-1     alu \ lshift: ( addr mask' | n' )
-    ~T                      alu
-    N       T->N    d+1     alu \ over: ( addr mask' addr | n' )
+b!: N       T->N            alu \ ( baddr n )
+    N       T->R    d-1 r+1 alu
+    mask    T->N    d+1     alu
+    N       T->N    d+1     alu
+    R       T->N    d+1 r-1 alu
+    N       T->N            alu
+    N<<T            d-1     alu \ T is shifted and aligned n
+    N       T->R    d-1 r+1 alu
+    N       T->N            alu
+    W       T->N    d+1     alu
+    N       T->N            alu
+    N<<T            d-1     alu
+    ~T                      alu \ T is mask for read-modify-write
+    N       T->N    d+1     alu
     T                       alu \ wait for read to settle
-    [T]                     alu \ @
-    T&N             d-1     alu \ and: ( addr data' | n' )
-    R       T->N    d+1 r-1 alu \ r>
-    T+N             d-1     alu \ +: ( addr data" )
-    N       T->N            alu \ swap
-    T       N->[T]  d-1     alu \ !
+    [T]                     alu
+    T&N             d-1     alu \ Zero the bits in the read data
+    R       T->N    d+1 r-1 alu
+    T+N             d-1     alu \ merge n
+    N       T->N            alu
+    T       N->[T]  d-1     alu \ save it
     N       RET     d-1 r-1 alu
 ```
 
