@@ -169,9 +169,9 @@ once:   _pc = pc + 1;
             case 0x15: _t = ~t;                              break; /* ~T   */
             case 0x06: _t = s & t;                           break; /* T&N  */
             case 0x16: _t = w & t;                           break; /* T&W  */
-            case 0x07: _t = t >> 8;  w = ~(ALL_ONES << t);   break; /* T>>8 */
-            case 0x17: _t = t << 8;                          break; /* T<<8 */
-
+            case 0x07: temp = (t >> CELLSIZE) & CELL_AMASK;
+                _t = t >> (2 * CELLSIZE);
+                w = ~(ALL_ONES << (temp + 1));               break; /* mask */
             case 0x08: sum = (sum_t)s + (sum_t)t;
                 c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* T+N  */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
@@ -181,8 +181,8 @@ once:   _pc = pc + 1;
             case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
                 c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* N-Tc */
             case 0x0A: _t = (t) ? 0 : -1;                    break; /* T0=  */
-            case 0x0B: _t = s >> t;                          break; /* N>>T */
-            case 0x0C: _t = s << t;                          break; /* N<<T */
+            case 0x0B: _t = s >> (t & CELL_AMASK);           break; /* N>>T */
+            case 0x0C: _t = s << (t & CELL_AMASK);           break; /* N<<T */
 
             case 0x0D: _t = Rstack[RP];                      break; /* R    */
             case 0x1D: _t = Rstack[RP] - 1;                  break; /* R-1  */
@@ -494,7 +494,7 @@ cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
         int target = IR & 0x1FFF;
         switch ((IR>>12) & 7) {
         case 6: printf("%x lex", IR & 0x7F);  break;
-        case 7: if (IR & 0x80) {printf("RET ");}
+        case 7: if (IR & ret) {printf("RET ");}
             printf("%x imm", (IR & 0x7F) | (IR & 0xF00)>>1);  break;
         default:
             name = TargetName(target);
@@ -503,17 +503,17 @@ cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
             if (name != NULL) printf("%s ", name);
         }
     } else { // ALU
-        int id = (IR>>8) & 7;
-        switch ((IR>>11) & 3) {
-        case 0: diss(id,"T\0T0<\0T2/\0T2*\0N\0T^N\0T&N\0T>>8"); break;
-        case 1: diss(id,"T+N\0N-T\0T0=\0N>>T\0N<<T\0R\0mem[T]\0status"); break;
-        case 2: diss(id,"---\0C\0cT2/\0T2*c\0---\0~T\0mask\0T<<8"); break;
+        int id = (IR>>9) & 7;
+        switch ((IR>>12) & 3) {
+        case 0: diss(id,"T\0T0<\0T2/\0T2*\0N\0T^N\0T&N\0mask"); break;
+        case 1: diss(id,"T+N\0N-T\0T0=\0N>>T\0N<<T\0R\0[T]\0status"); break;
+        case 2: diss(id,"---\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
         default: diss(id,"T+Nc\0N-Tc\0---\0---\0---\0R-1\0io[T]\0---");
         }
         diss((IR>>4)&7,"\0T->N\0T->R\0N->[T]\0N->io[T]\0_IORD_\0CO\0T->CNT");
         diss( IR&3,    "\0d+1\0d-2\0d-1");
         diss((IR>>2)&3,"\0r+1\0r-2\0r-1");
-        if (IR & 0x80) printf("RET ");
+        if (IR & ret) printf("RET ");
         printf("alu");
     }
     return 0;
@@ -535,7 +535,7 @@ SV doDASM (void) { // ( addr len -- )
 }
 
 SV RegDump(void) {
-    printf("N=%x, T=%x, R=%x, W=%x, c=%x\n", Dstack[SP], t, Rstack[RP], w, cy);
+    printf("N=%x, T=%x, R=%x, W=%x, c=%x ", Dstack[SP], t, Rstack[RP], w, cy);
     printf("SP=%x, RP=%x, code[%x] = ", sp, rp, pc);
     DisassembleInsn(Code[pc & (CodeSize - 1)]);
     printf("\n");
@@ -548,6 +548,7 @@ SV doSteps(void) {                     // ( addr steps -- )
     for (int i = 0; i < cnt; i++) {
         CPUsim(1);
         RegDump();
+        if (rp == (StackSize - 1)) break;
     }
 }
 
@@ -703,7 +704,8 @@ SV doVARIABLE(void) {
 
 SV doBitfield(void) {
     cell width = Dpop();
-    if (width > CELLBITS) error = BAD_BITFIELD;
+    if ((width == 0) || (width > CELLBITS)) 
+        error = BAD_BITFIELD;
     int shft = bp % CELLBITS;
     int addr = bp / CELLBITS;
     if ((shft + width) > CELLBITS) {
@@ -711,7 +713,8 @@ SV doBitfield(void) {
         addr++;
         bp = addr * CELLBITS;           // start a new cell
     }
-    Dpush((addr << (CELLSIZE*2)) | (width << CELLSIZE) | shft);  doEQU();
+    Dpush((addr << (CELLSIZE*2)) | ((width-1) << CELLSIZE) | shft);  
+    doEQU();
     bp += width;
 }
 
@@ -883,12 +886,12 @@ SV LoadKeywords(void) {
     AddModifier("T2*",  shl1 );
     AddModifier("T2*c", shlx );
     AddModifier("N",    NtoT );
+    AddModifier("W",    WtoT );
     AddModifier("T^N",  eor  );
     AddModifier("~T",   com  );
     AddModifier("T&N",  Tand );
-    AddModifier("mask", mask );
-    AddModifier("T>>8", shr8 );
-    AddModifier("T<<8", shl8 );
+    AddModifier("T&W",  TandW );
+    AddModifier("mask", bmask );
     AddModifier("T+N",  add  );
     AddModifier("T+Nc", addc );
     AddModifier("N-T",  sub  );

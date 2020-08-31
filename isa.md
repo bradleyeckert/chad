@@ -12,7 +12,7 @@ stack (in data memory) to prevent possible stack overflow.
 A complex chunk of code would be preceded by `f[` *( depth -- )* to minimize
 stacks and `]f` would restore the stacks.
 For example, `2 f[` would leave nothing but two items on the data stack and
-an empty return stack.
+an empty return stack. `stats` tells you how deep your code is actually stacking.
 
 Bit fields should be used instead of variables when raw speed is not needed.
 They can use `b@` and `b!` as operators.
@@ -28,10 +28,6 @@ Requiring fewer bits in the `imm` instruction freed up two extra bits
 
 The J1 is a little unwieldy for loops.
 A small tweak allows a 3-instruction `for` `next` loop.
-
-Separate stacks are smaller, faster, and easier to use.
-Your application should be able to manage stacks to avoid overflow.
-The ISA is modified to expedite that, to keep stacks small.
 
 ## Chad ISA summary
 
@@ -49,7 +45,7 @@ The ISA is modified to expedite that, to keep stacks small.
 110nnnnn nnnnnnnn = call, same as jump but pushes PC.
 1110nnnn nnnnnnnn = literal extension
     lex = (lex<<12) | n;  Any other instruction clears lex.
-1111nnnn Rnnnnnnn = unsigned literal (imm)
+1111nnnR nnnnnnnn = unsigned literal (imm)
     T = (lex<<13) | n
     R = return
 ```
@@ -66,13 +62,13 @@ The `insn[12:8]` field of the ALU instruction is:
 - 0_0011: `T2*` T = T << 1
 - 1_0011: `T2*c` T = (T << 1) + carry
 - 0_0100: `N` T = N
-- 1_0101: `W` T = W
+- 1_0100: `W` T = W
 - 0_0101: `T^N` T = N ^ T
 - 1_0101: `~T` T = ~T
 - 0_0110: `T&N` T = N & T
 - 1_0110: `T&W` T = W & T
-- 0_0111: `T>>8` T = T >> 8; W = ~(-1<<T\[7:4])
-- 1_0111: `T<<8` T = T << 8;
+- x_0111: `maskW` if 16-bit cells: T = T >> 8; W = ~(-1<<T\[7:4]). 
+Otherwise, T = T >> 10; W = ~(-1<<T\[9:5]). W is a bit mask.
 - 0_1000: `T+N` T = N + T
 - 1_1000: `T+Nc` T = N + T + carry
 - 0_1001: `N-T` T = N - T
@@ -166,44 +162,43 @@ Example use of bit fields:
 myvar b@ .    \ read and print it
 ```
 
-Bit field read is about 7 cycles:
+Bit field read is 6 cycles.
 
 ```
-     T>>8  T->N  d+1    ( count addr )
-     T                  \ wait for read to settle
-     [T]                \ read the cell
-     "SWAP"             ( data count )
-     N>>T        d-1    \ value
-     T&W        RET     \ bitfield
+    mask    T->N    d+1  alu    \ ( count baddr )
+    T                    alu    \ wait for read to settle
+    [T]                  alu    \ read the cell
+    N       T->N         alu    \ swap: ( data count )
+    N>>T            d-1  alu    \ value
+    T&W     RET         r-1 alu    \ bits
 ```
 
-This relies on `N>>T` ignoring the mask field of the bit address.
-If the cell is wider than 16-bit, some extra work is required to mask it off.
-Or, T>>8 could be changed to T>>10 and the mask be taken from T\[9:5].
-
-Bit field write is about 20 cycles:
+Bit field write is 22 cycles. Is that so bad?
+You read them a lot more often than you write them.
     
 ```
-     "SWAP"
-     ">R"
-     T>>8  T->N  d+1    ( count addr | n ) W = mask
-     T     T->R  r+1
-     [T]                ( count data | n addr )
-     "OVER"             ( count data count | n addr )
-     W     T->N  d+1    ( count data count mask | n addr )
-     "SWAP"
-     N<<T               ( count data mask' | n addr )
-     ~T
-     T&N         d-1    ( count data' | n addr )
-     "SWAP"             ( data' count | n addr )
-     "R>"               ( data' count n | addr )
-     T&W                ( data' count n | addr )
-     "SWAP"             ( data' n count | addr )
-     N<<T        d-1    ( data' n' | addr )
-     T+N         d-1    ( data' | addr )
-     "R>"               ( data' addr )
-     T    N->[T] d-1
-     N    RET    d-1
+    N       T->N            alu \ swap: ( baddr n )
+    N       T->R    d-1 r+1 alu \ >r
+    mask    T->N    d+1     alu \ ( shift addr | n ) W = mask
+    N       T->N    d+1     alu \ over: ( shift addr shift | n )
+    R       T->N    d+1 r-1 alu \ r>
+    N       T->N            alu \ swap: ( shift addr n shift )
+    N<<T            d-1     alu \ lshift: ( shift addr n' )
+    N       T->R    d-1 r+1 alu \ >r: ( shift addr | n' )
+    N       T->N            alu \ swap
+    W       T->N    d+1     alu \ w: ( addr shift mask | n' )
+    N       T->N            alu \ swap
+    N<<T            d-1     alu \ lshift: ( addr mask' | n' )
+    ~T                      alu
+    N       T->N    d+1     alu \ over: ( addr mask' addr | n' )
+    T                       alu \ wait for read to settle
+    [T]                     alu \ @
+    T&N             d-1     alu \ and: ( addr data' | n' )
+    R       T->N    d+1 r-1 alu \ r>
+    T+N             d-1     alu \ +: ( addr data" )
+    N       T->N            alu \ swap
+    T       N->[T]  d-1     alu \ !
+    N       RET     d-1 r-1 alu
 ```
 
 **Literal extension instruction** `litx` extends literals and jump destinations.

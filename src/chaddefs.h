@@ -35,6 +35,7 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 #define RDEPTH   (rp & RPMASK)
 #define SPMASK   (StackSize-1)
 #define SDEPTH   (sp & SPMASK)
+#define CELL_AMASK ((1 << CELLSIZE) - 1) /* 15 or 31 */
 #define SV static void
 #define SI static int
 #define CELL static cell
@@ -77,12 +78,12 @@ struct Keyword {
 #define shl1   (0x03 << 9)
 #define shlx   (0x13 << 9)
 #define NtoT   (0x04 << 9)
+#define WtoT   (0x14 << 9)
 #define eor    (0x05 << 9)
 #define com    (0x15 << 9)
 #define Tand   (0x06 << 9)
-#define mask   (0x16 << 9)
-#define shr8   (0x07 << 9)
-#define shl8   (0x17 << 9)
+#define TandW  (0x16 << 9)
+#define bmask  (0x07 << 9)
 #define add    (0x08 << 9)
 #define addc   (0x18 << 9)
 #define sub    (0x09 << 9)

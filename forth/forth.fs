@@ -1,9 +1,10 @@
 empty decimal
 0 equ 'TXbuf \ UART send output register
-0 equ false
+0 equ false  \ equates take up no code space. Have as many as you want.
 -1 equ true
 
 0 torg
+
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
@@ -59,6 +60,45 @@ CODE overxor   T^N                     RET alu END-CODE macro
 CODE rdrop     T                   r-1     alu END-CODE macro
 CODE tuck!     T     N->[T]        d-1 RET alu END-CODE macro
 CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
+
+\ Bit field operators
+\ Read is easy: Read, shift, and mask.
+\ Write needs a read-modify-write: limit and align n, read and mask
+\ the old data, add the new data, and write back the result.
+
+CODE b@  \ bs -- n              \ Read a bit field from packed bitspec
+    mask    T->N    d+1     alu \ ( count addr )
+    T                       alu \ wait for read to settle
+    [T]                     alu \ read the cell
+    N       T->N            alu \ swap: ( data count )
+    N>>T            d-1     alu \ value
+    T&W             RET r-1 alu \ bits
+END-CODE
+
+CODE b!  \ n bs --              \ Write to a packed bitspec
+    N       T->N            alu \ swap
+    N       T->R    d-1 r+1 alu \ >r
+    mask    T->N    d+1     alu \ ( shift addr | n ) W = mask
+    N       T->N    d+1     alu \ over: ( shift addr shift | n )
+    R       T->N    d+1 r-1 alu \ r>
+    N       T->N            alu \ swap: ( shift addr n shift )
+    N<<T            d-1     alu \ lshift: ( shift addr n' )
+    N       T->R    d-1 r+1 alu \ >r: ( shift addr | n' )
+    N       T->N            alu \ swap
+    W       T->N    d+1     alu \ w: ( addr shift mask | n' )
+    N       T->N            alu \ swap
+    N<<T            d-1     alu \ lshift: ( addr mask' | n' )
+    ~T                      alu
+    N       T->N    d+1     alu \ over: ( addr mask' addr | n' )
+    T                       alu \ wait for read to settle
+    [T]                     alu \ @
+    T&N             d-1     alu \ and: ( addr data' | n' )
+    R       T->N    d+1 r-1 alu \ r>
+    T+N             d-1     alu \ +: ( addr data" )
+    N       T->N            alu \ swap
+    T       N->[T]  d-1     alu \ !
+    N       RET     d-1 r-1 alu
+END-CODE
 
 \ Your code can usually use + instead of OR, but if it's needed:
 : or    invert swap invert and invert ; \ n t -- n|t
@@ -163,10 +203,6 @@ CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
 : */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- remainder n1*n2/n3
 : */     */mod swap drop ;              \ 6.1.0100  n1 n2 n3 -- n1*n2/n3
 
-: exec:  2* r> + >r ; \ for list of 2-cell literals
-
-: table  exec: [ 123 | 456 | 789 | 321 ] literal ;
-
 \ Now let's get some I/O set up
 
 : emit  'TXbuf io! ; \ c -- \ To terminal
@@ -198,6 +234,24 @@ depth 0 assert
 
 \ Try 25 fib, then stats
 
+\ sample lookup table:
+
+: exec2: 2* r> + >r ; \ for list of 2-cell literals
+: exec:  r> + >r ; \ for list of 2-cell literals
+
+cellsize |bits|
+: table  exec2: [ 123 | 456 | 789 | 321 ] literal ;
+11 |bits|
+: table1  exec: [ 123 | 456 | 789 | 321 ] literal ;
+cellsize |bits|
+
+\ Bit fields you can test with
+
+6 bits base     10 base b!       \ to handle up to base 36
+1 bits state     0 state b!      \ yup
+7 bits percent  33 percent b!    \ for numbers 0 to 100
+8 bits mybyte   47 mybyte b!     \ an actual byte
+16 bits classic 12345 classic b! \ old school 1-bit value
 
 there . .( instructions used) cr
 \ 0 there dasm
