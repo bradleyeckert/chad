@@ -835,7 +835,7 @@ SV LoadKeywords(void) {
     AddKeyword ("here", doHere, noCompile);
     AddKeyword ("org", doOrg, noCompile);
     AddKeyword ("variable", doVARIABLE, noCompile);
-    AddKeyword ("bitfield", doBitfield, noCompile);
+    AddKeyword ("bits", doBitfield, noCompile);
     AddKeyword ("bhere", doBhere, noCompile);
     AddKeyword ("borg", doBorg, noCompile);
     AddKeyword ("[", doToExec, doToExec);

@@ -158,6 +158,14 @@ for: ...
 - `rshift` T = N >> T
 - `lshift` T = N << T
 
+Example use of bit fields:
+
+```
+5 bits myvar  \ declare a 5-bit variable
+11 myvar b!   \ store 11 to it
+myvar b@ .    \ read and print it
+```
+
 Bit field read is about 7 cycles:
 
 ```
