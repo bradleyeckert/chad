@@ -64,78 +64,76 @@ struct Keyword {
     cell target;                        // target address if used
 };
 
-#define BYE -299
-#define NOTANEQU -3412
+#define NOTANEQU -3412 // unused
 
 // Assembler primitives for the ALU instruction
 // Names are chosen to not conflict with Forth or C
 
-#define alu    0x0000
-#define less0  0x0100
-#define carry  0x1100
-#define shr1   0x0200
-#define shrx   0x1200
-#define shl1   0x0300
-#define shlx   0x1300
-#define NtoT   0x0400
-#define eor    0x0500
-#define com    0x1500
-#define Tand   0x0600
-#define mask   0x1600
-#define shr8   0x0700
-#define shl8   0x1700
-#define add    0x0800
-#define addc   0x1800
-#define sub    0x0900
-#define subc   0x1900
-#define zeq    0x0A00
-#define shr    0x0B00
-#define shl    0x0C00
-#define RtoT   0x0D00
-#define RM1toT 0x1D00
-#define read   0x0E00
-#define input  0x1E00
-#define who    0x0F00
+#define alu    (0x00 << 9)
+#define less0  (0x01 << 9)
+#define carry  (0x11 << 9)
+#define shr1   (0x02 << 9)
+#define shrx   (0x12 << 9)
+#define shl1   (0x03 << 9)
+#define shlx   (0x13 << 9)
+#define NtoT   (0x04 << 9)
+#define eor    (0x05 << 9)
+#define com    (0x15 << 9)
+#define Tand   (0x06 << 9)
+#define mask   (0x16 << 9)
+#define shr8   (0x07 << 9)
+#define shl8   (0x17 << 9)
+#define add    (0x08 << 9)
+#define addc   (0x18 << 9)
+#define sub    (0x09 << 9)
+#define subc   (0x19 << 9)
+#define zeq    (0x0A << 9)
+#define shr    (0x0B << 9)
+#define shl    (0x0C << 9)
+#define RtoT   (0x0D << 9)
+#define RM1toT (0x1D << 9)
+#define read   (0x0E << 9)
+#define input  (0x1E << 9)
+#define who    (0x0F << 9)
 
-// The insn[7] bit of the ALU enables return
+// The insn[8] bit of the ALU enables return
 
-#define ret    0x0080
+#define ret    (1 << 8)
 
-// The insn[6:4] field of the ALU instruction is:
+// The insn[7:4] field of the ALU instruction is:
 
-#define TtoN   0x0010
-#define TtoR   0x0020
-#define write  0x0030
-#define iow    0x0040
-#define ior    0x0050
-#define co     0x0060
+#define TtoN   (1 << 4)
+#define TtoR   (2 << 4)
+#define write  (3 << 4)
+#define iow    (4 << 4)
+#define ior    (5 << 4)
+#define co     (6 << 4)
+#define TtoW   (7 << 4)
 
 // The insn[3:2] field of the ALU instruction is return stack control:
 
-#define rup    0x0004
-#define rdn2   0x0008
-#define rdn    0x000C
+#define rup    (1 << 2)
+#define rdn2   (2 << 2)
+#define rdn    (3 << 2)
 
 // The insn[1:0] field of the ALU instruction is data stack control:
 
-#define sup    0x0001
-#define sdn2   0x0002
-#define sdn    0x0003
+#define sup    1
+#define sdn2   2
+#define sdn    3
 
 // Other instruction types
 
-#define jump   0x8000
-#define zjump  0xA000
-#define call   0xC000
-#define litx   0xE000
-#define lit    0xF000
+#define jump   (4 << 13)
+#define zjump  (5 << 13)
+#define call   (6 << 13)
+#define litx   (14 << 12)
+#define lit    (15 << 12)
 
 #endif
 
-// 0uvppppp Rwwwrrss = ALU op
+// 0xpppppx Rwwwrrss = ALU op
 //  x = unused
-//  u = use tail pointer instead of head pointer for return stack
-//  v = use tail pointer instead of head pointer for data stack
 //  p = 5-bit ALU operation select
 //  R = return
 //  w = strobe select {-, TN, TR, wr, iow, ior, co, ?}
@@ -150,6 +148,7 @@ struct Keyword {
 
 // THROW Codes
 
+#define BYE            -299
 #define BAD_STACKOVER    -3 // Stack overflow
 #define BAD_STACKUNDER   -4 // Stack underflow
 #define BAD_RSTACKOVER   -5 // Return stack overflow

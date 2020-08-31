@@ -36,11 +36,11 @@ The ISA is modified to expedite that, to keep stacks small.
 ## Chad ISA summary
 
 ```
-0xxppppp Rwwwrrss = ALU instruction
+0xpppppR wwwwrrss = ALU instruction
     x = unused
     p = 5-bit ALU operation select
     R = return
-    w = strobe select {-, TN, TR, wr, iow, ior, co, w}
+    w = strobe select {-, TN, TR, wr, iow, ior, co, w, ...}
     r = return stack displacement
     s = data stack displacement
 100nnnnn nnnnnnnn = jump
@@ -86,20 +86,20 @@ The `insn[12:8]` field of the ALU instruction is:
 - 1_1110: `io[T]` T = io_din
 - x_1111: `status` T = status: T\[9:5] = Rdepth; T\[4:0] = Depth, T\[15:10] = ID
 
-The `insn[7]` bit of the ALU instruction is:
+The `insn[8]` bit of the ALU instruction is:
 
 - 1: `RET` Return after this instruction. You should also use `r-1`.
 
-The `insn[6:4]` field of the ALU instruction is:
+The `insn[7:4]` field of the ALU instruction is:
 
-- 000:
-- 001: `T->N` Write T to N
-- 010: `T->R` Write T to R
-- 011: `N->[T]` Write T to mem\[A]
-- 100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
-- 101: `_IORD_` Trigger read from the I/O port, wait if not ready
-- 110: `CO` Write to carry: Adder or shifter carry out
-- 111: `T->W` Write T to W
+- x000:
+- x001: `T->N` Write T to N
+- x010: `T->R` Write T to R
+- x011: `N->[T]` Write T to mem\[A]
+- x100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
+- x101: `_IORD_` Trigger read from the I/O port, wait if not ready
+- x110: `CO` Write to carry: Adder or shifter carry out
+- x111: `T->W` Write T to W
 
 The `insn[3:2]` field of the ALU instruction is return stack control:
 
@@ -218,7 +218,8 @@ that have their `RET` bits set.
 
 Most code that uses `or` can use `+` instead.
 If not, `or` is a cheap definition: `: or  invert swap invert and invert ;`.
-Many thanks to Chuck Moore for discovering this in his MISC work.
+Thanks to Chuck Moore for discovering this in his MISC work
+and for disabusing me of smudge bits.
 
 ### Memory Spaces
 
@@ -226,9 +227,9 @@ The code space contains ROM to function as a library.
 ROM costs nearly nothing (in die area) compared to RAM.
 Proposed memory space is organized as:
 
-- Code ROM: 512 x 18 (address 0x000 to 0x1FF)
-- Code RAM: 512 x 18 (address 0x400 to 0x5FF)
-- Data RAM: 512 x 18 (address 0x000 to 0x1FF)
+- Code ROM: 1024 x 16 (address 0x000 to 0x3FF)
+- Code RAM: 1024 x 16 (address 0x400 to 0x7FF)
+- Data RAM: 1024 x 18 (address 0x000 to 0x3FF)
 - I/O space: address 0x000 to 0xFFF
 
 The CPU boots from the ROM.

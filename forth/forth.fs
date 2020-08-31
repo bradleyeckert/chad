@@ -7,7 +7,7 @@ empty decimal
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
-CODE noop    T                      RET alu  END-CODE macro
+CODE noop    T                      RET alu  END-CODE 
 CODE xor     T^N            d-1     RET alu  END-CODE macro
 CODE and     T&N            d-1     RET alu  END-CODE macro
 CODE +       T+N    CO      d-1     RET alu  END-CODE macro
@@ -15,7 +15,7 @@ CODE -       N-T    CO      d-1     RET alu  END-CODE macro
 CODE dup     T      T->N    d+1     RET alu  END-CODE macro
 CODE drop    N              d-1     RET alu  END-CODE macro
 CODE invert  ~T                     RET alu  END-CODE macro
-CODE swap    N      T->N                 RET alu  END-CODE macro
+CODE swap    N      T->N            RET alu  END-CODE macro
 CODE over    N      T->N    d+1     RET alu  END-CODE macro
 CODE nip     T              d-1     RET alu  END-CODE macro
 CODE 0=      T0=                    RET alu  END-CODE macro
@@ -34,7 +34,7 @@ CODE @       T                          alu
              [T]                    RET alu  END-CODE macro
 CODE !       T      N->[T]  d-1         alu
              N              d-1     RET alu  END-CODE macro
-CODE io@     T      _IORD_                   alu
+CODE io@     T      _IORD_              alu
              T                          alu
              io[T]                  RET alu  END-CODE
 CODE io!     T      N->io[T] d-1        alu
@@ -185,7 +185,7 @@ depth 0 assert
 -1 5 d2* 11 assert -2 assert
 -5 -7 d2/ -4 assert -3 assert
 depth 0 assert
-\ Note: Data memory is byte-addressed but must be cell-aligned.
+\ Note: Data memory is cell-addressed. The test allows byte addressing.
 123 4 !  456 8 !  4 @ 123 assert  8 @ 456 assert
 depth 0 assert
 

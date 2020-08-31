@@ -46,7 +46,8 @@ int sp, rp;                             // stack pointers
 int spMax, rpMax;                       // stack depth tracking
 CELL t, pc, cy, lex, w;                 // registers
 static uint32_t writeprotect = 0;       // highest writable code address
-static uint64_t cycles = 0;
+static uint64_t cycles = 0;             // cycle counter
+static uint32_t latency = 0;            // maximum cycles between return
 
 // The C host uses this to write to code space.
 // Forth code can only write to code space using iomap.c.
@@ -101,6 +102,7 @@ SI rsx[4] = { 0, 1, 0, -1 };
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
     unsigned int _pc, _lex, insn;
+    uint64_t time0 = cycles;
     int mark = RDEPTH;
     if (single & 0x10000) {             // execute one instruction directly
         insn = single & 0xFFFF;
@@ -124,26 +126,32 @@ once:   _pc = pc + 1;
                 break;
             default:
                 if (insn & 0x1000) {    /* imm */
-                    Dpush((lex<<11) | ((insn&0xf00)>>1) | (insn&0x7f));
-                    if (insn & 0x80) {  /* r->pc */
+                    Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
+                    if (insn & 0x100) { /* r->pc */
                         _pc = Rstack[RP];
                         if (RDEPTH == mark) single = 1;
                         RP = RPMASK & (RP - 1);
+                        uint32_t time = (uint32_t)(cycles - time0);
+                        time0 = cycles;
+                        if (time > latency) latency = time;
                     }
                 } else {                /* lex */
                     _lex = (lex << 12) | (insn & 0xFFF);
                 }
             }
         } else { // ALU
-            if (insn & 0x80) {          /* r->pc */
+            if (insn & 0x100) {          /* r->pc */
                 _pc = Rstack[RP];
                 if (RDEPTH == mark) single = 1;
+                uint32_t time = (uint32_t)(cycles - time0);
+                time0 = cycles;
+                if (time > latency) latency = time;
             }
             cell s = Dstack[SP];
             cell c = 0;
             cell temp;
             sum_t sum;
-            switch ((insn >> 8) & 0x1F) {
+            switch ((insn >> 9) & 0x1F) {
             case 0x00: _t = t;                               break; /* T    */
             case 0x01: _t = (t&MSB) ? -1:0;                  break; /* T<0  */
             case 0x11: _t = cy;                              break; /* C    */
@@ -207,6 +215,13 @@ once:   _pc = pc + 1;
     return single;
 }
 
+SV Simulate(cell xt) {
+    latency = 0;                        // reset latency measurement
+    Rpush(0);  pc = xt;
+    int result = CPUsim(0);             // run until last RET or error
+    if (result < 0) error = result;
+}
+
 //##############################################################################
 // Compiler
 
@@ -258,13 +273,7 @@ SV Literal (cell x) {
         extended_lit(x >> 11);
 #endif
     x &= 0x7FF;
-    toCode (lit | (x & 0x7F) | (x & 0x780) << 1);
-}
-
-SV Simulate (cell xt) {
-    Rpush(0);  pc = xt;
-    int result = CPUsim(0);             // run until last RET or error
-    if (result < 0) error = result;
+    toCode (lit | (x & 0xff) | (x & 0x700) << 1);
 }
 
 SV CompCall (cell xt) {
@@ -285,7 +294,7 @@ SV doTableEntry(void) {
     cell x = Dpop();
     if (bits > 23) extended_lit(x >> 23);
     if (bits > 11) extended_lit(x >> 11);
-    toCode(ret | lit | (x & 0x7F) | (x & 0x780) << 1);
+    toCode(ret | lit | (x & 0xFF) | (x & 0x700) << 1);
 }
 
 // Compile Control Structures
@@ -562,7 +571,8 @@ uint64_t elapsed_us;
 uint64_t elapsed_cycles;
 
 SV doStats(void) {
-    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d", elapsed_cycles, spMax, rpMax);
+    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d, latency=%d", 
+        elapsed_cycles, spMax, rpMax, latency);
     if (elapsed_us > 99) {
         printf(", %" PRId64 " MIPS", elapsed_cycles / elapsed_us);
     }
@@ -715,7 +725,7 @@ SV CompMacro(void) {
     for (int i=0; i<len; i++) {
         int inst = Code[addr++];
         if ((i == (len - 1)) && (inst & ret)) { // last inst has a return?
-            inst &= ~(ret | 0xc);       // strip trailing return
+            inst &= ~(ret | rdn);       // strip trailing return
         }
         toCode(inst);
     }
@@ -898,6 +908,7 @@ SV LoadKeywords(void) {
     AddModifier("N->io[T]", iow  );
     AddModifier("_IORD_", ior  );
     AddModifier("CO", co  );
+    AddModifier("T->W", TtoW);
     AddModifier("r+1",  rup  );  // stack pointer field
     AddModifier("r-1",  rdn  );
     AddModifier("r-2", rdn2 );
