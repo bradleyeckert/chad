@@ -10,19 +10,24 @@
 
 void ErrorMessage (int error, char *s); // defined in errors.c
 
-#if (CELLSIZE == 32)
-    #define cell     uint32_t
-    #define CELLMASK 0xFFFFFFFF
-    #define MSB      0x80000000
-#elif (CELLSIZE > 16)
-    #define cell     uint32_t
+#define ALL_ONES  ((unsigned)(~0))
+#if (CELLBITS == 32)
+#define cell     uint32_t
+#define CELLSIZE 5 // log2(CELLBITS)
+#elif (CELLBITS > 16)
+#define cell     uint32_t
+#define CELLSIZE 5
 #else
-    #define cell     uint16_t
+#define cell     uint16_t
+#define CELLSIZE 4
 #endif
 
-#if (CELLSIZE < 32)
-#define CELLMASK (~((~0)<<CELLSIZE))
-#define MSB      (1 << (CELLSIZE-1))
+#if (CELLBITS < 32)
+#define CELLMASK (~(ALL_ONES<<CELLBITS))
+#define MSB      (1 << (CELLBITS-1))
+#else
+#define CELLMASK 0xFFFFFFFF
+#define MSB      0x80000000
 #endif
 
 #define File FileStack[filedepth]
@@ -162,4 +167,4 @@ struct Keyword {
 #define UNRECOGNIZED    -13 // Unrecognized word
 #define BAD_ASSERT      -68 // Test failure
 #define BAD_ALU_OP      -72 // Invalid ALU code
-
+#define BAD_BITFIELD    -73 // Bitfield is too wide for a cell

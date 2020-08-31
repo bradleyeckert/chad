@@ -15,11 +15,6 @@ static uint64_t GetMicroseconds() {
     tt /= 10;
     tt -= 11644473600000000ULL;
     return tt;
-//  return PCcycleCount.QuadPart /= PCfrequency.QuadPart;
-//  QueryPerformanceCounter(&PCcycleCount);
-//  QueryPerformanceFrequency(&PCfrequency);
-//  PCcycleCount.QuadPart *= 1000000;
-
 }
 #else
 #include <sys/time.h> // GCC library
@@ -39,7 +34,7 @@ static uint64_t GetMicroseconds() {
 #define NameOffset 0x20
 
 
-////////////////////////////////////////////////////////////////////////////////
+//##############################################################################
 // CPU simulator
 
 SI error;                               // simulator and interpreter error code
@@ -87,7 +82,7 @@ SV Rpush(cell v) // push v on the return stack
     Rstack[RP] = v;
 }
 
-#if (CELLSIZE > 31)
+#if (CELLBITS > 31)
 #define sum_t uint64_t
 #else
 #define sum_t uint32_t
@@ -155,10 +150,10 @@ once:   _pc = pc + 1;
             case 0x02: c = t & 1;  temp = (t & MSB);
                 _t = (t >> 1) | temp;                        break; /* T2/  */
             case 0x12: c = t & 1;
-                _t = (t >> 1) | (cy << (CELLSIZE-1));        break; /* cT2/ */
-            case 0x03: c = t >> (CELLSIZE-1);
+                _t = (t >> 1) | (cy << (CELLBITS-1));        break; /* cT2/ */
+            case 0x03: c = t >> (CELLBITS-1);
                        _t = t << 1;                          break; /* T2*  */
-            case 0x13: c = t >> (CELLSIZE-1);
+            case 0x13: c = t >> (CELLBITS-1);
                        _t = (t << 1) | cy;                   break; /* T2*c */
             case 0x04: _t = s;                               break; /* N    */
             case 0x14: _t = w;                               break; /* W    */
@@ -166,17 +161,17 @@ once:   _pc = pc + 1;
             case 0x15: _t = ~t;                              break; /* ~T   */
             case 0x06: _t = s & t;                           break; /* T&N  */
             case 0x16: _t = w & t;                           break; /* T&W  */
-            case 0x07: _t = t >> 8;  w = ~((~0) << t);       break; /* T>>8 */
+            case 0x07: _t = t >> 8;  w = ~(ALL_ONES << t);   break; /* T>>8 */
             case 0x17: _t = t << 8;                          break; /* T<<8 */
 
             case 0x08: sum = (sum_t)s + (sum_t)t;
-                c = (sum >> CELLSIZE) & 1;  _t = sum;        break; /* T+N  */
+                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* T+N  */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
-                c = (sum >> CELLSIZE) & 1;  _t = sum;        break; /* T+Nc */
+                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* T+Nc */
             case 0x09: sum = (sum_t)s - (sum_t)t;
-                c = (sum >> CELLSIZE) & 1;  _t = sum;        break; /* N-T  */
+                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* N-T  */
             case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
-                c = (sum >> CELLSIZE) & 1;  _t = sum;        break; /* N-Tc */
+                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* N-Tc */
             case 0x0A: _t = (t) ? 0 : -1;                    break; /* T0=  */
             case 0x0B: _t = s >> t;                          break; /* N>>T */
             case 0x0C: _t = s << t;                          break; /* N<<T */
@@ -211,98 +206,140 @@ once:   _pc = pc + 1;
     } while (single == 0);
     return single;
 }
-#define BAD_STACKOVER    -3 // Stack overflow
-#define BAD_STACKUNDER   -4 // Stack underflow
-#define BAD_RSTACKOVER   -5 // Return stack overflow
-#define BAD_RSTACKUNDER  -6 // Return stack underflow
 
-SV RegDump (void) {
-    printf("PC=%x, SP=%x, RP=%x, ",pc, sp, rp);
-    printf("N=%x, T=%x, R=%x, W=%x, c=%x\n",Dstack[SP],t,Rstack[RP],w,cy);
+//##############################################################################
+// Compiler
+
+CELL cp = 0;                            // dictionary pointer for code space
+CELL dp = 0;                            // dictionary pointer for data space
+CELL bp = 0;                            // bitfield pointer
+CELL fence = 0;                         // latest writable code word
+SI notail = 0;                          // tail recursion inhibited for recent call
+
+SV toCode (cell x) {                     // compile to code space
+    chadToCode(cp++, x);
 }
-SV doSteps (void) {             // ( addr steps -- )
-    uint8_t cnt = (uint8_t)Dpop();
-    pc = Dpop();
-    RegDump();
-    for (int i=0; i<cnt; i++) {
-        CPUsim(1);
-        RegDump();
+SV compExit (void) {                    // compile an exit
+    if (fence == cp) {                  // code run is empty
+        goto plain;                     // nothing to optimize
     }
-}
-
-SV doInstruction (void) {       // ( instruction -- )
-    CPUsim(0x10000 | Dpop());
-    RegDump();
-}
-
-CELL dp = 0;                    // dictionary pointer for data space
-CELL fence = 0;                 // latest writable code word
-SI notail = 0;                  // tail recursion inhibited for recent call
-
-SV comma (cell x) {             // compile to code space
-    chadToCode(dp++, x);
-}
-SV compExit (void) {            // compile an exit
-    if (fence == dp) {          // code run is empty
-        goto plain;
-    }
-    int a = (dp-1) & (CodeSize-1);
-    int old = Code[a];
-    if (((old & 0x8000) == 0) && (!(old & rdn))) { // ALU that doesn't change rp
-        Code[a] = rdn | old | ret;   // make the last instruction returnable
-    } else if ((old & lit) == lit) { // literal
-        Code[a] = old | ret;
+    int a = (cp-1) & (CodeSize-1);
+    int old = Code[a];                  // previous instruction
+    if (((old & 0x8000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
+        Code[a] = rdn | old | ret;      // make the ALU instruction return
+    } else if ((old & lit) == lit) {    // literal?
+        Code[a] = old | ret;            // lake the literal return
     } else if ((!notail) && ((old & 0xE000) == call)) {
-        Code[a] = (old & 0x1FFF) | jump; // tail recursion
+        Code[a] = (old & 0x1FFF) | jump; // tail recursion (call -> jump)
     } else {
-plain:  comma(alu | ret | rdn); // compile a stand-alone return
+plain:  toCode(alu | ret | rdn);         // compile a stand-alone return
     }
 }
 
-// Literal extension clears the 12-bit LEX register whenever
-// the instruction is not LITX.
-// Otherwise it shifts 12-bit data into LEX from the right.
+// The 12-bit LEX register is cleared whenever the instruction is not LITX.
+// LITX shifts 12-bit data into LEX from the right.
 // Full 16-bit and 32-bit data are supported with 2 or 3 inst.
 
 SV extended_lit (int k12) {
-    comma(litx | (k12 & 0xFFF));
+    toCode(litx | (k12 & 0xFFF));
 }
 SV Literal (cell x) {
-#if (CELLSIZE > 23)
+#if (CELLBITS > 23)
     if (x & 0xFF800000) {
         extended_lit(x >> 23);
         extended_lit(x >> 11);
     }
+    else {
+        if (x & 0x007FF800)
+            extended_lit(x >> 11);
+    }
 #else
     if (x & 0x007FF800)
-        extended_lit(x>>11);
+        extended_lit(x >> 11);
 #endif
     x &= 0x7FF;
-    comma (lit | (x & 0x7F) | (x & 0x780) << 1);
+    toCode (lit | (x & 0x7F) | (x & 0x780) << 1);
 }
 
 SV Simulate (cell xt) {
     Rpush(0);  pc = xt;
-    int result = CPUsim(0);
+    int result = CPUsim(0);             // run until last RET or error
     if (result < 0) error = result;
 }
 
 SV CompCall (cell xt) {
-    comma (call | xt);
+    if (xt & 0x01FFE000)
+        toCode(litx | (xt >> 13));       // accommodate 25-bit address space
+    toCode (call | (xt & 0x1fff));
 }
 
-// EXIT should test Code[dp-1] to see if it's a call. If so, convert to jump.
-// But the CALL needs to be able to inhibit that with a call-only flag
-// Add that to the data structure before adding this optimization.
+// Code space isn't randomly readable, so lookup tables are supported by jump
+// into a list of literals with their return bits set. 
+// Use |bits| to set the size of your data. It's cellsize by default.
+// Syntax is  : tjmp 2* r> + >r ;  : mytable tjmp [ 12 | 34 | 56 ] literal ;
 
-CELL base = 10;
-CELL state = 0;
+CELL tablebits = CELLBITS;
+SV doSetBits(void) { tablebits = Dpop(); }
+SV doTableEntry(void) {
+    int bits = tablebits;
+    cell x = Dpop();
+    if (bits > 23) extended_lit(x >> 23);
+    if (bits > 11) extended_lit(x >> 11);
+    toCode(ret | lit | (x & 0x7F) | (x & 0x780) << 1);
+}
 
+// Compile Control Structures
+
+CELL CtrlStack[256];                    // control stack
+uint8_t ConSP = 0;
+
+SV ControlSwap(void) {
+    cell x = CtrlStack[ConSP];
+    CtrlStack[ConSP] = CtrlStack[ConSP - 1];
+    CtrlStack[ConSP - 1] = x;
+}
+SV sane(void) {
+    if (ConSP)  error = BAD_CONTROL;
+    ConSP = 0;
+}
+
+// Addressing beyond 1FFFh is not supported yet.
+
+SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= cp; fence = cp; }
+SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst); fence = cp; }
+SV MarkFwd(void) { CtrlStack[++ConSP] = cp; }
+SV doBegin(void) { MarkFwd(); }
+SV doAgain(void) { ResolveRev(jump); }
+SV doUntil(void) { ResolveRev(zjump); }
+SV doIf(void) { MarkFwd();  toCode(zjump); }
+SV doThen(void) { ResolveFwd(); }
+SV doElse(void) { MarkFwd();  toCode(jump);  ControlSwap();  ResolveFwd(); }
+SV doWhile(void) { MarkFwd();  ControlSwap(); }
+SV doRepeat(void) { doElse();  doAgain();  doThen(); }
+SV doFor(void) { toCode(alu | NtoT | TtoR | sdn | rup);  MarkFwd(); }
+SV noCompile(void) { error = BAD_NOCOMPILE; }
+SV noExecute(void) { error = BAD_UNSUPPORTED; }
+
+SV doNext(void) {
+    toCode(alu | RM1toT | TtoN | sup);   /* (R-1)@ */
+    toCode(alu | zeq | TtoR);  ResolveRev(zjump);
+    toCode(alu | rdn);  fence = cp;      /* rdrop */
+}
+
+SV toData(cell x) {                     // compile to data space
+    if (x & ~(DataSize - 1))
+        error = BAD_DATA_WRITE;
+    Data[dp++ & (DataSize - 1)] = x;
+}
+
+//##############################################################################
 // Dictionary
 // The dictionary is a simple linear list that uses a bit mask for context.
 
-SI hp;                          // # of hp added at startup
-SI emptiness;                               // EMPTY sets hp to this
+CELL base = 10;
+CELL state = 0;
+SI hp;                                  // # of keywords in the Header list
+SI emptiness;                           // EMPTY sets hp to this
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of keyword being executed
 CELL context = 15;
@@ -334,19 +371,6 @@ SI NotKeyword (char *key) {             // do a command, return 0 if found
     return 0;
 }
 
-CELL CtrlStack[256];
-uint8_t ConSP = 0;
-
-SV ControlSwap(void) {
-    cell x = CtrlStack[ConSP];
-    CtrlStack[ConSP] = CtrlStack[ConSP-1];
-    CtrlStack[ConSP-1] = x;
-}
-SV sane (void) {
-    if (ConSP)  error = BAD_CONTROL;
-    ConSP = 0;
-}
-
 static uint32_t my (void) {return Header[me].w;}
 SV doLITERAL  (void) { Literal(Dpop()); }
 SV Equ_Comp   (void) { Literal(my()); }
@@ -354,25 +378,7 @@ SV Equ_Exec   (void) { Dpush(my()); }
 SV Def_Exec   (void) { Simulate(my()); }
 SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
-SV doLitOp    (void) { comma(Dpop() | my());  Dpush(0); }
-SV noCompile  (void) { error = BAD_NOCOMPILE; }
-SV noExecute  (void) { error = BAD_UNSUPPORTED; }
-SV ResolveFwd (void) { Code[CtrlStack[ConSP--]] |= dp; fence = dp; }
-SV ResolveRev (int inst) { comma(CtrlStack[ConSP--] | inst); fence = dp; }
-SV MarkFwd    (void) { CtrlStack[++ConSP] = dp; }
-SV doBegin    (void) { MarkFwd(); }
-SV doAgain    (void) { ResolveRev(jump); }
-SV doUntil    (void) { ResolveRev(zjump); }
-SV doIf       (void) { MarkFwd();  comma(zjump); }
-SV doThen     (void) { ResolveFwd(); }
-SV doElse     (void) { MarkFwd();  comma(jump);  ControlSwap();  ResolveFwd(); }
-SV doWhile    (void) { MarkFwd();  ControlSwap(); }
-SV doRepeat   (void) { doElse();  doAgain();  doThen(); }
-SV doFor      (void) { comma(alu | NtoT | TtoR | sdn | rup);  MarkFwd(); }
-
-SV doNext     (void) { comma(alu | RM1toT | TtoN | sup );     /* (R-1)@ */
-                       comma(alu | zeq    | TtoR);  ResolveRev(zjump);
-                       comma(alu |           rdn);  fence = dp;} /* rdrop */
+SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
 
 // A strncpy that complies with C safety checks.
 
@@ -383,14 +389,15 @@ void strmove (char *dest, char *src, int maxlength) {
     }   *--dest = 0;
 }
 
-SI header (char * s) {
+SI header (char * s) {                  // add a header to the list
     int r = 1;
     if (hp < MaxKeywords) {
         strmove(Header[hp].name, s, MaxNameSize);
         Header[hp].context = current;
-        Header[hp].length = 0;
+        Header[hp].length = 0;          // set defaults to 0
         Header[hp].notail = 0;
         Header[hp].target = 0;
+        Header[hp].notail = 0;
     } else {
         printf("Please increase MaxKeywords and rebuild.\n");
         r = 0;  error = BYE;
@@ -426,13 +433,16 @@ SV AddModifier (char *name, cell value) {
     }
 }
 
-// Literal operations literal data from the stack and comma the instruction.
+// Literal operations literal data from the stack and toCode the instruction.
 SV AddLitOp (char *name, cell value) {
     if (header(name)) {
         SetFns(value, doLitOp, noCompile);
         hp++;
     }
 }
+
+//##############################################################################
+// Facilities for viewing, debugging, etc.
 
 SV doWORDS (void) {
     for (int i=0; i<hp; i++) {
@@ -457,8 +467,8 @@ static char* TargetName (cell addr) {
 
 SV Cdot (cell x) {  // cuz no itoa
     int32_t n = x;
-    #if (CELLSIZE < 32)
-    if (x & (1<<(CELLSIZE-1))) n -= 1<<CELLSIZE;
+    #if (CELLBITS < 32)
+    if (x & (1<<(CELLBITS-1))) n -= 1<<CELLBITS;
     x &= CELLMASK; // unsigned
     #endif
     if (base == 16) printf("%x ", x);
@@ -515,8 +525,53 @@ SV doDASM (void) { // ( addr len -- )
     }
 }
 
+SV RegDump(void) {
+    printf("N=%x, T=%x, R=%x, W=%x, c=%x\n", Dstack[SP], t, Rstack[RP], w, cy);
+    printf("SP=%x, RP=%x, code[%x] = ", sp, rp, pc);
+    DisassembleInsn(Code[pc & (CodeSize - 1)]);
+    printf("\n");
+}
+
+SV doSteps(void) {                     // ( addr steps -- )
+    uint8_t cnt = (uint8_t)Dpop();     // single step debugger gives a listing
+    pc = Dpop();
+    RegDump();
+    for (int i = 0; i < cnt; i++) {
+        CPUsim(1);
+        RegDump();
+    }
+}
+
+SV doInstruction(void) {                // ( instruction -- )
+    CPUsim(0x10000 | Dpop());           // execute the instruction on the stack
+    RegDump();
+}
+
+SV doAssert(void) {                   // for test code
+    int expected = Dpop();
+    int actual = Dpop();
+    if (expected != actual) {
+        printf("Expected = "); Cdot(expected);
+        printf("actual = "); Cdot(actual);
+        printf("\n");
+        error = BAD_ASSERT;
+    }
+}
+
+uint64_t elapsed_us;
+uint64_t elapsed_cycles;
+
+SV doStats(void) {
+    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d", elapsed_cycles, spMax, rpMax);
+    if (elapsed_us > 99) {
+        printf(", %" PRId64 " MIPS", elapsed_cycles / elapsed_us);
+    }
+    printf("\n");
+    spMax = sp;  rpMax = rp;
+}
+
 SV PrintStack (void) {                  // ( ... -- ... )
-    int depth = SDEPTH;
+    int depth = SDEPTH;                 // primitive of .s
     for (int i=0; i<depth; i++) {
         if (i == (depth-1)) {
             Cdot(t);
@@ -527,25 +582,26 @@ SV PrintStack (void) {                  // ( ... -- ... )
 }
 
 SV dotESS (void) {                      // ( ... -- ... )
-    PrintStack();
+    PrintStack();                       // .s
     printf("<-Top\n");
 }
 
 SV dot (void) {                         // ( n -- )
-    Cdot(Dpop());
+    Cdot(Dpop());                       // .
 }
 
 SV ddot (void) {                        // ( d -- )
-    cell hi = Dpop();
+    cell hi = Dpop();                   // d.
     cell lo = Dpop();
-    uint64_t x = ((uint64_t)hi << CELLSIZE) | lo;
-    #if (CELLSIZE < 32) // sign extend
-    if (x & (1ull<<(CELLSIZE*2-1)))
-        x -= 1ull<<(CELLSIZE*2);
+    uint64_t x = ((uint64_t)hi << CELLBITS) | lo;
+    #if (CELLBITS < 32) // sign extend
+    if (x & (1ull<<(CELLBITS*2-1)))
+        x -= 1ull<<(CELLBITS*2);
     #endif
     printf("%" PRId64 " ", x);
 }
 
+//##############################################################################
 // Forth interpreter
 // When a file is included, the rest of the TIB is discarded.
 // A new file is pushed onto the file stack.
@@ -589,7 +645,7 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
 
 static char tok[LineBufferSize+1];      // blank-delimited token
 
-SI parseword (char delimiter) {
+SI parseword(char delimiter) {
     while (buf[toin] == delimiter) toin++;
     int length = 0;  char c;
     while ((c = buf[toin++]) != delimiter) {
@@ -602,7 +658,7 @@ SI parseword (char delimiter) {
     return length;
 }
 
-SV doINCLUDE (void) {                   // Nest into a source file
+SV doINCLUDE(void) {                    // Nest into a source file
     while (buf[toin] == ' ') toin++;
     if (buf[toin] == '"') {
         toin++;  parseword('"');        // allow filename in quotes
@@ -614,28 +670,46 @@ SV doINCLUDE (void) {                   // Nest into a source file
 
 int DefMark, DefMarkID;
 
-SV doColon (void) {
+SV doColon(void) {
     parseword(' ');
     if (header(tok)) {                  // define a word that simulates
-        SetFns(dp, Def_Exec, Def_Comp);
-        Header[hp].target = dp;
+        SetFns(cp, Def_Exec, Def_Comp);
+        Header[hp].target = cp;
         DefMarkID = hp++;               // save for later reference
-        DefMark = dp;  state = 1;
-        fence = dp;                     // code starts here
+        DefMark = cp;  state = 1;
+        fence = cp;                     // code starts here
         ConSP = 0;
     }
 }
 
-SV doEQU (void) {
+SV doEQU(void) {
     parseword(' ');
     AddEquate(tok, Dpop());
 }
 
-SV SaveLength (void) {                  // resolve length of definition
-    Header[DefMarkID].length = dp - DefMark;
+SV doVARIABLE(void) {
+    Dpush(dp++);  doEQU();
 }
 
-SV CompMacro (void) {
+SV doBitfield(void) {
+    cell width = Dpop();
+    if (width > CELLBITS) error = BAD_BITFIELD;
+    int shft = bp % CELLBITS;
+    int addr = bp / CELLBITS;
+    if ((shft + width) > CELLBITS) {
+        shft = 0;                       // doesn't fit
+        addr++;
+        bp = addr * CELLBITS;           // start a new cell
+    }
+    Dpush((addr << (CELLSIZE*2)) | (width << CELLSIZE) | shft);  doEQU();
+    bp += width;
+}
+
+SV SaveLength(void) {                   // resolve length of definition
+    Header[DefMarkID].length = cp - DefMark;
+}
+
+SV CompMacro(void) {
     int len = Header[me].length;
     int addr = my();
     for (int i=0; i<len; i++) {
@@ -643,15 +717,15 @@ SV CompMacro (void) {
         if ((i == (len - 1)) && (inst & ret)) { // last inst has a return?
             inst &= ~(ret | 0xc);       // strip trailing return
         }
-        comma(inst);
+        toCode(inst);
     }
 }
 
-SV doMACRO (void) {
+SV doMACRO(void) {
     Header[DefMarkID].CompFn = CompMacro;
 }
 
-SV doIMMEDIATE (void) {
+SV doIMMEDIATE(void) {
     Header[DefMarkID].CompFn = Header[DefMarkID].ExecFn;
 }
 
@@ -660,14 +734,14 @@ SV doNoTail (void) {
 }
 
 SV Marker_Exec (void) {                 // execution semantics of a marker
-    dp = my();
+    cp = my();
     hp = Header[me].w2;                 // also forgets the marker
 }
 
 SV doMARKER (void) {
     parseword(' ');
     if (header(tok)) {                  // define a word that simulates
-        SetFns(dp, Marker_Exec, noCompile);
+        SetFns(cp, Marker_Exec, noCompile);
         Header[hp].w2 = hp;
         hp++;
     }
@@ -689,38 +763,6 @@ SV doSEE (void) {                       // ( <name> -- )
     }
 }
 
-SV doAssert  (void) {                   // for test code
-    int expected = Dpop();
-    int actual = Dpop();
-    if (expected != actual) {
-        printf("Expected = "); Cdot(expected);
-        printf("actual = "); Cdot(actual);
-        printf("\n");
-        error = BAD_ASSERT;
-    }
-}
-
-uint64_t elapsed_us;
-uint64_t elapsed_cycles;
-CELL tablebits = CELLSIZE;
-
-SV doStats   (void) {
-    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d", elapsed_cycles, spMax, rpMax);
-    if (elapsed_us > 99) {
-        printf(", %" PRId64 " MIPS", elapsed_cycles/elapsed_us);
-    }
-    printf("\n");
-    spMax = sp;  rpMax = rp;
-}
-
-SV doTableEntry (void) {
-    int bits = tablebits;
-    cell x = Dpop();
-    if (bits > 23) extended_lit(x >> 23);
-    if (bits > 11) extended_lit(x >> 11);
-    comma (ret | lit | (x & 0x7F) | (x & 0x780) << 1);
-}
-
 SV doCODE    (void) { doColon(); state = 0; context |= 8;  Dpush(0);}
 SV doENDCODE (void) { SaveLength();        context &= ~8;  Dpop();  sane();}
 SV doEMPTY   (void) { hp = emptiness; }
@@ -736,14 +778,18 @@ SV doToContx (void) { context = Dpop(); }
 SV doToCurrn (void) { current = Dpop(); }
 SV doToExec  (void) { state = 0; }
 SV doToComp  (void) { state = 1; }
-SV doHere    (void) { Dpush(dp); }
 SV doTick    (void) { Dpush(tick()); }
+SV doThere   (void) { Dpush(cp); }
+SV doTorg    (void) { cp = Dpop(); }
+SV doHere    (void) { Dpush(dp); }
 SV doOrg     (void) { dp = Dpop(); }
+SV doBhere   (void) { Dpush(bp); }
+SV doBorg    (void) { bp = Dpop(); }
 SV doDROP    (void) { Dpop(); }
-SV doComma   (void) { comma(Dpop()); }
+SV doTcomma  (void) { toCode(Dpop()); }
+SV doComma   (void) { toData(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
 SV doSemi    (void) { compExit();  SaveLength();  state = 0;  sane();}
-SV doSetBits (void) { tablebits = Dpop(); }
 
 // Keywords are visible based on bits in context.
 // Set the same bits in current while loading hp.
@@ -780,14 +826,21 @@ SV LoadKeywords(void) {
     AddEquate  ("code-writable", CodeFence);
     AddEquate  ("code-size", CodeSize);
     AddEquate  ("data-size", DataSize);
-    AddEquate  ("cellsize", CELLSIZE);
+    AddEquate  ("cellsize", CELLBITS);
+    AddKeyword ("t,", doTcomma, noCompile);
+    AddKeyword ("there", doThere, noCompile);
+    AddKeyword ("torg", doTorg, noCompile);
     current = 2;    // compiler
-    AddKeyword ("[", doToExec, doToExec);
-    AddKeyword ("]", doToComp, doToComp);
-    AddKeyword ("'", doTick, noCompile);
     AddKeyword (",", doComma, noCompile);
     AddKeyword ("here", doHere, noCompile);
     AddKeyword ("org", doOrg, noCompile);
+    AddKeyword ("variable", doVARIABLE, noCompile);
+    AddKeyword ("bitfield", doBitfield, noCompile);
+    AddKeyword ("bhere", doBhere, noCompile);
+    AddKeyword ("borg", doBorg, noCompile);
+    AddKeyword ("[", doToExec, doToExec);
+    AddKeyword ("]", doToComp, doToComp);
+    AddKeyword ("'", doTick, noCompile);
     AddKeyword ("marker", doMARKER, noCompile);
     AddKeyword ("equ", doEQU, noCompile);
     AddKeyword (":", doColon, noCompile);
@@ -869,10 +922,9 @@ SV LoadKeywords(void) {
     emptiness = hp;
 }
 
-/*
-The QUIT loop processes a line at a time from either the keyboard or a file.
-The file handle is 0 for keyboard, other for file.
-*/
+//##############################################################################
+// Text Interpreter
+// Processes a line at a time from either stdin or a file.
 
 SV refill (void) {
 ask: toin = 0;
@@ -915,7 +967,7 @@ int chad(char * line, int maxlength) {
             while (parseword(' ')) {
                 if (NotKeyword(tok)) {  // try to convert to number
                     int i = 0;   int radix = base;   char c = 0;
-                    int64_t x = 0;  int dp = 0;  int neg = 0;
+                    int64_t x = 0;  int cp = 0;  int neg = 0;
                     switch (tok[0]) {   // leading digit
                         case '-': i++;  neg = -1;    break;
                         case '+': i++;               break;
@@ -929,7 +981,7 @@ int chad(char * line, int maxlength) {
                     while ((c = tok[i++])) {
                         switch (c) {
                         case '.':       // string position starts at 1
-                            dp = i;  break;
+                            cp = i;  break;
                         default:
                             c = c - '0';
                             if (c & 0x80) {goto bogus;}
@@ -942,8 +994,8 @@ bogus:                          error = UNRECOGNIZED;
                     }
                     if (neg) x = -x;
                     if (!error) {
-                        if (dp) {
-                            i = (x >> CELLSIZE) & CELLMASK;
+                        if (cp) {
+                            i = (x >> CELLBITS) & CELLMASK;
                             x &= CELLMASK;
                             if (state) {
                                 Literal((cell)x);
@@ -962,8 +1014,8 @@ bogus:                          error = UNRECOGNIZED;
                         }
                     }
                 }
-                if (sp == (StackSize-1)) error = BAD_STACKUNDER;
-                if (rp == (StackSize-1)) error = BAD_RSTACKUNDER;
+                if (sp == (StackSize - 1)) error = BAD_STACKUNDER; 
+                if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER; 
                 if (error) {
                     switch (error) {
                     case BYE: return 0;
@@ -975,6 +1027,7 @@ bogus:                          error = UNRECOGNIZED;
                         fclose(File.fp);
                         filedepth--;
                     }
+                    rp = sp = 0;
                     goto done;
                 }
             }
@@ -991,7 +1044,15 @@ done:       elapsed_us = GetMicroseconds() - time0;
     }
 }
 
-#define BYTES_PER_WORD ((CELLSIZE + 7) / 8)
+//##############################################################################
+// Other exported functions
+// These are called by iomap.c so that Forth code can access host data.
+// For example, chadGetSource packs a string into data memory.
+// Executable Forth may exercise the SPI bus to compile it to SPI flash.
+// This is beyond the scope of the C side of Chad.
+// chadGetHeader would be used when building a header structure in flash.
+
+#define BYTES_PER_WORD ((CELLBITS + 7) / 8)
 
 uint32_t chadGetSource (char delimiter) {
     int bytes;
@@ -1030,7 +1091,7 @@ uint32_t chadGetHeader (uint32_t select) {
         case 4: return Header[ID].w;
         case 5: return Header[ID].w2;
         case 6: return Header[ID].notail;
-        case 7: return dp;
+        case 7: return cp;
         default:
             if ((select < NameOffset) || (select >= (NameOffset + MaxNameSize)))
                 {return 0;}

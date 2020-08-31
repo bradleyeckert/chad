@@ -3,7 +3,7 @@ empty decimal
 0 equ false
 -1 equ true
 
-0 org
+0 torg
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
@@ -199,5 +199,5 @@ depth 0 assert
 \ Try 25 fib, then stats
 
 
-here . .( instructions used) cr
-\ 0 here dasm
+there . .( instructions used) cr
+\ 0 there dasm
