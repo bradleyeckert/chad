@@ -10,9 +10,10 @@
 // Sizes of memories in cells, should be an exact power of 2
 #define CodeSize      2048      /* Code memory cells                        */
 #define DataSize      1024      /* Data memory cells                        */
-#define StackSize       32      /* Stack cells                              */
+#define StackAwidth      5      /* log2(Stack cells)                        */
 #define CodeFence     1024      /* Beginning of RAM-based Code space        */
 
+#define EnableCPUchecks         /* Simulator has more instrumentation       */
 
 #define LineBufferSize 256      /* Size of line buffer                      */
 #define MaxKeywords   1024      /* Number of headers                        */
@@ -22,6 +23,8 @@
 #ifdef _MSC_VER                 /* Visual Studio wants "safe" functions.    */
 #define MORESAFE                /* Compiler supports them (C11, C17, etc).  */
 #endif
+
+#define StackSize  (1 << StackAwidth)
 
 #if ((CodeSize-1) & CodeSize)
 #error CodeSize must be an exact power of 2

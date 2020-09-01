@@ -12,9 +12,8 @@ Chad protects your software investment by targeting Verilog
 Modern computers are fast enough to simulate the CPU on the order of at-speed.
 Simulation speed on my computer (one AMD Rizen core) depends on the compiler:
 
-- 150 MIPS on Code::Blocks 17.12 (GCC).
-- 210 MIPS on Visual Studio 2019 Community Edition.
-- 85 MIPS on Ubuntu/Windows10 GCC (-O3 flag).
+- 145 MIPS on Code::Blocks 17.12 (GCC).
+- 160 MIPS on Visual Studio 2019 Community Edition.
 
 It's like having a real J1.
 Forth should execute the code it compiles.

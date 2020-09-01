@@ -40,10 +40,10 @@ static uint64_t GetMicroseconds() {
 SI error;                               // simulator and interpreter error code
 CELL Dstack[StackSize];                 // data stack
 CELL Rstack[StackSize];                 // return stack
-CELL Code[CodeSize];                    // code memory
+static uint16_t Code[CodeSize];         // code memory
 CELL Data[DataSize];                    // data memory
-int sp, rp;                             // stack pointers
-int spMax, rpMax;                       // stack depth tracking
+uint8_t sp, rp;                         // stack pointers
+uint8_t spMax, rpMax;                   // stack depth tracking
 CELL t, pc, cy, lex, w;                 // registers
 static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;             // cycle counter
@@ -96,14 +96,16 @@ SV Rpush(cell v) // push v on the return stack
 // 2 = PC is not in code space
 // other = stepped
 
-SI dsx[4] = { 0, 1, -2, -1 };           /* 2-bit sign extension */
-SI rsx[4] = { 0, 1, 0, -1 };
+SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
 
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
-    unsigned int _pc, _lex, insn;
-    uint64_t time0 = cycles;
-    int mark = RDEPTH;
+    cell _pc;
+    uint16_t insn;
+#ifdef EnableCPUchecks
+    uint16_t retMark = (uint16_t)cycles;
+#endif
+    uint8_t mark = RDEPTH;
     if (single & 0x10000) {             // execute one instruction directly
         insn = single & 0xFFFF;
         goto once;
@@ -111,9 +113,9 @@ SI CPUsim(int single) {
     do {
         insn = Code[pc & (CodeSize-1)];
 once:   _pc = pc + 1;
-        _lex = 0;
+        cell _lex = 0;
         if (insn & 0x8000) {
-            int target = insn & 0x1fff;
+            int target = (lex << 13) | (insn & 0x1fff);
             switch (insn >> 13) { // 4 to 7
             case 4:                     /* jump */
                 _pc = target;  break;
@@ -131,9 +133,12 @@ once:   _pc = pc + 1;
                         _pc = Rstack[RP];
                         if (RDEPTH == mark) single = 1;
                         RP = RPMASK & (RP - 1);
-                        uint32_t time = (uint32_t)(cycles - time0);
-                        time0 = cycles;
-                        if (time > latency) latency = time;
+#ifdef EnableCPUchecks
+                        uint16_t time = (uint16_t)cycles - retMark;
+                        retMark = (uint16_t)cycles;
+                        if (time > latency)
+                            latency = time;
+#endif
                     }
                 } else {                /* lex */
                     _lex = (lex << 12) | (insn & 0xFFF);
@@ -143,25 +148,28 @@ once:   _pc = pc + 1;
             if (insn & 0x100) {          /* r->pc */
                 _pc = Rstack[RP];
                 if (RDEPTH == mark) single = 1;
-                uint32_t time = (uint32_t)(cycles - time0);
-                time0 = cycles;
-                if (time > latency) latency = time;
+#ifdef EnableCPUchecks
+                uint16_t time = (uint16_t)cycles - retMark;
+                retMark = (uint16_t)cycles;
+                if (time > latency)
+                    latency = time;
+#endif
             }
             cell s = Dstack[SP];
-            cell c = 0;
+            cell _c = t & 1;
             cell temp;
             sum_t sum;
             switch ((insn >> 9) & 0x1F) {
             case 0x00: _t = t;                               break; /* T    */
-            case 0x01: _t = (t&MSB) ? -1:0;                  break; /* T<0  */
+            case 0x01: _t = (t & MSB) ? -1 : 0;              break; /* T<0  */
             case 0x11: _t = cy;                              break; /* C    */
-            case 0x02: c = t & 1;  temp = (t & MSB);
+            case 0x02: _c = t & 1;  temp = (t & MSB);
                 _t = (t >> 1) | temp;                        break; /* T2/  */
-            case 0x12: c = t & 1;
+            case 0x12: _c = t & 1;
                 _t = (t >> 1) | (cy << (CELLBITS-1));        break; /* cT2/ */
-            case 0x03: c = t >> (CELLBITS-1);
+            case 0x03: _c = t >> (CELLBITS-1);
                        _t = t << 1;                          break; /* T2*  */
-            case 0x13: c = t >> (CELLBITS-1);
+            case 0x13: _c = t >> (CELLBITS-1);
                        _t = (t << 1) | cy;                   break; /* T2*c */
             case 0x04: _t = s;                               break; /* N    */
             case 0x14: _t = w;                               break; /* W    */
@@ -173,13 +181,13 @@ once:   _pc = pc + 1;
                 _t = t >> (2 * CELLSIZE);
                 w = ~(ALL_ONES << (temp + 1));               break; /* mask */
             case 0x08: sum = (sum_t)s + (sum_t)t;
-                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* T+N  */
+                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* T+N  */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
-                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* T+Nc */
+                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* T+Nc */
             case 0x09: sum = (sum_t)s - (sum_t)t;
-                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* N-T  */
+                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* N-T  */
             case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
-                c = (sum >> CELLBITS) & 1;  _t = sum;        break; /* N-Tc */
+                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* N-Tc */
             case 0x0A: _t = (t) ? 0 : -1;                    break; /* T0=  */
             case 0x0B: _t = s >> (t & CELL_AMASK);           break; /* N>>T */
             case 0x0C: _t = s << (t & CELL_AMASK);           break; /* N<<T */
@@ -192,15 +200,15 @@ once:   _pc = pc + 1;
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
             }
-            SP = SPMASK & (SP + dsx[insn & 3]);                 /* dstack+- */
-            RP = RPMASK & (RP + rsx[(insn >> 2) & 3]);          /* rstack+- */
+            SP = SPMASK & (SP + sign2b[insn & 3]);                 /* dstack+- */
+            RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);          /* rstack+- */
             switch ((insn >> 4) & 7) {
             case  1: Dstack[SP] = t;                         break; /* T->N */
             case  2: Rstack[RP] = t;                         break; /* T->R */
             case  3: if (t & ~(DataSize-1)) { single = BAD_DATA_WRITE; }
                 Data[t & (DataSize-1)] = s;                  break; /* N->[T] */
             case  4: writeIOmap(t, s);                       break; /* N->io[T] */
-            case  6: cy = c;                                 break; /* co   */
+            case  6: cy = _c;                                break; /* co   */
             case  7: w = t;                                  break; /* T->W */
             default: break;
             }
@@ -208,8 +216,10 @@ once:   _pc = pc + 1;
         }
         pc = _pc;  lex = _lex;
         cycles++;
+#ifdef EnableCPUchecks
         if (sp > spMax) spMax = sp;
         if (rp > rpMax) rpMax = rp;
+#endif
         if (pc & ~(CodeSize-1)) single = BAD_PC;
     } while (single == 0);
     return single;
@@ -283,7 +293,7 @@ SV CompCall (cell xt) {
 }
 
 // Code space isn't randomly readable, so lookup tables are supported by jump
-// into a list of literals with their return bits set. 
+// into a list of literals with their return bits set.
 // Use |bits| to set the size of your data. It's cellsize by default.
 // Syntax is  : tjmp 2* r> + >r ;  : mytable tjmp [ 12 | 34 | 56 ] literal ;
 
@@ -292,7 +302,9 @@ SV doSetBits(void) { tablebits = Dpop(); }
 SV doTableEntry(void) {
     int bits = tablebits;
     cell x = Dpop();
+#if (CELLBITS > 23)
     if (bits > 23) extended_lit(x >> 23);
+#endif
     if (bits > 11) extended_lit(x >> 11);
     toCode(ret | lit | (x & 0xFF) | (x & 0x700) << 1);
 }
@@ -354,7 +366,7 @@ CELL me;                                // index of keyword being executed
 CELL context = 15;
 CELL current = 1;
 
-SI findname (char *key) {               // return index of word, -1 if not fount
+SI findname (char *key) {               // return index of word, -1 if not found
     if (strlen(key) < MaxNameSize) {
         int i = hp;
         while (--i >= 0) {              // scan the list backwards
@@ -394,11 +406,12 @@ SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
 void strmove (char *dest, char *src, int maxlength) {
     for (int i=0; i<maxlength; i++) {
         char c = *src++;  *dest++ = c;
-        if (!c) return;
-    }   *--dest = 0;
+        if (c == 0) return;
+    }   
+    *--dest = 0;                        // max reached, add terminator
 }
 
-SI header (char * s) {                  // add a header to the list
+SI AddHead (char * s) {                 // add a header to the list
     int r = 1;
     if (hp < MaxKeywords) {
         strmove(Header[hp].name, s, MaxNameSize);
@@ -421,14 +434,14 @@ SV SetFns (cell value, void (*exec)(), void (*comp)()) {
 }
 
 SV AddKeyword (char *name, void (*xte)(), void (*xtc)()) {
-    if (header(name)) {
+    if (AddHead(name)) {
         SetFns(NOTANEQU, xte, xtc);
         hp++;
     }
 }
 
 SV AddEquate (char *name, cell value) {
-    if (header(name)) {
+    if (AddHead(name)) {
         SetFns(value, Equ_Exec, Equ_Comp);
         hp++;
     }
@@ -436,7 +449,7 @@ SV AddEquate (char *name, cell value) {
 
 // Modify the ALU instruction being constructed
 SV AddModifier (char *name, cell value) {
-    if (header(name)) {
+    if (AddHead(name)) {
         SetFns(value, doInstMod, noCompile);
         hp++;
     }
@@ -444,7 +457,7 @@ SV AddModifier (char *name, cell value) {
 
 // Literal operations literal data from the stack and toCode the instruction.
 SV AddLitOp (char *name, cell value) {
-    if (header(name)) {
+    if (AddHead(name)) {
         SetFns(value, doLitOp, noCompile);
         hp++;
     }
@@ -534,15 +547,41 @@ SV doDASM (void) { // ( addr len -- )
     }
 }
 
+static char format[260];                // format string depends on cell width
+uint8_t fmtptr;                         // so we need to construct it...
+
+SV AppendFmt(char* s) {
+    int len = strlen(s);
+    for (int i = 0; i < len; i++)
+        format[fmtptr++] = *s++;
+}
+
+SV AddFormat(char* label, int width) {
+    char tmp[2];
+    AppendFmt(label);
+    AppendFmt("_%0");
+    tmp[0] = '0' + (char)((width + 3) >> 2);
+    tmp[1] = '\0';
+    AppendFmt(tmp);
+    AppendFmt("X ");
+}
+
 SV RegDump(void) {
-    printf("N=%x, T=%x, R=%x, W=%x, c=%x ", Dstack[SP], t, Rstack[RP], w, cy);
-    printf("SP=%x, RP=%x, code[%x] = ", sp, rp, pc);
-    DisassembleInsn(Code[pc & (CodeSize - 1)]);
+    fmtptr = 0;
+    AddFormat("N", CELLBITS);     AddFormat("T", CELLBITS);
+    AddFormat("R", CELLBITS);     AddFormat("W", CELLBITS);
+    AddFormat("c", 1);            AddFormat("SP", StackAwidth);
+    AddFormat("RP", StackAwidth); AddFormat("PC", CELLBITS);
+    AddFormat("inst", 16);        AppendFmt("= ");
+    format[fmtptr] = '\0';
+    uint16_t insn = Code[pc & (CodeSize - 1)];
+    printf(format, Dstack[SP], t, Rstack[RP], w, cy, sp, rp, pc, insn);
+    DisassembleInsn(insn);
     printf("\n");
 }
 
-SV doSteps(void) {                     // ( addr steps -- )
-    uint8_t cnt = (uint8_t)Dpop();     // single step debugger gives a listing
+SV doSteps(void) {                      // ( addr steps -- )
+    uint16_t cnt = (uint16_t)Dpop();    // single step debugger gives a listing
     pc = Dpop();
     RegDump();
     for (int i = 0; i < cnt; i++) {
@@ -572,7 +611,7 @@ uint64_t elapsed_us;
 uint64_t elapsed_cycles;
 
 SV doStats(void) {
-    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d, latency=%d", 
+    printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d, latency=%d",
         elapsed_cycles, spMax, rpMax, latency);
     if (elapsed_us > 99) {
         printf(", %" PRId64 " MIPS", elapsed_cycles / elapsed_us);
@@ -669,13 +708,18 @@ SI parseword(char delimiter) {
     return length;
 }
 
-SV doINCLUDE(void) {                    // Nest into a source file
+SV ParseFilename(void) {
     while (buf[toin] == ' ') toin++;
     if (buf[toin] == '"') {
         toin++;  parseword('"');        // allow filename in quotes
-    } else {
+    }
+    else {
         parseword(' ');                 // or a filename with no spaces
     }
+}
+
+SV doINCLUDE(void) {                    // Nest into a source file
+    ParseFilename();
     OpenNewFile(tok);
 }
 
@@ -683,7 +727,7 @@ int DefMark, DefMarkID;
 
 SV doColon(void) {
     parseword(' ');
-    if (header(tok)) {                  // define a word that simulates
+    if (AddHead(tok)) {                  // define a word that simulates
         SetFns(cp, Def_Exec, Def_Comp);
         Header[hp].target = cp;
         DefMarkID = hp++;               // save for later reference
@@ -704,7 +748,7 @@ SV doVARIABLE(void) {
 
 SV doBitfield(void) {
     cell width = Dpop();
-    if ((width == 0) || (width > CELLBITS)) 
+    if ((width == 0) || (width > CELLBITS))
         error = BAD_BITFIELD;
     int shft = bp % CELLBITS;
     int addr = bp / CELLBITS;
@@ -713,7 +757,7 @@ SV doBitfield(void) {
         addr++;
         bp = addr * CELLBITS;           // start a new cell
     }
-    Dpush((addr << (CELLSIZE*2)) | ((width-1) << CELLSIZE) | shft);  
+    Dpush((addr << (CELLSIZE*2)) | ((width-1) << CELLSIZE) | shft);
     doEQU();
     bp += width;
 }
@@ -753,7 +797,7 @@ SV Marker_Exec (void) {                 // execution semantics of a marker
 
 SV doMARKER (void) {
     parseword(' ');
-    if (header(tok)) {                  // define a word that simulates
+    if (AddHead(tok)) {                  // define a word that simulates
         SetFns(cp, Marker_Exec, noCompile);
         Header[hp].w2 = hp;
         hp++;
@@ -1030,8 +1074,8 @@ bogus:                          error = UNRECOGNIZED;
                         }
                     }
                 }
-                if (sp == (StackSize - 1)) error = BAD_STACKUNDER; 
-                if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER; 
+                if (sp == (StackSize - 1)) error = BAD_STACKUNDER;
+                if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER;
                 if (error) {
                     switch (error) {
                     case BYE: return 0;

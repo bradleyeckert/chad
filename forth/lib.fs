@@ -29,6 +29,9 @@ CODE 2*c     T2*c   CO              RET alu  END-CODE macro
 CODE 2/      T2/    CO              RET alu  END-CODE macro
 CODE 2/c     cT2/   CO              RET alu  END-CODE macro
 CODE carry   C      T->N    d+1     RET alu  END-CODE macro
+CODE >carry  N      CO      d-1     RET alu  END-CODE macro
+CODE w       W      T->N    d+1     RET alu  END-CODE macro
+CODE >w      N      T->W    d-1     RET alu  END-CODE macro
 CODE rshift  N>>T           d-1     RET alu  END-CODE macro
 CODE lshift  N<<T           d-1     RET alu  END-CODE macro
 CODE @       T                          alu
@@ -114,32 +117,45 @@ END-CODE
 : abs   dup 0< if negate then ;   \ 6.1.0690  n -- u
 : execute                  >r ;   \ 6.1.1370  xt --
 
-\ Multiplication using shift-and-add, about 190 cycles at 16-bit.
+\ Math iterations are subroutines to minimize the latency of lazy interrupts.
+\ These interrupts modify the RET operation to service ISRs.
+\ RET ends the scope of carry and W so that ISRs may trash them.
+\ Latency is the maximum time between returns.
+
+\ Multiplication using shift-and-add, 160 to 256 cycles at 16-bit.
+\ Latency = 17
+: (um*) 
+    2* >r 2*c carry
+    if  over r> + >r carry +
+    then  r>
+;
 : um*  \ u1 u2 -- ud
-    0 [ cellsize ] literal
-    for 2* >r 2*c carry
-        if  over r> + >r carry +
-        then  r>
-    next
+    0 [ cellsize 2/ ] literal			\ cell is an even number of bits
+    for (um*) (um*) next
     >r nip r> swap
 ;
 
-\ Long division takes about 310 cycles at 16-bit.
+\ Long division takes about 340 cycles at 16-bit.
+\ Latency = 25
+: (um/mod)
+    >r  swap 2*c swap 2*c           	\ 2dividend | divisor
+    carry if	
+        r@ -   0 >carry
+    else	
+        dup r@  - drop              	\ test subtraction
+        carry 0= if  r@ -  then     	\ keep it
+    then
+    r>  carry    						\ carry is safe on the stack 
+;
 : um/mod  \ ud u -- ur uq               \ 6.1.2370
     over over- drop carry
     if  drop drop dup xor
         dup invert  exit                \ overflow = 0 -1
     then
-    [ cellsize ] literal
-    for >r  swap 2*c swap 2*c           \ 2dividend | divisor
-        carry if
-            r@ -   0 2* drop            \ clear carry
-        else
-            dup r@  - drop              \ test subtraction
-            carry 0= if  r@ -  then     \ keep it
-        then
-        r>
-    next
+    [ cellsize 2/ ] literal
+    for (um/mod) >carry
+		(um/mod) >carry
+	next
     drop swap 2*c invert                \ finish quotient
 ;
 
@@ -185,7 +201,7 @@ END-CODE
 
 
 : <   - 0< ;
-: u<  - drop carry ;
+: u<  - drop carry 0= 0= ;
 
 : min    over over- 0< if swap drop exit then  drop ; \ 6.1.1870
 : max    over over- 0< if drop exit then  swap drop ; \ 6.1.1880
