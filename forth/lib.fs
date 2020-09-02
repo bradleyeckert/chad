@@ -5,6 +5,8 @@ empty decimal
 
 0 torg
 
+defer cold  \ a forward reference to resolve with `is`.
+
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
@@ -95,9 +97,6 @@ cellbits 32 = [if]
     r@ @ and  + r> !
 ;
 [then]  \ m 1 
-
-
-
 
 \ Bit field operators
 \ Read is easy: Read, shift, and mask.
@@ -275,7 +274,6 @@ depth 0 assert
 123 4 !  456 8 !  4 @ 123 assert  8 @ 456 assert
 depth 0 assert
 
-
 \ Use colorForth style of recursion
 \ This kind of recursion is non-ANS.
 \ We don't hide a word within its definition.
@@ -308,6 +306,7 @@ cellbits |bits|
 8 bvar mybyte   47 mybyte b!     \ an actual byte
 16 bvar classic 12345 classic b! \ old school 16-bit value
 
+' fib is cold
 
 there . .( instructions used) cr
 \ 0 there dasm

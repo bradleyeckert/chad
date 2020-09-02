@@ -737,11 +737,6 @@ SV doColon(void) {
     }
 }
 
-SV doDEFER(void) {
-    doColon();  state = 0;  toCode(jump);
-    Header[hp].w2 = MAGIC_DEFER;
-}
-
 SV doEQU(void) {
     parseword(' ');
     AddEquate(tok, Dpop());
@@ -833,7 +828,7 @@ SI tick (void) {                        // get the w field of the word
         error = UNRECOGNIZED;
         return 0;
     }
-    return my();                        // W field of found word
+    return Header[me].target;           // W field of found word
 }
 
 SV doSEE (void) {                       // ( <name> -- )
@@ -843,11 +838,16 @@ SV doSEE (void) {                       // ( <name> -- )
     }
 }
 
+SV doDEFER(void) {
+    doColon();  state = 0;  toCode(jump);
+    Header[hp-1].w2 = MAGIC_DEFER;
+}
+
 SV doIS(void) {                        // ( xt <name> -- )
-    int addr;
-    if ((addr = tick())) {
-        Dpush(addr);  Dpush(Header[me].length);  doDASM();
-    }
+    int addr = tick();
+    if (Header[me].w2 != MAGIC_DEFER) error = BAD_IS;
+    cell insn = jump | (Dpop() & 0x1fff);
+    chadToCode(addr, insn);
 }
 
 
@@ -1007,6 +1007,7 @@ SV LoadKeywords(void) {
     AddKeyword ("equ", doEQU, noCompile);
     AddKeyword (":", doColon, noCompile);
     AddKeyword ("defer", doDEFER, noCompile);
+    AddKeyword ("is", doIS, noCompile);
     AddKeyword ("CODE", doCODE, noCompile);
     AddKeyword ("exit", noExecute, compExit);
     AddKeyword (";", doSemiEX, doSemi);

@@ -18,10 +18,10 @@ Reasons not to:
 
 - They are a little slower, especially on write.
 - An ANS compatibility harness will be even slower.
-- Backward compatibility to ANS will cost you.
+- Backward compatibility to ANS will cost a little time.
 
-So, maybe it was a dead-end experiment.
-It did demonstrate exactly how many cycles you would need for `b@` and `b!`.
+VFX compiled ANS Forth `b@` into 18 ia32 instructions. That's fast.
+Bit fields are okay for any code that isn't time-critical.
 
 A bit fields could be used instead of `variable` when raw speed is not needed.
 The bit field specifier, or *bf*, consists of packed address, shift, and width fields.

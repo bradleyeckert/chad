@@ -161,7 +161,7 @@ struct Keyword {
 #define BAD_STACKUNDER   -4 // Stack underflow
 #define BAD_RSTACKOVER   -5 // Return stack overflow
 #define BAD_RSTACKUNDER  -6 // Return stack underflow
-#define BAD_EOF         -58 // unexpected EOF
+#define BAD_EOF         -58 // unexpected EOF in [IF]
 #define BAD_DATA_WRITE  -64 // Write to non-existent data memory
 #define BAD_DATA_READ   -65 // Read from non-existent data memory
 #define BAD_PC          -66 // PC is in non-existent code memory
@@ -176,3 +176,4 @@ struct Keyword {
 #define BAD_ASSERT      -68 // Test failure
 #define BAD_ALU_OP      -72 // Invalid ALU code
 #define BAD_BITFIELD    -73 // Bitfield is too wide for a cell
+#define BAD_IS          -74 // Trying to IS a non-DEFER
