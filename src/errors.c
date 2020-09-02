@@ -85,7 +85,7 @@ void ErrorMessage (int error, char *s) {
        case  -70: msg = "Bad I/O address";                              break;
        case  -71: msg = "Writing to flash without issuing WREN first";  break;
        case  -72: msg = "Invalid ALU opcode";                           break;
-       case  -73: msg = "Bitfield is too wide for a cell";              break;
+       case  -73: msg = "Bitfield is 0 or too wide for a cell";         break;
        case  -80: msg = "Dictionary full";                              break;
        case  -99: msg = "Nesting overflow during include";              break;
        case -100: msg = "ALLOCATE failed";                              break;

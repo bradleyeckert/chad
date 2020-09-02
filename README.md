@@ -5,17 +5,17 @@ James Bowman's seminal paper on the
 [J1 CPU](https://excamera.com/sphinx/fpga-j1.html "J1 CPU") was presented in 2010.
 At under 200 lines of Verilog, the J1 was a real breakthrough in simplicity.
 It also happens to be a very powerful Forth processor.
-Chad tweaks the J1, but it's very similar.
+Chad improves on the J1.
 
-Chad protects your software investment by targeting Verilog
-(or its VHDL equivalent) directly.
-Modern computers are fast enough to simulate the CPU on the order of at-speed.
-Simulation speed on my computer (one AMD Rizen core) depends on the compiler:
+Chad protects your software investment by targeting a very simple but very powerful
+(for its size) stack computer.
+Modern desktop computers are fast enough to simulate the CPU on the order of at-speed.
+Simulation speed on my desktop depends on the compiler:
 
 - 145 MIPS on Code::Blocks 17.12 (GCC).
 - 160 MIPS on Visual Studio 2019 Community Edition.
 
-It's like having a real J1.
+It's like having a real CPU running in an FPGA, but without an FPGA.
 Forth should execute the code it compiles.
 Cross compiling, such as targeting ARM with code running on x86,
 adds a lot of complexity which is completely unnecessary with Chad.

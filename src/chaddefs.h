@@ -13,13 +13,19 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 #define ALL_ONES  ((unsigned)(~0))
 #if (CELLBITS == 32)
 #define cell     uint32_t
-#define CELLSIZE 5 // log2(CELLBITS)
+#define CELLSIZE 5  /* log2(CELLBITS) */
+#define CELL_ADDR(x) (x >> 2)
+#define BYTE_ADDR(x) (x << 2)
 #elif (CELLBITS > 16)
 #define cell     uint32_t
-#define CELLSIZE 5
+#define CELLSIZE 5  /* # of bits needed to address bits in a cell */
+#define CELL_ADDR(x) (x >> 1) 
+#define BYTE_ADDR(x) (x << 1)
 #else
 #define cell     uint16_t
 #define CELLSIZE 4
+#define CELL_ADDR(x) (x >> 1)
+#define BYTE_ADDR(x) (x << 1)
 #endif
 
 #if (CELLBITS < 32)
@@ -65,7 +71,8 @@ struct Keyword {
     cell target;                        // target address if used
 };
 
-#define NOTANEQU -3412 // unused
+#define NOTANEQU -3412
+#define MAGIC_DEFER 1000
 
 // Assembler primitives for the ALU instruction
 // Names are chosen to not conflict with Forth or C
@@ -154,6 +161,7 @@ struct Keyword {
 #define BAD_STACKUNDER   -4 // Stack underflow
 #define BAD_RSTACKOVER   -5 // Return stack overflow
 #define BAD_RSTACKUNDER  -6 // Return stack underflow
+#define BAD_EOF         -58 // unexpected EOF
 #define BAD_DATA_WRITE  -64 // Write to non-existent data memory
 #define BAD_DATA_READ   -65 // Read from non-existent data memory
 #define BAD_PC          -66 // PC is in non-existent code memory

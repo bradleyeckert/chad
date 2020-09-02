@@ -123,14 +123,14 @@ once:   _pc = pc + 1;
                 if (!Dpop()) {_pc = target;}  break;
             case 6:                     /* call */
                 RP = RPMASK & (RP + 1);
-                Rstack[RP & RPMASK] = _pc;
+                Rstack[RP & RPMASK] = BYTE_ADDR(_pc);
                 _pc = target;
                 break;
             default:
                 if (insn & 0x1000) {    /* imm */
                     Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
                     if (insn & 0x100) { /* r->pc */
-                        _pc = Rstack[RP];
+                        _pc = CELL_ADDR(Rstack[RP]);
                         if (RDEPTH == mark) single = 1;
                         RP = RPMASK & (RP - 1);
 #ifdef EnableCPUchecks
@@ -146,7 +146,7 @@ once:   _pc = pc + 1;
             }
         } else { // ALU
             if (insn & 0x100) {          /* r->pc */
-                _pc = Rstack[RP];
+                _pc = CELL_ADDR(Rstack[RP]);
                 if (RDEPTH == mark) single = 1;
 #ifdef EnableCPUchecks
                 uint16_t time = (uint16_t)cycles - retMark;
@@ -178,16 +178,16 @@ once:   _pc = pc + 1;
             case 0x06: _t = s & t;                           break; /* T&N  */
             case 0x16: _t = w & t;                           break; /* T&W  */
             case 0x07: temp = (t >> CELLSIZE) & CELL_AMASK;
-                _t = t >> (2 * CELLSIZE);
+                _t = BYTE_ADDR(t >> (2 * CELLSIZE));
                 w = ~(ALL_ONES << (temp + 1));               break; /* mask */
             case 0x08: sum = (sum_t)s + (sum_t)t;
-                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* T+N  */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* T+N  */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
-                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* T+Nc */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* T+Nc */
             case 0x09: sum = (sum_t)s - (sum_t)t;
-                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* N-T  */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* N-T  */
             case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
-                _c = (sum >> CELLBITS) & 1;  _t = sum;       break; /* N-Tc */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* N-Tc */
             case 0x0A: _t = (t) ? 0 : -1;                    break; /* T0=  */
             case 0x0B: _t = s >> (t & CELL_AMASK);           break; /* N>>T */
             case 0x0C: _t = s << (t & CELL_AMASK);           break; /* N<<T */
@@ -195,7 +195,7 @@ once:   _pc = pc + 1;
             case 0x0D: _t = Rstack[RP];                      break; /* R    */
             case 0x1D: _t = Rstack[RP] - 1;                  break; /* R-1  */
             case 0x0E: if (t & ~(DataSize-1)) { single = BAD_DATA_READ; }
-                _t = Data[t & (DataSize-1)];                 break; /* [T]  */
+                _t = Data[CELL_ADDR(t) & (DataSize - 1)];    break; /* [T]  */
             case 0x1E: _t = readIOmap(t);                    break; /* io[T] */
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
@@ -206,7 +206,7 @@ once:   _pc = pc + 1;
             case  1: Dstack[SP] = t;                         break; /* T->N */
             case  2: Rstack[RP] = t;                         break; /* T->R */
             case  3: if (t & ~(DataSize-1)) { single = BAD_DATA_WRITE; }
-                Data[t & (DataSize-1)] = s;                  break; /* N->[T] */
+                Data[CELL_ADDR(t) & (DataSize - 1)] = s;     break; /* N->[T] */
             case  4: writeIOmap(t, s);                       break; /* N->io[T] */
             case  6: cy = _c;                                break; /* co   */
             case  7: w = t;                                  break; /* T->W */
@@ -572,7 +572,7 @@ SV RegDump(void) {
     AddFormat("R", CELLBITS);     AddFormat("W", CELLBITS);
     AddFormat("c", 1);            AddFormat("SP", StackAwidth);
     AddFormat("RP", StackAwidth); AddFormat("PC", CELLBITS);
-    AddFormat("inst", 16);        AppendFmt("= ");
+    AddFormat("inst", 16);        AppendFmt("\\ ");
     format[fmtptr] = '\0';
     uint16_t insn = Code[pc & (CodeSize - 1)];
     printf(format, Dstack[SP], t, Rstack[RP], w, cy, sp, rp, pc, insn);
@@ -727,7 +727,7 @@ int DefMark, DefMarkID;
 
 SV doColon(void) {
     parseword(' ');
-    if (AddHead(tok)) {                  // define a word that simulates
+    if (AddHead(tok)) {                 // define a word that simulates
         SetFns(cp, Def_Exec, Def_Comp);
         Header[hp].target = cp;
         DefMarkID = hp++;               // save for later reference
@@ -735,6 +735,11 @@ SV doColon(void) {
         fence = cp;                     // code starts here
         ConSP = 0;
     }
+}
+
+SV doDEFER(void) {
+    doColon();  state = 0;  toCode(jump);
+    Header[hp].w2 = MAGIC_DEFER;
 }
 
 SV doEQU(void) {
@@ -760,6 +765,24 @@ SV doBitfield(void) {
     Dpush((addr << (CELLSIZE*2)) | ((width-1) << CELLSIZE) | shft);
     doEQU();
     bp += width;
+}
+
+SV doBitAlign(void) {
+    bp = ((bp / CELLBITS) + 1) * CELLBITS;
+}
+
+SV doDEFINED(void) {                    // [defined]
+    parseword(' ');
+    int r = (findname(tok) < 0) ? 0 : 1;
+    if (r) {
+        if (Header[me].target == 0) r = 0;
+    }
+    Dpush(r);
+}
+
+SV doUNDEFINED(void) {                  // [undefined]
+    doDEFINED();
+    Dpush(~Dpop());
 }
 
 SV SaveLength(void) {                   // resolve length of definition
@@ -820,6 +843,15 @@ SV doSEE (void) {                       // ( <name> -- )
     }
 }
 
+SV doIS(void) {                        // ( xt <name> -- )
+    int addr;
+    if ((addr = tick())) {
+        Dpush(addr);  Dpush(Header[me].length);  doDASM();
+    }
+}
+
+
+SV doNothing (void) { }
 SV doCODE    (void) { doColon(); state = 0; context |= 8;  Dpush(0);}
 SV doENDCODE (void) { SaveLength();        context &= ~8;  Dpop();  sane();}
 SV doEMPTY   (void) { hp = emptiness; }
@@ -847,6 +879,73 @@ SV doTcomma  (void) { toCode(Dpop()); }
 SV doComma   (void) { toData(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
 SV doSemi    (void) { compExit();  SaveLength();  state = 0;  sane();}
+SV doSemiEX  (void) { SaveLength();  sane(); }
+
+// `;` in immediate mode assumes fall through to next word. Resolve the length.
+
+SI refill(void) {
+    int result = -1;
+ask: toin = 0;
+    File.LineNumber++;
+    if (File.fp == stdin) {
+        printf("ok>");
+    }
+    if (fgets(buf, maxlen, File.fp) == NULL) {
+        result = 0;
+        if (filedepth) {
+            fclose(File.fp);
+            filedepth--;
+            goto ask;
+        }
+    }
+    else {
+        char* p;                        // remove trailing newline
+        if ((p = strchr(buf, '\n')) != NULL) *p = '\0';
+        int len = strlen(buf);
+        for (int i = 0; i < len; i++) {
+            if (buf[i] == '\t')         // replace tabs with blanks
+                buf[i] = ' ';
+            if (buf[i] == '\r')         // trim CR if present
+                buf[i] = '\0';
+        }
+    }
+    // save the line for error reporting
+    strmove(File.Line, buf, LineBufferSize);
+    return result;
+}
+
+// [IF ] [ELSE] [THEN]
+
+static void do_ELSE(void) {
+    int level = 1;
+    while (level) {
+        parseword(' ');
+        int length = strlen(tok);
+        if (length) {
+            if (!strcmp(tok, "[if]")) {
+                level++;
+            }
+            if (!strcmp(tok, "[then]")) {
+                level--;
+            }
+            if (!strcmp(tok, "[else]") && (level == 1)) {
+                level--;
+            }
+        }
+        else {                        // EOL
+            if (!refill()) {
+                error = BAD_EOF;
+                return;
+            }
+        }
+    }
+}
+static void do_IF(void) {
+    int flag = Dpop();
+    if (!flag) {
+        do_ELSE();
+    }
+}
 
 // Keywords are visible based on bits in context.
 // Set the same bits in current while loading hp.
@@ -857,6 +956,11 @@ SV LoadKeywords(void) {
     current = -1;   // visible everywhere
     AddKeyword (">context", doToContx, noCompile);  // ( n -- )
     AddKeyword ("assert", doAssert, noCompile);     // ( n1 n2 -- )
+    AddKeyword ("[if]", do_IF, noCompile);
+    AddKeyword ("[then]", doNothing, noCompile);
+    AddKeyword ("[else]", do_ELSE, noCompile);
+    AddKeyword ("[undefined]", doUNDEFINED, noCompile);
+    AddKeyword ("[defined]", doDEFINED, noCompile);
     current = 1;    // hosting tools
     AddKeyword ("empty", doEMPTY, noCompile);
     AddKeyword ("context>", doContext, noCompile);  // ( -- n )
@@ -883,7 +987,7 @@ SV LoadKeywords(void) {
     AddEquate  ("code-writable", CodeFence);
     AddEquate  ("code-size", CodeSize);
     AddEquate  ("data-size", DataSize);
-    AddEquate  ("cellsize", CELLBITS);
+    AddEquate  ("cellbits", CELLBITS);
     AddKeyword ("t,", doTcomma, noCompile);
     AddKeyword ("there", doThere, noCompile);
     AddKeyword ("torg", doTorg, noCompile);
@@ -892,7 +996,8 @@ SV LoadKeywords(void) {
     AddKeyword ("here", doHere, noCompile);
     AddKeyword ("org", doOrg, noCompile);
     AddKeyword ("variable", doVARIABLE, noCompile);
-    AddKeyword ("bits", doBitfield, noCompile);
+    AddKeyword ("bvar", doBitfield, noCompile);
+    AddKeyword ("balign", doBitAlign, noCompile);
     AddKeyword ("bhere", doBhere, noCompile);
     AddKeyword ("borg", doBorg, noCompile);
     AddKeyword ("[", doToExec, doToExec);
@@ -901,9 +1006,10 @@ SV LoadKeywords(void) {
     AddKeyword ("marker", doMARKER, noCompile);
     AddKeyword ("equ", doEQU, noCompile);
     AddKeyword (":", doColon, noCompile);
+    AddKeyword ("defer", doDEFER, noCompile);
     AddKeyword ("CODE", doCODE, noCompile);
     AddKeyword ("exit", noExecute, compExit);
-    AddKeyword (";", noExecute, doSemi);
+    AddKeyword (";", doSemiEX, doSemi);
     AddKeyword ("literal", noExecute, doLITERAL);
     AddKeyword ("macro", doMACRO, noCompile);
     AddKeyword ("immediate", doIMMEDIATE, noCompile);
@@ -984,33 +1090,6 @@ SV LoadKeywords(void) {
 // Text Interpreter
 // Processes a line at a time from either stdin or a file.
 
-SV refill (void) {
-ask: toin = 0;
-    File.LineNumber++;
-    if (File.fp == stdin) {
-        printf("ok>");
-    }
-    if (fgets(buf, maxlen, File.fp) == NULL) {
-        if (filedepth) {
-            fclose(File.fp);
-            filedepth--;
-            goto ask;
-        }
-    } else {
-        char* p;                        // remove trailing newline
-        if ((p = strchr(buf, '\n')) != NULL) *p = '\0';
-        int len = strlen(buf);
-        for (int i=0; i<len; i++) {
-            if (buf[i] == '\t')         // replace tabs with blanks
-                buf[i] = ' ';
-            if (buf[i] == '\r')         // trim CR if present
-                buf[i] = '\0';
-        }
-    }
-    // save the line for error reporting
-    strmove (File.Line, buf, LineBufferSize);
-}
-
 int chad(char * line, int maxlength) {
     buf = line;  maxlen = maxlength;    // assign a working buffer
     LoadKeywords();
@@ -1044,9 +1123,12 @@ int chad(char * line, int maxlength) {
                             cp = i;  break;
                         default:
                             c = c - '0';
-                            if (c & 0x80) {goto bogus;}
-                            if (c > 9)    {c -= 7;}
-                            if (c > radix) {
+                            if (c & 0x80) goto bogus;
+                            if (c > 9) {
+                                c -= 7;
+                                if (c < 10) goto bogus;
+                            }
+                            if (c >= radix) {
 bogus:                          error = UNRECOGNIZED;
                             }
                             x = x * radix + c;

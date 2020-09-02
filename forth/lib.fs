@@ -63,6 +63,41 @@ CODE overxor   T^N                     RET alu END-CODE macro
 CODE rdrop     T                   r-1     alu END-CODE macro
 CODE tuck!     T     N->[T]        d-1 RET alu END-CODE macro
 CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
+CODE dup@      T                           alu
+			   [T]   T->N          d+1     alu END-CODE macro
+
+: =  xor 0= ;
+
+cellbits 32 = [if]
+: cells 2* 2* ; macro
+: cell+ 4 + ; macro
+: c@  dup@ swap 3 and 3 lshift rshift $FF and ;
+: w@  dup@ swap 2 and 3 lshift rshift $FFFF and ;
+: (x!)  ( u w-addr bitmask wordmask )
+	>w swap
+	dup>r and 3 lshift dup>r lshift 
+	w r> lshift invert
+    r@ @ and  + r> !
+;
+
+: w! ( u w-addr -- )  2 $FFFF (x!) ;
+: c! ( u w-addr -- )  3 $FF   (x!) ;
+[else]
+: cells 2* ; macro
+: cell+ 2 + ; macro
+: c@  dup@ swap 1 and 3 lshift rshift $FF and ;
+: c! ( u c-addr -- )
+    dup>r 1 and if
+        8 lshift  $00FF
+    else
+        255 and   $FF00
+    then
+    r@ @ and  + r> !
+;
+[then]  \ m 1 
+
+
+
 
 \ Bit field operators
 \ Read is easy: Read, shift, and mask.
@@ -109,7 +144,6 @@ END-CODE
 : 2dup  over over ; macro \ d -- d d
 : 1+ 1 + ; macro
 : 1- 1 - ; macro
-: =                    xor 0= ;   \ 6.1.0530  x y -- f
 : <>                xor 0= 0= ;   \ 6.2.0500  x y -- f
 : 0<>                   0= 0= ; macro   \ 6.2.0260  x y -- f
 : negate            invert 1+ ;
@@ -130,7 +164,7 @@ END-CODE
     then  r>
 ;
 : um*  \ u1 u2 -- ud
-    0 [ cellsize 2/ ] literal			\ cell is an even number of bits
+    0 [ cellbits 2/ ] literal			\ cell is an even number of bits
     for (um*) (um*) next
     >r nip r> swap
 ;
@@ -152,7 +186,7 @@ END-CODE
     if  drop drop dup xor
         dup invert  exit                \ overflow = 0 -1
     then
-    [ cellsize 2/ ] literal
+    [ cellbits 2/ ] literal
     for (um/mod) >carry
 		(um/mod) >carry
 	next
@@ -237,11 +271,14 @@ depth 0 assert
 -1 5 d2* 11 assert -2 assert
 -5 -7 d2/ -4 assert -3 assert
 depth 0 assert
-\ Note: Data memory is cell-addressed. The test allows byte addressing.
+\ Note: Data memory is byte-addressed, allow 4-byte cells
 123 4 !  456 8 !  4 @ 123 assert  8 @ 456 assert
 depth 0 assert
 
+
 \ Use colorForth style of recursion
+\ This kind of recursion is non-ANS.
+\ We don't hide a word within its definition.
 
 : fib ( n1 -- n2 )
     dup 2 < if drop 1 exit then
@@ -250,24 +287,27 @@ depth 0 assert
 
 \ Try 25 fib, then stats
 
-\ sample lookup table:
+\ sample lookup tables are built with code (you can't read code space)
+\ Notice the fall-through of exec2:.
+\ `;` in immediate mode does not compile a return.
 
-: exec2: 2* r> + >r ; \ for list of 2-cell literals
-: exec:  r> + >r ; \ for list of 2-cell literals
+: exec2: 2* [ ;       \ for list of 2-cell literals
+: exec:  2* r> + >r ; \ for list of 1-cell literals
 
-cellsize |bits|
+cellbits |bits|
 : table  exec2: [ 123 | 456 | 789 | 321 ] literal ;
 11 |bits|
 : table1  exec: [ 123 | 456 | 789 | 321 ] literal ;
-cellsize |bits|
+cellbits |bits|
 
 \ Bit fields you can test with
 
-6 bits base     10 base b!       \ to handle up to base 36
-1 bits state     0 state b!      \ yup
-7 bits percent  33 percent b!    \ for numbers 0 to 100
-8 bits mybyte   47 mybyte b!     \ an actual byte
-16 bits classic 12345 classic b! \ old school 1-bit value
+6 bvar base     10 base b!       \ to handle up to base 36
+1 bvar state     0 state b!      \ yup
+7 bvar percent  33 percent b!    \ for numbers 0 to 100
+8 bvar mybyte   47 mybyte b!     \ an actual byte
+16 bvar classic 12345 classic b! \ old school 16-bit value
+
 
 there . .( instructions used) cr
 \ 0 there dasm

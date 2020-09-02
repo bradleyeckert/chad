@@ -1,10 +1,4 @@
-# Chad's rendition of the J1 CPU architecture
-
-All addressing is in cells. Bytes are not supported in hardware because you
-should not be thinking bytes. Bytes are so 1970s.
-Bytes are bit fields with a width of 8.
-Why are applications declaring variables in bytes?
-They should be using bit fields. RAM on a small processor isn't cheap.
+# Novix Stack Computer architecture, Chad style
 
 Data and return stacks don't need to be deep. A frame stack abstraction should
 be used by library code to move excess stack contents to and from the frame
@@ -14,20 +8,13 @@ stacks and `]f` would restore the stacks.
 For example, `2 f[` would leave nothing but two items on the data stack and
 an empty return stack. `stats` tells you how deep your code is actually stacking.
 
-Bit fields should be used instead of variables when raw speed is not needed.
-They can use `b@` and `b!` as operators.
-The bit address consists of packed address, shift, and width fields.
-A 16-bit cell would address a bit field within a 256-cell block of RAM.
-
-Support of double precision math was lacking in the J1. Chad supports carry.
-Arbitrary width literals are supported in hardware.
-The same trick allows jumps and calls into an arbitrarily large
-(but physically limited to *2^cellsize* words) of code space.
-Requiring fewer bits in the `imm` instruction freed up two extra bits
-(currently unused) in the ALU instruction.
-
-The J1 is a little unwieldy for loops.
-A small tweak allows a 3-instruction `for` `next` loop.
+The Chad ISA was inspired by the J1 architecture.
+How did Bowman come up with the J1?
+Somehow the stars lined up and out popped the J1.
+What a great architecture for the future of computing.
+Some small tweaks to the J1 facilitate double precision math, looping,
+large address spaces, bit field operations, and room for user instructions.
+The result is the Chad ISA.
 
 ## Chad ISA summary
 
@@ -36,7 +23,7 @@ A small tweak allows a 3-instruction `for` `next` loop.
     x = unused
     p = 5-bit ALU operation select
     R = return
-    w = strobe select {-, TN, TR, wr, iow, ior, co, w, ...}
+    w = strobe select {-, TN, TR, wr, iow, ior, co, TW, ...}
     r = return stack displacement
     s = data stack displacement
 100nnnnn nnnnnnnn = jump
@@ -144,62 +131,6 @@ for: ...
      T0=  T->R
      zjump for
                      r-1
-```
-
-**Bytes and bit fields** need shifters:
-
-- `mask` T = ~(-1 << MASK) & T
-- `T>>8` T = T >> 8; MASK = T\[7:4]
-- `T<<8` T = T << 8;
-- `rshift` T = N >> T
-- `lshift` T = N << T
-
-Example use of bit fields:
-
-```
-5 bits myvar  \ declare a 5-bit variable
-11 myvar b!   \ store 11 to it
-myvar b@ .    \ read and print it
-```
-
-Bit field read is 6 cycles.
-
-```
-b@: mask    T->N    d+1     alu \ ( count baddr )
-    T                       alu \ wait for read to settle
-    [T]                     alu \ read the cell
-    N       T->N            alu
-    N>>T            d-1     alu
-    T&W     RET         r-1 alu \ apply the mask
-```
-
-Bit field write is 22 cycles. Is that so bad?
-You read them a lot more often than you write them.
-If it's too slow, use a `variable`.
-    
-```
-b!: N       T->N            alu \ ( baddr n )
-    N       T->R    d-1 r+1 alu
-    mask    T->N    d+1     alu
-    N       T->N    d+1     alu
-    R       T->N    d+1 r-1 alu
-    N       T->N            alu
-    N<<T            d-1     alu \ T is shifted and aligned n
-    N       T->R    d-1 r+1 alu
-    N       T->N            alu
-    W       T->N    d+1     alu
-    N       T->N            alu
-    N<<T            d-1     alu
-    ~T                      alu \ T is mask for read-modify-write
-    N       T->N    d+1     alu
-    T                       alu \ wait for read to settle
-    [T]                     alu
-    T&N             d-1     alu \ Zero the bits in the read data
-    R       T->N    d+1 r-1 alu
-    T+N             d-1     alu \ merge n
-    N       T->N            alu
-    T       N->[T]  d-1     alu \ save it
-    N       RET     d-1 r-1 alu
 ```
 
 **Literal extension instruction** `litx` extends literals and jump destinations.
