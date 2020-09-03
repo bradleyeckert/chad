@@ -93,7 +93,6 @@ SV Rpush(cell v) // push v on the return stack
 // We want to single step or run. To single step, use single = 1.
 // Execution starts at the pc. It returns a code:
 // 1 = finished with execution
-// 2 = PC is not in code space
 // other = stepped
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
@@ -145,7 +144,7 @@ once:   _pc = pc + 1;
                 }
             }
         } else { // ALU
-            if (insn & 0x100) {          /* r->pc */
+            if (insn & 0x100) {         /* r->pc */
                 _pc = CELL_ADDR(Rstack[RP]);
                 if (RDEPTH == mark) single = 1;
 #ifdef EnableCPUchecks
@@ -160,56 +159,56 @@ once:   _pc = pc + 1;
             cell temp;
             sum_t sum;
             switch ((insn >> 9) & 0x1F) {
-            case 0x00: _t = t;                               break; /* T    */
-            case 0x01: _t = (t & MSB) ? -1 : 0;              break; /* T<0  */
-            case 0x11: _t = cy;                              break; /* C    */
+            case 0x00: _t = t;                               break; /*      T */
+            case 0x01: _t = (t & MSB) ? -1 : 0;              break; /*    T<0 */
+            case 0x11: _t = cy;                              break; /*      C */
             case 0x02: _c = t & 1;  temp = (t & MSB);
-                _t = (t >> 1) | temp;                        break; /* T2/  */
+                _t = (t >> 1) | temp;                        break; /*    T2/ */
             case 0x12: _c = t & 1;
-                _t = (t >> 1) | (cy << (CELLBITS-1));        break; /* cT2/ */
+                _t = (t >> 1) | (cy << (CELLBITS-1));        break; /*   cT2/ */
             case 0x03: _c = t >> (CELLBITS-1);
-                       _t = t << 1;                          break; /* T2*  */
+                       _t = t << 1;                          break; /*    T2* */
             case 0x13: _c = t >> (CELLBITS-1);
-                       _t = (t << 1) | cy;                   break; /* T2*c */
-            case 0x04: _t = s;                               break; /* N    */
-            case 0x14: _t = w;                               break; /* W    */
-            case 0x05: _t = s ^ t;                           break; /* T^N  */
-            case 0x15: _t = ~t;                              break; /* ~T   */
-            case 0x06: _t = s & t;                           break; /* T&N  */
-            case 0x16: _t = w & t;                           break; /* T&W  */
+                       _t = (t << 1) | cy;                   break; /*   T2*c */
+            case 0x04: _t = s;                               break; /*      N */
+            case 0x14: _t = w;                               break; /*      W */
+            case 0x05: _t = s ^ t;                           break; /*    T^N */
+            case 0x15: _t = ~t;                              break; /*     ~T */
+            case 0x06: _t = s & t;                           break; /*    T&N */
+            case 0x16: _t = w & t;                           break; /*    T&W */
             case 0x07: temp = (t >> CELLSIZE) & CELL_AMASK;
                 _t = BYTE_ADDR(t >> (2 * CELLSIZE));
-                w = ~(ALL_ONES << (temp + 1));               break; /* mask */
+                w = ~(ALL_ONES << (temp + 1));               break; /*   mask */
             case 0x08: sum = (sum_t)s + (sum_t)t;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* T+N  */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    T+N */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* T+Nc */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*   T+Nc */
             case 0x09: sum = (sum_t)s - (sum_t)t;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* N-T  */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    N-T */
             case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /* N-Tc */
-            case 0x0A: _t = (t) ? 0 : -1;                    break; /* T0=  */
-            case 0x0B: _t = s >> (t & CELL_AMASK);           break; /* N>>T */
-            case 0x0C: _t = s << (t & CELL_AMASK);           break; /* N<<T */
+                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*   N-Tc */
+            case 0x0A: _t = (t) ? 0 : -1;                    break; /*    T0= */
+            case 0x0B: _t = s >> (t & CELL_AMASK);           break; /*   N>>T */
+            case 0x0C: _t = s << (t & CELL_AMASK);           break; /*   N<<T */
 
-            case 0x0D: _t = Rstack[RP];                      break; /* R    */
-            case 0x1D: _t = Rstack[RP] - 1;                  break; /* R-1  */
+            case 0x0D: _t = Rstack[RP];                      break; /*      R */
+            case 0x1D: _t = Rstack[RP] - 1;                  break; /*    R-1 */
             case 0x0E: if (t & ~(DataSize-1)) { single = BAD_DATA_READ; }
-                _t = Data[CELL_ADDR(t) & (DataSize - 1)];    break; /* [T]  */
-            case 0x1E: _t = readIOmap(t);                    break; /* io[T] */
+                _t = Data[CELL_ADDR(t) & (DataSize - 1)];    break; /*    [T] */
+            case 0x1E: _t = readIOmap(t);                    break; /*  io[T] */
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
             }
-            SP = SPMASK & (SP + sign2b[insn & 3]);                 /* dstack+- */
-            RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);          /* rstack+- */
+            SP = SPMASK & (SP + sign2b[insn & 3]);                /* dstack+- */
+            RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);         /* rstack+- */
             switch ((insn >> 4) & 7) {
-            case  1: Dstack[SP] = t;                         break; /* T->N */
-            case  2: Rstack[RP] = t;                         break; /* T->R */
+            case  1: Dstack[SP] = t;                         break;   /* T->N */
+            case  2: Rstack[RP] = t;                         break;   /* T->R */
             case  3: if (t & ~(DataSize-1)) { single = BAD_DATA_WRITE; }
                 Data[CELL_ADDR(t) & (DataSize - 1)] = s;     break; /* N->[T] */
-            case  4: writeIOmap(t, s);                       break; /* N->io[T] */
-            case  6: cy = _c;                                break; /* co   */
-            case  7: w = t;                                  break; /* T->W */
+            case  4: writeIOmap(t, s);                     break; /* N->io[T] */
+            case  6: cy = _c;                                break;   /*   co */
+            case  7: w = t;                                  break;   /* T->W */
             default: break;
             }
             t = _t & CELLMASK;
@@ -239,9 +238,9 @@ CELL cp = 0;                            // dictionary pointer for code space
 CELL dp = 0;                            // dictionary pointer for data space
 CELL bp = 0;                            // bitfield pointer
 CELL fence = 0;                         // latest writable code word
-SI notail = 0;                          // tail recursion inhibited for recent call
+SI notail = 0;                          // tail recursion inhibited for call
 
-SV toCode (cell x) {                     // compile to code space
+SV toCode (cell x) {                    // compile to code space
     chadToCode(cp++, x);
 }
 SV compExit (void) {                    // compile an exit
@@ -355,34 +354,137 @@ SV toData(cell x) {                     // compile to data space
 
 //##############################################################################
 // Dictionary
-// The dictionary is a simple linear list that uses a bit mask for context.
+// The dictionary uses a static array of data structures loaded at startup.
+// Links are int indices into this array of Headers.
 
 CELL base = 10;
 CELL state = 0;
 SI hp;                                  // # of keywords in the Header list
-SI emptiness;                           // EMPTY sets hp to this
+SI emptyhead;                           // EMPTY sets hp to this
+SI emptywids;
 static struct Keyword Header[MaxKeywords];
-CELL me;                                // index of keyword being executed
-CELL context = 15;
-CELL current = 1;
+CELL me;                                // index of found keyword
 
-SI findname (char *key) {               // return index of word, -1 if not found
+// The search order is a lists of contexts with order[orders] searched first
+// order:   wid3 wid2 wid1
+// context------------^ ^-----orders
+// A wid points to a linked list of headers.
+// The head pointer of the list is created by WORDLIST. 
+// In Forth, it would just be a cell in the dictionary placed by comma.
+// The paradigm here expects names for everything.
+
+SI order[32];                           // search order list
+SI orders;                              // items in the search order list
+static uint16_t wordlist[MaxWordlists]; // head pointers to linked lists
+static char wordlistname[MaxWordlists][16];// optional name string
+SI wordlists;
+SI root_wid;                            // the basic wordlists
+SI forth_wid;
+SI asm_wid;
+SI current;                             // the current definition
+SI context(void) { return order[orders]; } // top of context
+
+SV printWID(int wid) {
+    char* s = &wordlistname[wid][0];
+    if (*s)
+        printf("%s ", s);
+    else
+        printf("%d ", wid);
+}
+
+SV doORDER(void) {
+    printf(" Context : ");  
+    for (int i = 1; i <= orders; i++)  printWID(order[i]);
+    printf("\n Current : ");  printWID(current);
+}
+
+SI findinWL(char* key, int wid) {       // find in wordlist
+    uint16_t i = wordlist[wid];
     if (strlen(key) < MaxNameSize) {
-        int i = hp;
-        while (--i >= 0) {              // scan the list backwards
-            if (Header[i].context & context) {
-                if (strcmp(key, Header[i].name) == 0) {
-                    me = i;
-                    return i;
-                }
+        while (i) {
+            if (strcmp(key, Header[i].name) == 0) {
+                me = i;
+                return i;
             }
+            i = Header[i].link;
         }
+    }
+    return -1;                          // return index of word, -1 if not found
+}
+
+SI findinCT(char* key) {                // find in context
+    for (int i = orders; i > 0; i--) {
+        int id = findinWL(key, i);
+        if (id >= 0) return id;
     }
     return -1;
 }
 
+// A strncpy that complies with C safety checks.
+
+void strmove(char* dest, char* src, int maxlen) {
+    for (int i = 0; i < maxlen; i++) {
+        char c = *src++;  *dest++ = c;
+        if (c == 0) return;
+    }
+    *--dest = 0;                        // max reached, add terminator
+}
+
+SI AddWordlist(char *name) {
+    wordlist[++wordlists] = 0;          // start with empty wordlist
+    strmove(&wordlistname[wordlists][0], name, 16);
+    if (wordlists == (MaxWordlists - 1)) error = BAD_WID_OVER;
+    return wordlists;
+}
+
+SV ListWords(int wid) {                 // in a given wordlist
+    uint16_t i = wordlist[wid];
+    while (i) {
+        printf("%s ", Header[i].name);
+        i = Header[i].link;             // traverse from oldest
+    }
+}
+SV doWoords(void) {
+    ListWords(context());           // top of wordlist
+    printf("\n");
+}
+
+SV OrderPush(int n) {
+    order[31 & ++orders] = n;
+    if (orders == 16) error = BAD_ORDER_OVER;
+}
+
+SI OrderPop(void) {
+    int r = (order[31 & orders--]);
+    if (orders < 0) error = BAD_ORDER_UNDER;
+    return r;
+}
+
+SV doONLY(void) { orders = 0; OrderPush(root_wid); OrderPush(forth_wid); }
+SV doFORTH(void) { order[orders] = forth_wid; }
+SV doASSEMBLER(void) { order[orders] = asm_wid; }
+SV doDEFINITIONS(void) { current = context(); }
+SV doPlusOrder(void) { OrderPush(Dpop()); }
+SV doSetCurrent(void) { current = Dpop(); }
+SV doGetCurrent(void) { Dpush(current); }
+
+SV doGetOrder(void) {
+    for (int i = 0; i < orders; i++)
+        Dpush(order[i]);
+    Dpush(orders);
+}
+
+SV doSetOrder(void) {
+    uint8_t len = Dpop();
+    orders = 0;
+    for (int i = 0; i < len; i++)
+        OrderPush(Dpop());
+}
+
+// REMOVE this, ccontext, header context field
+
 SI NotKeyword (char *key) {             // do a command, return 0 if found
-    int i = findname(key);
+    int i = findinCT(key);
     if (i < 0)
         return -1;                      // not found
     if (state)
@@ -401,25 +503,17 @@ SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
 SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
 
-// A strncpy that complies with C safety checks.
-
-void strmove (char *dest, char *src, int maxlength) {
-    for (int i=0; i<maxlength; i++) {
-        char c = *src++;  *dest++ = c;
-        if (c == 0) return;
-    }   
-    *--dest = 0;                        // max reached, add terminator
-}
-
 SI AddHead (char * s) {                 // add a header to the list
     int r = 1;
+    hp++;
     if (hp < MaxKeywords) {
         strmove(Header[hp].name, s, MaxNameSize);
-        Header[hp].context = current;
         Header[hp].length = 0;          // set defaults to 0
         Header[hp].notail = 0;
         Header[hp].target = 0;
         Header[hp].notail = 0;
+        Header[hp].link = wordlist[current];
+        wordlist[current] = hp;
     } else {
         printf("Please increase MaxKeywords and rebuild.\n");
         r = 0;  error = BYE;
@@ -436,14 +530,12 @@ SV SetFns (cell value, void (*exec)(), void (*comp)()) {
 SV AddKeyword (char *name, void (*xte)(), void (*xtc)()) {
     if (AddHead(name)) {
         SetFns(NOTANEQU, xte, xtc);
-        hp++;
     }
 }
 
-SV AddEquate (char *name, cell value) {
+SV AddEquate(char* name, cell value) {
     if (AddHead(name)) {
         SetFns(value, Equ_Exec, Equ_Comp);
-        hp++;
     }
 }
 
@@ -451,7 +543,6 @@ SV AddEquate (char *name, cell value) {
 SV AddModifier (char *name, cell value) {
     if (AddHead(name)) {
         SetFns(value, doInstMod, noCompile);
-        hp++;
     }
 }
 
@@ -459,27 +550,17 @@ SV AddModifier (char *name, cell value) {
 SV AddLitOp (char *name, cell value) {
     if (AddHead(name)) {
         SetFns(value, doLitOp, noCompile);
-        hp++;
     }
 }
 
 //##############################################################################
 // Facilities for viewing, debugging, etc.
 
-SV doWORDS (void) {
-    for (int i=0; i<hp; i++) {
-        if (Header[i].context & context) {
-            printf("%s ", Header[i].name);
-        }
-    }
-    printf("\n");
-}
-
 // Disassembler
 
 static char* TargetName (cell addr) {
     if (!addr) return NULL;
-    for (int i=0; i<hp; i++) {
+    for (int i = 1; i <= hp; i++) {
         if (Header[i].target == addr) {
             return Header[i].name;
         }
@@ -730,7 +811,7 @@ SV doColon(void) {
     if (AddHead(tok)) {                 // define a word that simulates
         SetFns(cp, Def_Exec, Def_Comp);
         Header[hp].target = cp;
-        DefMarkID = hp++;               // save for later reference
+        DefMarkID = hp;                 // save for later reference
         DefMark = cp;  state = 1;
         fence = cp;                     // code starts here
         ConSP = 0;
@@ -742,8 +823,14 @@ SV doEQU(void) {
     AddEquate(tok, Dpop());
 }
 
+SV doLexicon(void) {                    // named wordlist
+    parseword(' ');
+    AddEquate(tok, AddWordlist(tok));
+}
+
 SV doVARIABLE(void) {
-    Dpush(dp++);  doEQU();
+    Dpush(dp);  doEQU();
+    dp += BYTE_ADDR(1);
 }
 
 SV doBitfield(void) {
@@ -768,7 +855,7 @@ SV doBitAlign(void) {
 
 SV doDEFINED(void) {                    // [defined]
     parseword(' ');
-    int r = (findname(tok) < 0) ? 0 : 1;
+    int r = (findinCT(tok) < 0) ? 0 : 1;
     if (r) {
         if (Header[me].target == 0) r = 0;
     }
@@ -818,13 +905,12 @@ SV doMARKER (void) {
     if (AddHead(tok)) {                  // define a word that simulates
         SetFns(cp, Marker_Exec, noCompile);
         Header[hp].w2 = hp;
-        hp++;
     }
 }
 
 SI tick (void) {                        // get the w field of the word
     parseword(' ');
-    if (findname(tok) < 0) {
+    if (findinCT(tok) < 0) {
         error = UNRECOGNIZED;
         return 0;
     }
@@ -840,7 +926,7 @@ SV doSEE (void) {                       // ( <name> -- )
 
 SV doDEFER(void) {
     doColon();  state = 0;  toCode(jump);
-    Header[hp-1].w2 = MAGIC_DEFER;
+    Header[hp].w2 = MAGIC_DEFER;
 }
 
 SV doIS(void) {                        // ( xt <name> -- )
@@ -850,11 +936,10 @@ SV doIS(void) {                        // ( xt <name> -- )
     chadToCode(addr, insn);
 }
 
-
 SV doNothing (void) { }
-SV doCODE    (void) { doColon(); state = 0; context |= 8;  Dpush(0);}
-SV doENDCODE (void) { SaveLength();        context &= ~8;  Dpop();  sane();}
-SV doEMPTY   (void) { hp = emptiness; }
+SV doCODE    (void) { doColon();  state = 0;  OrderPush(asm_wid);  Dpush(0);}
+SV doENDCODE (void) { SaveLength();  OrderPop();  Dpop();  sane();}
+SV doEMPTY   (void) { hp = emptyhead; }
 SV doBYE     (void) { error = BYE; }
 SV doHEX     (void) { base = 16; }
 SV doDEC     (void) { base = 10; }
@@ -862,9 +947,7 @@ SV doComment (void) { toin = strlen(buf); }
 SV doCmParen (void) { parseword(')'); }
 SV doComEcho (void) { doCmParen();  printf("%s",tok); }
 SV doCR      (void) { printf("\n"); }
-SV doContext (void) { Dpush(context); }
-SV doToContx (void) { context = Dpop(); }
-SV doToCurrn (void) { current = Dpop(); }
+SV doContext (void) { Dpush(context()); }
 SV doToExec  (void) { state = 0; }
 SV doToComp  (void) { state = 1; }
 SV doTick    (void) { Dpush(tick()); }
@@ -947,24 +1030,39 @@ static void do_IF(void) {
     }
 }
 
+
 // Keywords are visible based on bits in context.
 // Set the same bits in current while loading hp.
 // Current is 1 for host words, 2 for compiler, 4 for definitions
 
 SV LoadKeywords(void) {
     hp = 0; // start empty
-    current = -1;   // visible everywhere
-    AddKeyword (">context", doToContx, noCompile);  // ( n -- )
+    wordlists = 0;
+    // Forth definitions
+    root_wid = AddWordlist("root");
+    forth_wid = AddWordlist("forth");
+    doONLY(); // order = root _forth
+    current = root_wid;
+    AddEquate  ("root", root_wid);
+    AddEquate  ("_forth", forth_wid);
     AddKeyword ("assert", doAssert, noCompile);     // ( n1 n2 -- )
     AddKeyword ("[if]", do_IF, noCompile);
     AddKeyword ("[then]", doNothing, noCompile);
     AddKeyword ("[else]", do_ELSE, noCompile);
     AddKeyword ("[undefined]", doUNDEFINED, noCompile);
     AddKeyword ("[defined]", doDEFINED, noCompile);
-    current = 1;    // hosting tools
     AddKeyword ("empty", doEMPTY, noCompile);
-    AddKeyword ("context>", doContext, noCompile);  // ( -- n )
-    AddKeyword (">current", doToCurrn, noCompile);  // ( n -- )
+    AddKeyword ("forth", doFORTH, noCompile);
+    AddKeyword ("assembler", doASSEMBLER, noCompile);
+    AddKeyword ("lexicon", doLexicon, noCompile);
+    AddKeyword ("definitions", doDEFINITIONS, noCompile);
+    AddKeyword ("only", doONLY, noCompile);
+    AddKeyword ("+order", doPlusOrder, noCompile);
+    AddKeyword ("previous", OrderPop, noCompile);
+    AddKeyword ("get-current", doGetCurrent, noCompile);
+    AddKeyword ("set-current", doSetCurrent, noCompile);
+    AddKeyword ("get-order", doGetOrder, noCompile);
+    AddKeyword ("set-order", doSetOrder, noCompile);
     AddKeyword ("stats", doStats, doToComp);
     AddKeyword ("hex", doHEX, noCompile);
     AddKeyword ("decimal", doDEC, noCompile);
@@ -972,10 +1070,11 @@ SV LoadKeywords(void) {
     AddKeyword ("\\", doComment, doComment);
     AddKeyword ("(", doCmParen, doCmParen);
     AddKeyword (".(", doComEcho, noCompile);
+    AddKeyword ("order", doORDER, noCompile);
     AddKeyword ("cr", doCR, noCompile);
     AddKeyword ("include", doINCLUDE, noCompile);
     AddKeyword ("bye", doBYE, noCompile);
-    AddKeyword ("words", doWORDS, noCompile);
+    AddKeyword ("words", doWoords, noCompile);
     AddKeyword (".s", dotESS, noCompile);
     AddKeyword (".", dot, noCompile);               // ( n -- )
     AddKeyword ("d.", ddot, noCompile);             // ( d -- )
@@ -991,7 +1090,6 @@ SV LoadKeywords(void) {
     AddKeyword ("t,", doTcomma, noCompile);
     AddKeyword ("there", doThere, noCompile);
     AddKeyword ("torg", doTorg, noCompile);
-    current = 2;    // compiler
     AddKeyword (",", doComma, noCompile);
     AddKeyword ("here", doHere, noCompile);
     AddKeyword ("org", doOrg, noCompile);
@@ -1027,7 +1125,9 @@ SV LoadKeywords(void) {
     AddKeyword ("repeat",  noExecute, doRepeat);
     AddKeyword ("for",  noExecute, doFor);
     AddKeyword ("next",  noExecute, doNext);
-    current = 8;    // assembler
+    asm_wid = AddWordlist("asm");
+    AddEquate  ("asm", asm_wid);
+    current = asm_wid;
     AddKeyword ("END-CODE", doENDCODE, noCompile);
     AddModifier("T",    alu  );  // Instruction fields
     AddModifier("T0<",  less0);
@@ -1083,8 +1183,9 @@ SV LoadKeywords(void) {
     AddKeyword ("then",  doThen, noCompile);
     AddKeyword ("while",  doWhile, noCompile);
     AddKeyword ("repeat",  doRepeat, noCompile);
-    current = 4;    // forth
-    emptiness = hp;
+    current = forth_wid;
+    emptyhead = hp;
+    emptywids = wordlists;
 }
 
 //##############################################################################
@@ -1195,7 +1296,7 @@ done:       elapsed_us = GetMicroseconds() - time0;
 // This is beyond the scope of the C side of Chad.
 // chadGetHeader would be used when building a header structure in flash.
 
-#define BYTES_PER_WORD ((CELLBITS + 7) / 8)
+#define BYTES_PER_WORD  BYTE_ADDR(1)
 
 uint32_t chadGetSource (char delimiter) {
     int bytes;
@@ -1211,38 +1312,40 @@ uint32_t chadGetSource (char delimiter) {
     }
     int words = (bytes + BYTES_PER_WORD - 1) / BYTES_PER_WORD;
     int addr = DataSize - words;
-    cell *dest = &Data[addr];
-    for (int i=0; i<words; i++) {       // pack string into data memory
+    cell* dest = &Data[addr];
+    for (int i = 0; i < words; i++) {   // pack string into data memory
         uint32_t w = 0;                 // little-endian packing
-        for (int j=0; j<BYTES_PER_WORD; j++) {
-            w |= (uint8_t)*src++ << (j*8);
+        for (int j = 0; j < BYTES_PER_WORD; j++) {
+            w |= (uint8_t)*src++ << (j * 8);
         }
         *dest++ = w;
     }
-    return (addr<<8) + words;
+    return (addr << 8) + words;
 }
 
 uint32_t chadGetHeader (uint32_t select) {
     int ID = select >> 6;
     select &= 0x3F;
-    if (ID < hp) {                      // valid ID
-        switch (select) {
-        case 0: return (Header[ID].ExecFn == Def_Exec); // it's executable code
-        case 1: return (Header[ID].ExecFn == Header[ID].CompFn); // immediate
-        case 2: return Header[ID].target;
-        case 3: return Header[ID].length;
-        case 4: return Header[ID].w;
-        case 5: return Header[ID].w2;
-        case 6: return Header[ID].notail;
-        case 7: return cp;
-        default:
-            if ((select < NameOffset) || (select >= (NameOffset + MaxNameSize)))
-                {return 0;}
-            return Header[ID].name[select - NameOffset];
-        }
-    } else {
-        return hp;                      // next free Header structure
+    if (ID > hp) return -1;
+    switch (select) {
+    case 0: return (Header[ID].ExecFn == Def_Exec); // it's executable code
+    case 1: return (Header[ID].ExecFn == Header[ID].CompFn); // immediate
+    case 2: return Header[ID].target;
+    case 3: return Header[ID].length;
+    case 4: return Header[ID].w;
+    case 5: return Header[ID].w2;
+    case 6: return Header[ID].notail;
+    case 7: return Header[ID].link;
+    case 16: return cp;
+    case 17: return dp;
+    case 18: return bp;
+    case 19: return hp;
+    default:
+        if ((select < 0x20) || (select >= (0x20 + MaxNameSize)))
+            return 0;
+        return Header[ID].name[select - 0x20];
     }
+    return 0;
 }
 
 void chadError (int errorcode) {

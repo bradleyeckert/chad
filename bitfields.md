@@ -11,8 +11,9 @@ So, there's not much to be gained here.
 Reasons to use bit fields:
 
 - Saves data space: Use only the bits in data memory you need. 
-- The range is automatically limited, so a narrow bit field can safely use a 2^n sized lookup table.
-- `b@` is slightly faster than `c@`.
+- The range is automatically limited, so a narrow bit field can safely index
+a 2^n sized lookup table.
+- `b@` is faster than `c@`.
 
 Reasons not to: 
 

@@ -19,6 +19,7 @@
 #define MaxKeywords   1024      /* Number of headers                        */
 #define MaxNameSize     16      /* Number of chars in a name (less 1)       */
 #define MaxFiles        20      /* Max depth of file nesting                */
+#define MaxWordlists   256      /* Max number of wordlists                  */
 
 #ifdef _MSC_VER                 /* Visual Studio wants "safe" functions.    */
 #define MORESAFE                /* Compiler supports them (C11, C17, etc).  */

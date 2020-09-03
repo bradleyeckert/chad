@@ -87,6 +87,8 @@ void ErrorMessage (int error, char *s) {
        case  -72: msg = "Invalid ALU opcode";                           break;
        case  -73: msg = "Bitfield is 0 or too wide for a cell";         break;
        case  -74: msg = "Resolving a word that's not a DEFER";          break;
+       case  -75: msg = "Too many WORDLISTs used";                      break;
+       case  -76: msg = "Internal API calls are blocked";               break;
        case  -80: msg = "Dictionary full";                              break;
        case  -99: msg = "Nesting overflow during include";              break;
        case -100: msg = "ALLOCATE failed";                              break;

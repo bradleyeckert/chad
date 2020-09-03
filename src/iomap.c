@@ -14,15 +14,18 @@
 // The `_IORD_` field in an ALU instruction strobes io_rd.
 // In the J1, input devices sit on (mem_addr,io_din)
 
-static uint32_t source_addr;
+static uint32_t source_addr;        // host API return data
 static uint32_t source_length;
 static uint32_t header_data;
 static uint8_t SPIresult;
+static uint8_t nohostAPI;           // prohibit access to host API
 
 static int termKey(void);
 
 uint32_t readIOmap (uint32_t addr) {
     printf("Reading from iomap[%x]\n", addr);
+    if ((addr & 0x8000) && (nohostAPI))
+        chadError(BAD_HOSTAPI);
     switch (addr) {
     case 0: return termKey();       // Get the next incoming stream char
     case 1: // terminal type (control and function keys differ)
@@ -42,11 +45,13 @@ uint32_t readIOmap (uint32_t addr) {
 }
 
 // The `iow` field in an ALU instruction strobes io_wr.
-// In the J1B, output devices sit on (mem_addr,dout)
+// In the J1, output devices sit on (mem_addr,dout)
 
 // Code space is writable through this interface.
 void writeIOmap (uint32_t addr, uint32_t x) {
     uint32_t y;  int r;
+    if ((addr & 0x8000) && (nohostAPI))
+        chadError(BAD_HOSTAPI);
     switch (addr) {
     case 0:
         putchar((char)x);
@@ -55,6 +60,8 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     usleep(1000);
 #endif
         break;
+    case 3:
+        nohostAPI = x;  break;
     case 4:
         r = FlashMemSPI8 ((int)x);
         SPIresult = (uint8_t)r;

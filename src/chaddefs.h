@@ -60,15 +60,16 @@ struct FileRec {
 typedef void (*VoidFn)();
 
 struct Keyword {
-    char  name[MaxNameSize];            // a name and
+    char name[MaxNameSize];             // word name, local copy is needed
     VoidFn ExecFn;                      // C functions for compile/execute
     VoidFn CompFn;
     cell length;                        // size of definition in code space
     cell w;                             // optional data
     cell w2;
-    cell notail;                        // inhibit tail recursion
-    cell context;                       // 1=Forth, 2=assembler
     cell target;                        // target address if used
+    uint16_t link;                      // 1=Forth, 2=assembler
+    uint8_t notail;                     // inhibit tail recursion
+    uint8_t *aux;                       // pointer to aux C data (like a string)
 };
 
 #define NOTANEQU -3412
@@ -161,6 +162,8 @@ struct Keyword {
 #define BAD_STACKUNDER   -4 // Stack underflow
 #define BAD_RSTACKOVER   -5 // Return stack overflow
 #define BAD_RSTACKUNDER  -6 // Return stack underflow
+#define BAD_ORDER_OVER  -49 // Search-order overflow
+#define BAD_ORDER_UNDER -50 // Search-order underflow
 #define BAD_EOF         -58 // unexpected EOF in [IF]
 #define BAD_DATA_WRITE  -64 // Write to non-existent data memory
 #define BAD_DATA_READ   -65 // Read from non-existent data memory
@@ -177,3 +180,4 @@ struct Keyword {
 #define BAD_ALU_OP      -72 // Invalid ALU code
 #define BAD_BITFIELD    -73 // Bitfield is too wide for a cell
 #define BAD_IS          -74 // Trying to IS a non-DEFER
+#define BAD_WID_OVER    -75 // Too many WORDLISTs
