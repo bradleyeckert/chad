@@ -11,7 +11,7 @@ an empty return stack. `stats` tells you how deep your code is actually stacking
 The Chad ISA was inspired by the J1 architecture.
 How did Bowman come up with the J1?
 Somehow the stars lined up and out popped the J1.
-What a great architecture for the future of computing.
+What a big architecture for the future of little computing.
 Some small tweaks to the J1 facilitate double precision math, looping,
 large address spaces, bit field operations, and room for user instructions.
 The result is the Chad ISA.
@@ -19,19 +19,20 @@ The result is the Chad ISA.
 ## Chad ISA summary
 
 ```
-0xpppppR wwwwrrss = ALU instruction
+0xpppppR xwwwrrss = ALU instruction
     x = unused
     p = 5-bit ALU operation select
     R = return
-    w = strobe select {-, TN, TR, wr, iow, ior, co, TW, ...}
+    w = strobe select {-, TN, TR, wr, iow, ior, co, TW}
     r = return stack displacement
     s = data stack displacement
 100nnnnn nnnnnnnn = jump
     PC = (lex<<13) | n
 101nnnnn nnnnnnnn = conditional jump
 110nnnnn nnnnnnnn = call, same as jump but pushes PC.
-1110nnnn nnnnnnnn = literal extension
-    lex = (lex<<12) | n;  Any other instruction clears lex.
+11100nnn nnnnnnnn = literal extension
+    lex = (lex<<11) | n;  Any other instruction clears lex.
+11101nnn nnnnnnnn = reserved for user's coprocessor
 1111nnnR nnnnnnnn = unsigned literal (imm)
     T = (lex<<13) | n
     R = return
@@ -41,7 +42,8 @@ The result is the Chad ISA.
 
 The `insn[12:8]` field of the ALU instruction is:
 
-- x_0000: `T` T = T
+- 0_0000: `T` T = T
+- 1_0000: `COP` T = coprocessor status (0 if none)
 - 0_0001: `T0<` T = -1 if T < 0 else 0
 - 1_0001: `C` T = 1 if carry else 0
 - 0_0010: `T2/` T = T / 2
@@ -73,16 +75,16 @@ The `insn[8]` bit of the ALU instruction is:
 
 - 1: `RET` Return after this instruction. You should also use `r-1`.
 
-The `insn[7:4]` field of the ALU instruction is:
+The `insn[6:4]` field of the ALU instruction is:
 
-- x000:
-- x001: `T->N` Write T to N
-- x010: `T->R` Write T to R
-- x011: `N->[T]` Write T to mem\[A]
-- x100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
-- x101: `_IORD_` Trigger read from the I/O port, wait if not ready
-- x110: `CO` Write to carry: Adder or shifter carry out
-- x111: `T->W` Write T to W
+- 000:
+- 001: `T->N` Write T to N
+- 010: `T->R` Write T to R
+- 011: `N->[T]` Write T to mem\[A]
+- 100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
+- 101: `_IORD_` Trigger read from the I/O port, wait if not ready
+- 110: `CO` Write to carry: Adder or shifter carry out
+- 111: `T->W` Write T to W
 
 The `insn[3:2]` field of the ALU instruction is return stack control:
 
@@ -161,5 +163,44 @@ Proposed memory space is organized as:
 
 The CPU boots from the ROM.
 ROM contains the Forth kernel.
-Code executing from ROM loads the application from the stream interface.
+Code executing from ROM loads the application.
+
+## Coprocessor Conventions
+
+A coprocessor can take parameters from T, N, W, and carry.
+
+The `COP` ALU field sets T=0 when there is no coprocessor.
+Instruction 11101xxxxxxxxxxx is reserved for a coprocessor if you have one.
+In simulation, it would trigger the chadCOPtrigger(T, N, W).
+The simulator would perform `chadCOPstep` in each cycle. 
+The `COP` field would set T = `chadCOPresult`.
+
+To enable code to detect the coprocessor (if any), the `copid` instruction
+is defined as `0xE800`.
+After that executes, `COP` is ready at most two cycles later.
+These are the proposed `copid` codes:
+
+- 0: No coprocessor exists
+- 1: Hardware multiply and divide
+
+### Hardware multiply and divide (TBD)
+
+There are many ways to implement a multiplier: iterative, pipelined, or full.
+The software doesn't care. It just needs to test for completion.
+Once an operation is triggered, reading `COP` gives a 0 when the coprocessor
+is busy. Once finished, you can read result registers into `COP`.
+
+- 0xE800 = Read ID = 1
+- 0xE801 = Read upper multiplication product
+- 0xE802 = Read lower multiplication product
+- 0xE803 = Read division quotient
+- 0xE804 = Read division remainder
+- 0xE808 = Trigger multiplication of T and N
+- 0xE809 = Trigger division of T:N by W
+
+
+
+
+
+
 

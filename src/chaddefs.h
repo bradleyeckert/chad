@@ -80,6 +80,7 @@ struct Keyword {
 // Names are chosen to not conflict with Forth or C
 
 #define alu    (0x00 << 9)
+#define cop    (0x10 << 9)
 #define less0  (0x01 << 9)
 #define carry  (0x11 << 9)
 #define shr1   (0x02 << 9)
@@ -137,7 +138,8 @@ struct Keyword {
 #define jump   (4 << 13)
 #define zjump  (5 << 13)
 #define call   (6 << 13)
-#define litx   (14 << 12)
+#define litx   (28 << 11)
+#define copid  (29 << 11)
 #define lit    (15 << 12)
 
 #endif

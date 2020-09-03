@@ -2,13 +2,19 @@
 A self-hosting Forth for J1-style CPUs
 
 James Bowman's seminal paper on the 
-[J1 CPU](https://excamera.com/sphinx/fpga-j1.html "J1 CPU") was presented in 2010.
+[J1 CPU](https://excamera.com/sphinx/fpga-j1.html "J1 CPU")
+was presented in 2010.
 At under 200 lines of Verilog, the J1 was a real breakthrough in simplicity.
 It also happens to be a very powerful Forth processor.
-Chad improves on the J1.
 
-Chad protects your software investment by targeting a very simple but very powerful
-(for its size) stack computer.
+The Chad CPU, like the J1, has excellent semantic density.
+The application of the J1 was a UDP stack in a Xilinx FPGA.
+The code was 70% smaller than the equivalent C on a MicroBlaze.
+The code just wouldn't fit in memory, so the J1 was used instead.
+Chad improves on the J1 to facilitate bigger apps.
+
+Chad protects your software investment by targeting a very simple but
+very powerful (for its size) stack computer.
 Modern desktop computers are fast enough to simulate the CPU on the order of at-speed.
 Simulation speed on my desktop depends on the compiler:
 

@@ -116,19 +116,19 @@ once:   _pc = pc + 1;
         if (insn & 0x8000) {
             int target = (lex << 13) | (insn & 0x1fff);
             switch (insn >> 13) { // 4 to 7
-            case 4:                     /* jump */
+            case 4:                                                 /*   jump */
                 _pc = target;  break;
-            case 5:                     /* zjump */
+            case 5:                                                 /*  zjump */
                 if (!Dpop()) {_pc = target;}  break;
-            case 6:                     /* call */
+            case 6:                                                 /*   call */
                 RP = RPMASK & (RP + 1);
                 Rstack[RP & RPMASK] = BYTE_ADDR(_pc);
                 _pc = target;
                 break;
             default:
-                if (insn & 0x1000) {    /* imm */
+                if (insn & 0x1000) {                                /*    imm */
                     Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
-                    if (insn & 0x100) { /* r->pc */
+                    if (insn & 0x100) {                             /*  r->pc */
                         _pc = CELL_ADDR(Rstack[RP]);
                         if (RDEPTH == mark) single = 1;
                         RP = RPMASK & (RP - 1);
@@ -139,12 +139,12 @@ once:   _pc = pc + 1;
                             latency = time;
 #endif
                     }
-                } else {                /* lex */
-                    _lex = (lex << 12) | (insn & 0xFFF);
+                } else {
+                    _lex = (lex << 11) | (insn & 0x7FF);            /*   litx */
                 }
             }
         } else { // ALU
-            if (insn & 0x100) {         /* r->pc */
+            if (insn & 0x100) {                                     /*  r->pc */
                 _pc = CELL_ADDR(Rstack[RP]);
                 if (RDEPTH == mark) single = 1;
 #ifdef EnableCPUchecks
@@ -160,6 +160,7 @@ once:   _pc = pc + 1;
             sum_t sum;
             switch ((insn >> 9) & 0x1F) {
             case 0x00: _t = t;                               break; /*      T */
+            case 0x10: _t = 0;                               break; /*    COP */
             case 0x01: _t = (t & MSB) ? -1 : 0;              break; /*    T<0 */
             case 0x11: _t = cy;                              break; /*      C */
             case 0x02: _c = t & 1;  temp = (t & MSB);
@@ -260,25 +261,25 @@ plain:  toCode(alu | ret | rdn);         // compile a stand-alone return
     }
 }
 
-// The 12-bit LEX register is cleared whenever the instruction is not LITX.
-// LITX shifts 12-bit data into LEX from the right.
+// The LEX register is cleared whenever the instruction is not LITX.
+// LITX shifts 11-bit data into LEX from the right.
 // Full 16-bit and 32-bit data are supported with 2 or 3 inst.
 
-SV extended_lit (int k12) {
-    toCode(litx | (k12 & 0xFFF));
+SV extended_lit (int k) {
+    toCode(litx | (k & 0x7FF));
 }
 SV Literal (cell x) {
-#if (CELLBITS > 23)
-    if (x & 0xFF800000) {
-        extended_lit(x >> 23);
+#if (CELLBITS > 22)
+    if (x & 0xFFC00000) {
+        extended_lit(x >> 22);
         extended_lit(x >> 11);
     }
     else {
-        if (x & 0x007FF800)
+        if (x & 0x003FF800)
             extended_lit(x >> 11);
     }
 #else
-    if (x & 0x007FF800)
+    if (x & 0x003FF800)
         extended_lit(x >> 11);
 #endif
     x &= 0x7FF;
@@ -301,8 +302,8 @@ SV doSetBits(void) { tablebits = Dpop(); }
 SV doTableEntry(void) {
     int bits = tablebits;
     cell x = Dpop();
-#if (CELLBITS > 23)
-    if (bits > 23) extended_lit(x >> 23);
+#if (CELLBITS > 22)
+    if (bits > 22) extended_lit(x >> 22);
 #endif
     if (bits > 11) extended_lit(x >> 11);
     toCode(ret | lit | (x & 0xFF) | (x & 0x700) << 1);
@@ -593,7 +594,7 @@ cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
     if (IR & 0x8000) {
         int target = IR & 0x1FFF;
         switch ((IR>>12) & 7) {
-        case 6: printf("%x lex", IR & 0x7F);  break;
+        case 6: printf("%x litx", IR & 0x7FF);  break;
         case 7: if (IR & ret) {printf("RET ");}
             printf("%x imm", (IR & 0x7F) | (IR & 0xF00)>>1);  break;
         default:
@@ -1171,6 +1172,7 @@ SV LoadKeywords(void) {
     current = asm_wid;
     AddKeyword ("END-CODE", doENDCODE, noCompile);
     AddModifier("T",    alu  );  // Instruction fields
+    AddModifier("COP",  cop  );
     AddModifier("T0<",  less0);
     AddModifier("C",    carry);
     AddModifier("T2/",  shr1 );
@@ -1214,7 +1216,8 @@ SV LoadKeywords(void) {
     AddLitOp   ("branch", jump );
     AddLitOp   ("0branch", zjump);
     AddLitOp   ("scall", call );
-    AddLitOp   ("lex", litx );
+    AddLitOp   ("litx", litx );
+    AddLitOp   ("copid", copid );
     AddLitOp   ("imm", lit  );
     AddKeyword ("begin", doBegin, noCompile);
     AddKeyword ("again", doAgain, noCompile);
