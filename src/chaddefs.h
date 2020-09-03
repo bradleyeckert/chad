@@ -67,9 +67,10 @@ struct Keyword {
     cell w;                             // optional data
     cell w2;
     cell target;                        // target address if used
-    uint16_t link;                      // 1=Forth, 2=assembler
+    uint16_t references;
+    uint16_t link;                      // enough for 64k headers
+    uint16_t *aux;                      // pointer to aux C data 
     uint8_t notail;                     // inhibit tail recursion
-    uint8_t *aux;                       // pointer to aux C data (like a string)
 };
 
 #define NOTANEQU -3412

@@ -3,6 +3,11 @@ empty decimal
 0 equ false  \ equates take up no code space. Have as many as you want.
 -1 equ true
 
+\ You can compile to either check address alignment or not.
+\ Set to 0 when everything looks stable. The difference is 25 instructions.
+
+1 equ check_alignment \ enable @, !, w@, and w! to check address alignment
+
 0 torg
 
 defer cold  \ a forward reference to resolve with `is`.
@@ -10,7 +15,11 @@ defer cold  \ a forward reference to resolve with `is`.
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
-CODE noop    T                      RET alu  END-CODE 
+\ We want the primitives to be executable, so they get compiled.
+\ Marking them as macros means they are copied without the trailing RET bit.
+
+CODE noop    T                      RET alu  END-CODE
+CODE nop     T                      RET alu  END-CODE macro
 CODE xor     T^N            d-1     RET alu  END-CODE macro
 CODE and     T&N            d-1     RET alu  END-CODE macro
 CODE +       T+N    CO      d-1     RET alu  END-CODE macro
@@ -36,10 +45,8 @@ CODE w       W      T->N    d+1     RET alu  END-CODE macro
 CODE >w      N      T->W    d-1     RET alu  END-CODE macro
 CODE rshift  N>>T           d-1     RET alu  END-CODE macro
 CODE lshift  N<<T           d-1     RET alu  END-CODE macro
-CODE @       T                          alu
-             [T]                    RET alu  END-CODE macro
-CODE !       T      N->[T]  d-1         alu
-             N              d-1     RET alu  END-CODE macro
+CODE _@      [T]                    RET alu  END-CODE macro
+CODE _!      T      N->[T]  d-1         alu  END-CODE macro
 CODE io@     T      _IORD_              alu
              T                          alu
              io[T]                  RET alu  END-CODE
@@ -66,37 +73,61 @@ CODE rdrop     T                   r-1     alu END-CODE macro
 CODE tuck!     T     N->[T]        d-1 RET alu END-CODE macro
 CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
 CODE dup@      T                           alu
-			   [T]   T->N          d+1     alu END-CODE macro
+               [T]   T->N          d+1     alu END-CODE macro
 
 : =  xor 0= ;
 
-cellbits 32 = [if]
-: cells 2* 2* ; macro
-: cell+ 4 + ; macro
-: c@  dup@ swap 3 and 3 lshift rshift $FF and ;
-: w@  dup@ swap 2 and 3 lshift rshift $FFFF and ;
-: (x!)  ( u w-addr bitmask wordmask )
-	>w swap
-	dup>r and 3 lshift dup>r lshift 
-	w r> lshift invert
-    r@ @ and  + r> !
-;
+\ iomap.c throws errors to the Chad interpreter
 
-: w! ( u w-addr -- )  2 $FFFF (x!) ;
-: c! ( u w-addr -- )  3 $FF   (x!) ;
-[else]
-: cells 2* ; macro
-: cell+ 2 + ; macro
-: c@  dup@ swap 1 and 3 lshift rshift $FF and ;
-: c! ( u c-addr -- )
-    dup>r 1 and if
-        8 lshift  $00FF
-    else
-        255 and   $FF00
-    then
-    r@ @ and  + r> !
-;
-[then]  \ m 1 
+: exception  ( error -- )  $8002 io! ;
+
+cellbits 32 = [if]
+    : cells 2* 2* ; macro
+    : cell+ 4 + ; macro
+    : c@  dup@ swap 3 and 3 lshift rshift $FF and ;
+    : (x!)  ( u w-addr bitmask wordmask )
+        >w swap
+        dup>r and 3 lshift dup>r lshift
+        w r> lshift invert
+        r@ nop _@ and  + r> _! drop
+    ;
+    : c!  ( u c-addr -- )  3 $FF  (x!) ;
+  check_alignment [if]
+    : (ta)  ( a mask -- a )
+	      over and if  22 invert exception  then ;
+    : @   3 (ta)  _@ ;
+    : !   3 (ta)  _! drop ;
+    : w!  ( u w-addr -- )
+          1 (ta) 2 $FFFF (x!) ;
+    : w@  ( w-addr -- u )
+          1 (ta) dup@ swap 2 and 3 lshift rshift $FFFF and ;
+  [else]
+    : @   nop _@ ; macro
+    : !   _! drop ; macro
+    : w!  2 $FFFF (x!) ;
+    : w@  dup@ swap 2 and 3 lshift rshift $FFFF and ;
+  [then]
+[else] \ 16-bit or 18-bit cells
+    : cells 2* ; macro
+    : cell+ 2 + ; macro
+  check_alignment [if]
+    : (ta)  over and if  22 invert exception  then ;
+    : @   1 (ta)  _@ ;
+    : !   1 (ta)  _! drop ;
+  [else]
+    : @   nop _@ ; macro
+    : !   _! drop ; macro
+  [then]
+    : c@  dup@ swap 1 and 3 lshift rshift $FF and ;
+    : c! ( u c-addr -- )
+        dup>r 1 and if
+            8 lshift  $00FF
+        else
+            255 and   $FF00
+        then
+        r@ nop _@ and  + r> _! drop
+    ;
+[then]
 
 \ Bit field operators
 \ Read is easy: Read, shift, and mask.
@@ -138,17 +169,12 @@ CODE b!  \ n bs --              \ Write to a packed bitspec
 END-CODE
 
 \ Your code can usually use + instead of OR, but if it's needed:
-: or    invert swap invert and invert ; \ n t -- n|t
+: or     invert swap invert and invert ; \ n t -- n|t
 
-: 2dup  over over ; macro \ d -- d d
-: 1+ 1 + ; macro
-: 1- 1 - ; macro
-: <>                xor 0= 0= ;   \ 6.2.0500  x y -- f
-: 0<>                   0= 0= ; macro   \ 6.2.0260  x y -- f
-: negate            invert 1+ ;
-: 0>                negate 0< ;   \ 6.2.0280  n -- f
-: abs   dup 0< if negate then ;   \ 6.1.0690  n -- u
-: execute                  >r ;   \ 6.1.1370  xt --
+: 2dup   over over ; macro \ d -- d d
+: 1+     1 + ; macro
+: 1-     1 - ; macro
+: negate invert 1+ ;
 
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
@@ -157,13 +183,13 @@ END-CODE
 
 \ Multiplication using shift-and-add, 160 to 256 cycles at 16-bit.
 \ Latency = 17
-: (um*) 
+: (um*)
     2* >r 2*c carry
     if  over r> + >r carry +
     then  r>
 ;
 : um*  \ u1 u2 -- ud
-    0 [ cellbits 2/ ] literal			\ cell is an even number of bits
+    0 [ cellbits 2/ ] literal           \ cell is an even number of bits
     for (um*) (um*) next
     >r nip r> swap
 ;
@@ -171,14 +197,14 @@ END-CODE
 \ Long division takes about 340 cycles at 16-bit.
 \ Latency = 25
 : (um/mod)
-    >r  swap 2*c swap 2*c           	\ 2dividend | divisor
-    carry if	
+    >r  swap 2*c swap 2*c               \ 2dividend | divisor
+    carry if
         r@ -   0 >carry
-    else	
-        dup r@  - drop              	\ test subtraction
-        carry 0= if  r@ -  then     	\ keep it
+    else
+        dup r@  - drop                  \ test subtraction
+        carry 0= if  r@ -  then         \ keep it
     then
-    r>  carry    						\ carry is safe on the stack 
+    r>  carry                           \ carry is safe on the stack
 ;
 : um/mod  \ ud u -- ur uq               \ 6.1.2370
     over over- drop carry
@@ -187,10 +213,18 @@ END-CODE
     then
     [ cellbits 2/ ] literal
     for (um/mod) >carry
-		(um/mod) >carry
-	next
+        (um/mod) >carry
+    next
     drop swap 2*c invert                \ finish quotient
 ;
+
+: <>                xor 0= 0= ;   \ 6.2.0500  x y -- f
+: 0<>                   0= 0= ; macro   \ 6.2.0260  x y -- f
+: 0>                negate 0< ;   \ 6.2.0280  n -- f
+: abs   dup 0< if negate then ;   \ 6.1.0690  n -- u
+: execute            cells >r ;   \ 6.1.1370  xt --
+
+\ We're about at 256 instructions at this point.
 
 : d2*  swap 2* swap 2*c ;
 : d2/  2/ swap 2/c swap ;

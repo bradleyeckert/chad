@@ -360,16 +360,17 @@ SV toData(cell x) {                     // compile to data space
 CELL base = 10;
 CELL state = 0;
 SI hp;                                  // # of keywords in the Header list
-SI emptyhead;                           // EMPTY sets hp to this
-SI emptywids;
+static uint16_t emhead;                 // EMPTY sets hp to this
+static uint16_t emlists;
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of found keyword
+SI verbose = 0;
 
 // The search order is a lists of contexts with order[orders] searched first
 // order:   wid3 wid2 wid1
 // context------------^ ^-----orders
 // A wid points to a linked list of headers.
-// The head pointer of the list is created by WORDLIST. 
+// The head pointer of the list is created by WORDLIST.
 // In Forth, it would just be a cell in the dictionary placed by comma.
 // The paradigm here expects names for everything.
 
@@ -377,7 +378,7 @@ SI order[32];                           // search order list
 SI orders;                              // items in the search order list
 static uint16_t wordlist[MaxWordlists]; // head pointers to linked lists
 static char wordlistname[MaxWordlists][16];// optional name string
-SI wordlists;
+static uint16_t wordlists;
 SI root_wid;                            // the basic wordlists
 SI forth_wid;
 SI asm_wid;
@@ -393,7 +394,7 @@ SV printWID(int wid) {
 }
 
 SV doORDER(void) {
-    printf(" Context : ");  
+    printf(" Context : ");
     for (int i = 1; i <= orders; i++)  printWID(order[i]);
     printf("\n Current : ");  printWID(current);
 }
@@ -412,10 +413,13 @@ SI findinWL(char* key, int wid) {       // find in wordlist
     return -1;                          // return index of word, -1 if not found
 }
 
-SI findinCT(char* key) {                // find in context
+SI FindWord(char* key) {                // find in context
     for (int i = orders; i > 0; i--) {
         int id = findinWL(key, i);
-        if (id >= 0) return id;
+        if (id >= 0) {
+            Header[me].references += 1; // bump reference counter
+            return id;
+        }
     }
     return -1;
 }
@@ -465,6 +469,7 @@ SV doFORTH(void) { order[orders] = forth_wid; }
 SV doASSEMBLER(void) { order[orders] = asm_wid; }
 SV doDEFINITIONS(void) { current = context(); }
 SV doPlusOrder(void) { OrderPush(Dpop()); }
+SV doPrevious(void) { OrderPop(); }
 SV doSetCurrent(void) { current = Dpop(); }
 SV doGetCurrent(void) { Dpush(current); }
 
@@ -484,7 +489,7 @@ SV doSetOrder(void) {
 // REMOVE this, ccontext, header context field
 
 SI NotKeyword (char *key) {             // do a command, return 0 if found
-    int i = findinCT(key);
+    int i = FindWord(key);
     if (i < 0)
         return -1;                      // not found
     if (state)
@@ -513,6 +518,7 @@ SI AddHead (char * s) {                 // add a header to the list
         Header[hp].target = 0;
         Header[hp].notail = 0;
         Header[hp].link = wordlist[current];
+        Header[hp].references = 0;
         wordlist[current] = hp;
     } else {
         printf("Please increase MaxKeywords and rebuild.\n");
@@ -818,6 +824,13 @@ SV doColon(void) {
     }
 }
 
+SV doNoName(void) {
+    Dpush(cp);  DefMarkID = 0;          // no length
+    state = 1;
+    fence = cp;
+    ConSP = 0;
+}
+
 SV doEQU(void) {
     parseword(' ');
     AddEquate(tok, Dpop());
@@ -855,7 +868,7 @@ SV doBitAlign(void) {
 
 SV doDEFINED(void) {                    // [defined]
     parseword(' ');
-    int r = (findinCT(tok) < 0) ? 0 : 1;
+    int r = (FindWord(tok) < 0) ? 0 : 1;
     if (r) {
         if (Header[me].target == 0) r = 0;
     }
@@ -868,7 +881,8 @@ SV doUNDEFINED(void) {                  // [undefined]
 }
 
 SV SaveLength(void) {                   // resolve length of definition
-    Header[DefMarkID].length = cp - DefMark;
+    if (DefMarkID)
+        Header[DefMarkID].length = cp - DefMark;
 }
 
 SV CompMacro(void) {
@@ -895,22 +909,44 @@ SV doNoTail (void) {
     Header[DefMarkID].notail = 1;
 }
 
-SV Marker_Exec (void) {                 // execution semantics of a marker
-    cp = my();
-    hp = Header[me].w2;                 // also forgets the marker
+SV SaveMarker(uint16_t* dest) {
+    dest[0] = hp;    dest[1] = cp;    dest[2] = dp;
+    dest[3] = bp;    dest[4] = wordlists;
+    memcpy(&dest[5], wordlist, sizeof(uint16_t) * MaxWordlists);
+}
+
+SV LoadMarker(uint16_t* src) {
+    hp = src[0];     cp = src[1];     dp = src[2];
+    bp = src[3];     wordlists = src[4];
+    memcpy(wordlist, &src[5], sizeof(uint16_t) * MaxWordlists);
+}
+
+static uint16_t emptymarker[MaxWordlists + 8];
+
+SV doEMPTY(void) { // reset dictionary to startup state
+    LoadMarker(emptymarker);
+    doONLY();  doDEFINITIONS();
+}
+
+SV Marker_Exec(void) {                 // execution semantics of a marker
+    uint16_t* pad = Header[me].aux;
+    LoadMarker(pad);
+    free(pad);
 }
 
 SV doMARKER (void) {
     parseword(' ');
-    if (AddHead(tok)) {                  // define a word that simulates
+    if (AddHead(tok)) {
         SetFns(cp, Marker_Exec, noCompile);
-        Header[hp].w2 = hp;
+        uint16_t* pad = malloc(sizeof(uint16_t) * (MaxWordlists + 8));
+        Header[hp].aux = pad;
+        SaveMarker(pad);
     }
 }
 
 SI tick (void) {                        // get the w field of the word
     parseword(' ');
-    if (findinCT(tok) < 0) {
+    if (FindWord(tok) < 0) {
         error = UNRECOGNIZED;
         return 0;
     }
@@ -939,7 +975,6 @@ SV doIS(void) {                        // ( xt <name> -- )
 SV doNothing (void) { }
 SV doCODE    (void) { doColon();  state = 0;  OrderPush(asm_wid);  Dpush(0);}
 SV doENDCODE (void) { SaveLength();  OrderPop();  Dpop();  sane();}
-SV doEMPTY   (void) { hp = emptyhead; }
 SV doBYE     (void) { error = BYE; }
 SV doHEX     (void) { base = 16; }
 SV doDEC     (void) { base = 10; }
@@ -947,7 +982,6 @@ SV doComment (void) { toin = strlen(buf); }
 SV doCmParen (void) { parseword(')'); }
 SV doComEcho (void) { doCmParen();  printf("%s",tok); }
 SV doCR      (void) { printf("\n"); }
-SV doContext (void) { Dpush(context()); }
 SV doToExec  (void) { state = 0; }
 SV doToComp  (void) { state = 1; }
 SV doTick    (void) { Dpush(tick()); }
@@ -963,15 +997,17 @@ SV doComma   (void) { toData(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
 SV doSemi    (void) { compExit();  SaveLength();  state = 0;  sane();}
 SV doSemiEX  (void) { SaveLength();  sane(); }
+SV doVerbose (void) { verbose = Dpop(); }
 
 // `;` in immediate mode assumes fall through to next word. Resolve the length.
 
 SI refill(void) {
     int result = -1;
 ask: toin = 0;
-    File.LineNumber++;
+    int lineno = File.LineNumber++;
     if (File.fp == stdin) {
         printf("ok>");
+        lineno = 0;
     }
     if (fgets(buf, maxlen, File.fp) == NULL) {
         result = 0;
@@ -994,6 +1030,8 @@ ask: toin = 0;
     }
     // save the line for error reporting
     strmove(File.Line, buf, LineBufferSize);
+    if (verbose)
+        printf("%d: %s\n", lineno, buf);
     return result;
 }
 
@@ -1045,7 +1083,8 @@ SV LoadKeywords(void) {
     current = root_wid;
     AddEquate  ("root", root_wid);
     AddEquate  ("_forth", forth_wid);
-    AddKeyword ("assert", doAssert, noCompile);     // ( n1 n2 -- )
+    AddKeyword("assert", doAssert, noCompile);     // ( n1 n2 -- )
+    AddKeyword(">verbose", doVerbose, noCompile);
     AddKeyword ("[if]", do_IF, noCompile);
     AddKeyword ("[then]", doNothing, noCompile);
     AddKeyword ("[else]", do_ELSE, noCompile);
@@ -1058,7 +1097,8 @@ SV LoadKeywords(void) {
     AddKeyword ("definitions", doDEFINITIONS, noCompile);
     AddKeyword ("only", doONLY, noCompile);
     AddKeyword ("+order", doPlusOrder, noCompile);
-    AddKeyword ("previous", OrderPop, noCompile);
+    AddKeyword ("previous", doPrevious, noCompile);
+    AddKeyword ("previous", doPrevious, noCompile);
     AddKeyword ("get-current", doGetCurrent, noCompile);
     AddKeyword ("set-current", doSetCurrent, noCompile);
     AddKeyword ("get-order", doGetOrder, noCompile);
@@ -1104,6 +1144,7 @@ SV LoadKeywords(void) {
     AddKeyword ("marker", doMARKER, noCompile);
     AddKeyword ("equ", doEQU, noCompile);
     AddKeyword (":", doColon, noCompile);
+    AddKeyword (":noname", doNoName, noCompile);
     AddKeyword ("defer", doDEFER, noCompile);
     AddKeyword ("is", doIS, noCompile);
     AddKeyword ("CODE", doCODE, noCompile);
@@ -1184,9 +1225,9 @@ SV LoadKeywords(void) {
     AddKeyword ("while",  doWhile, noCompile);
     AddKeyword ("repeat",  doRepeat, noCompile);
     current = forth_wid;
-    emptyhead = hp;
-    emptywids = wordlists;
+    SaveMarker(emptymarker);
 }
+
 
 //##############################################################################
 // Text Interpreter
@@ -1336,6 +1377,7 @@ uint32_t chadGetHeader (uint32_t select) {
     case 5: return Header[ID].w2;
     case 6: return Header[ID].notail;
     case 7: return Header[ID].link;
+    case 8: return Header[ID].references;
     case 16: return cp;
     case 17: return dp;
     case 18: return bp;
