@@ -73,6 +73,8 @@ struct Keyword {
     uint8_t notail;                     // inhibit tail recursion
 };
 
+int chadSpinFunction(void); // external function waiting for keyboard input
+
 #define NOTANEQU -3412
 #define MAGIC_DEFER 1000
 

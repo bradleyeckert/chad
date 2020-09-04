@@ -21,3 +21,9 @@ int main(int argc, char *argv[]) {
     int ior = chad(command, LineBufferSize);
     return ior;
 }
+
+// If you poll for window messages, use this. Return true to quit chad. 
+// Or, just comment it out so _kbhit is not needed.
+// int chadSpinFunction(void) { 
+//     return 0; 
+// }

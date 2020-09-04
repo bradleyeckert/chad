@@ -5,6 +5,8 @@
 //===============================================================================
 #ifndef __CHAD_H__
 #define __CHAD_H__
+#include <stdint.h>
+#include "config.h"
 
 // The Forth QUIT loop and simulator
 // Returns a return code: 0 = BYE

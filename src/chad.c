@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>
+#include <conio.h>
 
 #ifdef _MSC_VER
 
@@ -361,8 +362,6 @@ SV toData(cell x) {                     // compile to data space
 CELL base = 10;
 CELL state = 0;
 SI hp;                                  // # of keywords in the Header list
-static uint16_t emhead;                 // EMPTY sets hp to this
-static uint16_t emlists;
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of found keyword
 SI verbose = 0;
@@ -639,8 +638,8 @@ static char format[260];                // format string depends on cell width
 uint8_t fmtptr;                         // so we need to construct it...
 
 SV AppendFmt(char* s) {
-    int len = strlen(s);
-    for (int i = 0; i < len; i++)
+    size_t len = strlen(s);
+    for (size_t i = 0; i < len; i++)
         format[fmtptr++] = *s++;
 }
 
@@ -979,7 +978,7 @@ SV doENDCODE (void) { SaveLength();  OrderPop();  Dpop();  sane();}
 SV doBYE     (void) { error = BYE; }
 SV doHEX     (void) { base = 16; }
 SV doDEC     (void) { base = 10; }
-SV doComment (void) { toin = strlen(buf); }
+SV doComment (void) { toin = (int)strlen(buf); }
 SV doCmParen (void) { parseword(')'); }
 SV doComEcho (void) { doCmParen();  printf("%s",tok); }
 SV doCR      (void) { printf("\n"); }
@@ -1009,6 +1008,15 @@ ask: toin = 0;
     if (File.fp == stdin) {
         printf("ok>");
         lineno = 0;
+#ifdef chadSpinFunction
+        if (_kbhit() == 0) {
+            if (chadSpinFunction()) {
+                buf[0] = '\0';
+                error = BYE;
+                return -1;
+            }
+        }
+#endif
     }
     if (fgets(buf, maxlen, File.fp) == NULL) {
         result = 0;
@@ -1021,8 +1029,8 @@ ask: toin = 0;
     else {
         char* p;                        // remove trailing newline
         if ((p = strchr(buf, '\n')) != NULL) *p = '\0';
-        int len = strlen(buf);
-        for (int i = 0; i < len; i++) {
+        size_t len = strlen(buf);
+        for (size_t i = 0; i < len; i++) {
             if (buf[i] == '\t')         // replace tabs with blanks
                 buf[i] = ' ';
             if (buf[i] == '\r')         // trim CR if present
@@ -1042,7 +1050,7 @@ static void do_ELSE(void) {
     int level = 1;
     while (level) {
         parseword(' ');
-        int length = strlen(tok);
+        int length = (int)strlen(tok);
         if (length) {
             if (!strcmp(tok, "[if]")) {
                 level++;
@@ -1343,7 +1351,7 @@ done:       elapsed_us = GetMicroseconds() - time0;
 #define BYTES_PER_WORD  BYTE_ADDR(1)
 
 uint32_t chadGetSource (char delimiter) {
-    int bytes;
+    size_t bytes;
     char *src;
     if (delimiter) {
         parseword(delimiter);
@@ -1354,17 +1362,17 @@ uint32_t chadGetSource (char delimiter) {
         bytes = strlen(buf) - toin;
         doComment();
     }
-    int words = (bytes + BYTES_PER_WORD - 1) / BYTES_PER_WORD;
-    int addr = DataSize - words;
+    size_t words = (bytes + BYTES_PER_WORD - 1) / BYTES_PER_WORD;
+    size_t addr = DataSize - words;
     cell* dest = &Data[addr];
-    for (int i = 0; i < words; i++) {   // pack string into data memory
+    for (size_t i = 0; i < words; i++) {// pack string into data memory
         uint32_t w = 0;                 // little-endian packing
         for (int j = 0; j < BYTES_PER_WORD; j++) {
             w |= (uint8_t)*src++ << (j * 8);
         }
         *dest++ = w;
     }
-    return (addr << 8) + words;
+    return (uint32_t)((addr << 8) + words);
 }
 
 uint32_t chadGetHeader (uint32_t select) {
