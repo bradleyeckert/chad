@@ -15,67 +15,11 @@ defer cold  \ a forward reference to resolve with `is`.
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
 
-\ We want the primitives to be executable, so they get compiled.
-\ Marking them as macros means they are copied without the trailing RET bit.
-
-CODE noop    T                      RET alu  END-CODE
-CODE nop     T                      RET alu  END-CODE macro
-CODE xor     T^N            d-1     RET alu  END-CODE macro
-CODE and     T&N            d-1     RET alu  END-CODE macro
-CODE +       T+N    CO      d-1     RET alu  END-CODE macro
-CODE -       N-T    CO      d-1     RET alu  END-CODE macro
-CODE dup     T      T->N    d+1     RET alu  END-CODE macro
-CODE drop    N              d-1     RET alu  END-CODE macro
-CODE invert  ~T                     RET alu  END-CODE macro
-CODE swap    N      T->N            RET alu  END-CODE macro
-CODE over    N      T->N    d+1     RET alu  END-CODE macro
-CODE nip     T              d-1     RET alu  END-CODE macro
-CODE 0=      T0=                    RET alu  END-CODE macro
-CODE 0<      T0<                    RET alu  END-CODE macro
-CODE >r      N      T->R    d-1 r+1     alu  END-CODE macro
-CODE r>      R      T->N    d+1 r-1     alu  END-CODE macro
-CODE r@      R      T->N    d+1         alu  END-CODE macro
-CODE 2*      T2*    CO              RET alu  END-CODE macro
-CODE 2*c     T2*c   CO              RET alu  END-CODE macro
-CODE 2/      T2/    CO              RET alu  END-CODE macro
-CODE 2/c     cT2/   CO              RET alu  END-CODE macro
-CODE carry   C      T->N    d+1     RET alu  END-CODE macro
-CODE >carry  N      CO      d-1     RET alu  END-CODE macro
-CODE w       W      T->N    d+1     RET alu  END-CODE macro
-CODE >w      N      T->W    d-1     RET alu  END-CODE macro
-CODE rshift  N>>T           d-1     RET alu  END-CODE macro
-CODE lshift  N<<T           d-1     RET alu  END-CODE macro
-CODE _@      [T]                    RET alu  END-CODE macro
-CODE _!      T      N->[T]  d-1         alu  END-CODE macro
-CODE io@     T      _IORD_              alu
-             T                          alu
-             io[T]                  RET alu  END-CODE
-CODE io!     T      N->io[T] d-1        alu
-             T                          alu
-             N              d-1     RET alu  END-CODE
-
-\ Elided words
-\ These words are supported by the hardware but are not
-\ part of ANS Forth.  They are named after the word-pair
-\ that matches their effect
-\ Using these elided words instead of
-\ the pair saves one cycle and one instruction.
-
-CODE 2dupand   T&N   T->N          d+1 RET alu END-CODE macro
-CODE 2dup+     T+N   T->N          d+1 RET alu END-CODE macro
-CODE 2dupxor   T^N   T->N          d+1 RET alu END-CODE macro
-CODE dup>r     T     T->R      r+1         alu END-CODE macro
-CODE overand   T&N                     RET alu END-CODE macro
-CODE over+     T+N   CO                RET alu END-CODE macro
-CODE over-     N-T   CO                RET alu END-CODE macro
-CODE overxor   T^N                     RET alu END-CODE macro
-CODE rdrop     T                   r-1     alu END-CODE macro
-CODE tuck!     T     N->[T]        d-1 RET alu END-CODE macro
-CODE +c        T+Nc  CO            d-1 RET alu END-CODE macro
-CODE dup@      T                           alu
-               [T]   T->N          d+1     alu END-CODE macro
-
-: =  xor 0= ;
+: noop nop ;
+: io@  _io@ nop _io@_ ;
+: io!  _io! nop drop ;
+: =    xor 0= ;
+: or   invert swap invert and invert ;
 
 \ iomap.c throws errors to the Chad interpreter
 

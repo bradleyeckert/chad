@@ -503,6 +503,8 @@ static uint32_t my (void) {return Header[me].w;}
 SV doLITERAL  (void) { Literal(Dpop()); }
 SV Equ_Comp   (void) { Literal(my()); }
 SV Equ_Exec   (void) { Dpush(my()); }
+SV Prim_Comp  (void) { toCode(my()); }
+SV Prim_Exec  (void) { CPUsim(0x10000 + my()); } // single step
 SV Def_Exec   (void) { Simulate(my()); }
 SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
@@ -536,6 +538,12 @@ SV SetFns (cell value, void (*exec)(), void (*comp)()) {
 SV AddKeyword (char *name, void (*xte)(), void (*xtc)()) {
     if (AddHead(name)) {
         SetFns(NOTANEQU, xte, xtc);
+    }
+}
+
+SV AddPrimitiv(char* name, cell value) {
+    if (AddHead(name)) {
+        SetFns(value, Prim_Exec, Prim_Comp);
     }
 }
 
@@ -1165,6 +1173,52 @@ SV LoadKeywords(void) {
     AddKeyword ("notail", doNoTail, noCompile);
     AddKeyword ("|bits|", doSetBits, noCompile);
     AddKeyword ("|", doTableEntry, noCompile);
+    // primitives
+    AddPrimitiv("nop", 0);
+    AddPrimitiv("invert", com);
+    AddPrimitiv("2*",     shl1  | co);
+    AddPrimitiv("2/",     shr1  | co);
+    AddPrimitiv("2*c",    shlx  | co);
+    AddPrimitiv("2/c",    shrx  | co);
+    AddPrimitiv("xor",    eor   |        sdn);
+    AddPrimitiv("and",    Tand  |        sdn);
+    AddPrimitiv("+",      add   | co   | sdn);
+    AddPrimitiv("-",      sub   | co   | sdn);
+    AddPrimitiv("dup",            TtoN | sup);
+    AddPrimitiv("over",   NtoT  | TtoN | sup);
+    AddPrimitiv("swap",   NtoT  | TtoN);
+    AddPrimitiv("drop",   NtoT  |        sdn);
+    AddPrimitiv("nip",                   sdn);
+    AddPrimitiv("0=",     zeq   );
+    AddPrimitiv("0<",     less0 );
+    AddPrimitiv(">r",     NtoT  | TtoR | sdn | rup);
+    AddPrimitiv("r>",     RtoT  | TtoN | sup | rdn);
+    AddPrimitiv("r@",     RtoT  | TtoN | sup);
+    AddPrimitiv("carry",  carry | TtoN | sup);
+    AddPrimitiv("w",      WtoT  | TtoN | sup);
+    AddPrimitiv(">carry",  NtoT | co   | sdn);
+    AddPrimitiv(">w",     NtoT  | TtoW | sdn);
+    AddPrimitiv("rshift",  shr         | sdn);
+    AddPrimitiv("lshift",  shl         | sdn);
+    AddPrimitiv("_@",     read);
+    AddPrimitiv("_!",     write        | sdn);
+    AddPrimitiv("_io!",   iow          | sdn);
+    AddPrimitiv("_io@",   ior); // trigger a read
+    AddPrimitiv("_io@_",  input); // get data
+    AddPrimitiv("2dupand", Tand | TtoN | sup);
+    AddPrimitiv("2dupxor", eor  | TtoN | sup);
+    AddPrimitiv("2dup+",  add   | TtoN | sup);
+    AddPrimitiv("2dup-",  sub   | TtoN | sup);
+    AddPrimitiv("overand", Tand);
+    AddPrimitiv("overxor",  eor);
+    AddPrimitiv("over+",  add   | co);
+    AddPrimitiv("over-",  sub   | co);
+    AddPrimitiv("dup>r",  TtoR         | rup);
+    AddPrimitiv("rdrop",                 rdn);
+    AddPrimitiv("+c",     addc  | co   | sdn);
+    AddPrimitiv("tuck!",  write        | sdn);
+    AddPrimitiv("dup@",   read  | TtoN | sup);
+
     AddKeyword ("begin", noExecute, doBegin);
     AddKeyword ("again", noExecute, doAgain);
     AddKeyword ("until", noExecute, doUntil);
@@ -1175,6 +1229,7 @@ SV LoadKeywords(void) {
     AddKeyword ("repeat",  noExecute, doRepeat);
     AddKeyword ("for",  noExecute, doFor);
     AddKeyword ("next",  noExecute, doNext);
+    // assembler
     asm_wid = AddWordlist("asm");
     AddEquate  ("asm", asm_wid);
     current = asm_wid;
