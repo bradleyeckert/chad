@@ -1,4 +1,7 @@
-empty decimal
+[defined] -kernel [if] -kernel [else] marker -kernel
+only forth definitions 
+decimal
+
 0 equ 'TXbuf \ UART send output register
 0 equ false  \ equates take up no code space. Have as many as you want.
 -1 equ true

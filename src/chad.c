@@ -91,10 +91,9 @@ SV Rpush(cell v) // push v on the return stack
 #endif
 
 // The simulator used https://github.com/samawati/j1eforth as a template.
-// We want to single step or run. To single step, use single = 1.
-// Execution starts at the pc. It returns a code:
-// 1 = finished with execution
-// other = stepped
+// single = 0: Run until the return stack empties, returns 1 if ok else error.
+// single = 1: Execute one instruction (single step) from Code[PC].
+// single = 10000h + instruction: Execute instruction. Returns the instruction.
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
 
@@ -929,13 +928,6 @@ SV LoadMarker(uint16_t* src) {
     memcpy(wordlist, &src[5], sizeof(uint16_t) * MaxWordlists);
 }
 
-static uint16_t emptymarker[MaxWordlists + 8];
-
-SV doEMPTY(void) { // reset dictionary to startup state
-    LoadMarker(emptymarker);
-    doONLY();  doDEFINITIONS();
-}
-
 SV Marker_Exec(void) {                 // execution semantics of a marker
     uint16_t* pad = Header[me].aux;
     LoadMarker(pad);
@@ -1087,7 +1079,7 @@ static void do_IF(void) {
 
 // Save and Load binary memory images.
 // They are not large, save the entire space.
-// The result differs between little-endian and big-endian machines. Who cares?
+// The result differs between little-endian and big-endian machines.
 
 SV SaveMem(uint8_t* mem, int length) { // save binary to a file
     ParseFilename();
@@ -1149,7 +1141,6 @@ SV LoadKeywords(void) {
     AddKeyword ("[else]", do_ELSE, noCompile);
     AddKeyword ("[undefined]", doUNDEFINED, noCompile);
     AddKeyword ("[defined]", doDEFINED, noCompile);
-    AddKeyword ("empty", doEMPTY, noCompile);
     AddKeyword ("forth", doFORTH, noCompile);
     AddKeyword ("assembler", doASSEMBLER, noCompile);
     AddKeyword ("lexicon", doLexicon, noCompile);
@@ -1333,7 +1324,6 @@ SV LoadKeywords(void) {
     AddKeyword ("while",  doWhile, noCompile);
     AddKeyword ("repeat",  doRepeat, noCompile);
     current = forth_wid;
-    SaveMarker(emptymarker);
 }
 
 
