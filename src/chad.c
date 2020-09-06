@@ -1085,10 +1085,48 @@ static void do_IF(void) {
     }
 }
 
+// Save and Load binary memory images.
+// They are not large, save the entire space.
+// The result differs between little-endian and big-endian machines. Who cares?
 
-// Keywords are visible based on bits in context.
-// Set the same bits in current while loading hp.
-// Current is 1 for host words, 2 for compiler, 4 for definitions
+SV SaveMem(uint8_t* mem, int length) { // save binary to a file
+    ParseFilename();
+    FILE* fp;
+#ifdef MORESAFE
+    errno_t err = fopen_s(&fp, tok, "wb");
+#else
+    fp = fopen(filename, "wb");
+#endif
+    if (fp == NULL)
+        error = BAD_CREATEFILE;
+    else {
+        fwrite(mem, length, 1, fp);
+        fclose(fp);
+    }
+};
+
+SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
+    ParseFilename();
+    FILE* fp;
+#ifdef MORESAFE
+    errno_t err = fopen_s(&fp, tok, "rb");
+#else
+    fp = fopen(filename, "rb");
+#endif
+    if (fp == NULL)
+        error = BAD_OPENFILE;
+    else {
+        fread(mem, length, 1, fp);
+        fclose(fp);
+    }
+};
+
+SV doLoadCodeBin(void) { LoadMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
+SV doSaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
+SV doLoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
+SV doSaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
+
+// Initialize the dictionary at startup
 
 SV LoadKeywords(void) {
     hp = 0; // start empty
@@ -1100,8 +1138,12 @@ SV LoadKeywords(void) {
     current = root_wid;
     AddEquate  ("root", root_wid);
     AddEquate  ("_forth", forth_wid);
-    AddKeyword("assert", doAssert, noCompile);     // ( n1 n2 -- )
-    AddKeyword(">verbose", doVerbose, noCompile);
+    AddKeyword ("assert", doAssert, noCompile);     // ( n1 n2 -- )
+    AddKeyword (">verbose", doVerbose, noCompile);
+    AddKeyword ("load-code", doLoadCodeBin, noCompile);
+    AddKeyword ("save-code", doSaveCodeBin, noCompile);
+    AddKeyword ("load-data", doLoadDataBin, noCompile);
+    AddKeyword ("save-data", doSaveDataBin, noCompile);
     AddKeyword ("[if]", do_IF, noCompile);
     AddKeyword ("[then]", doNothing, noCompile);
     AddKeyword ("[else]", do_ELSE, noCompile);
@@ -1175,49 +1217,49 @@ SV LoadKeywords(void) {
     AddKeyword ("|", doTableEntry, noCompile);
     // primitives
     AddPrimitiv("nop", 0);
-    AddPrimitiv("invert", com);
-    AddPrimitiv("2*",     shl1  | co);
-    AddPrimitiv("2/",     shr1  | co);
-    AddPrimitiv("2*c",    shlx  | co);
-    AddPrimitiv("2/c",    shrx  | co);
-    AddPrimitiv("xor",    eor   |        sdn);
-    AddPrimitiv("and",    Tand  |        sdn);
-    AddPrimitiv("+",      add   | co   | sdn);
-    AddPrimitiv("-",      sub   | co   | sdn);
-    AddPrimitiv("dup",            TtoN | sup);
-    AddPrimitiv("over",   NtoT  | TtoN | sup);
-    AddPrimitiv("swap",   NtoT  | TtoN);
-    AddPrimitiv("drop",   NtoT  |        sdn);
-    AddPrimitiv("nip",                   sdn);
-    AddPrimitiv("0=",     zeq   );
-    AddPrimitiv("0<",     less0 );
-    AddPrimitiv(">r",     NtoT  | TtoR | sdn | rup);
-    AddPrimitiv("r>",     RtoT  | TtoN | sup | rdn);
-    AddPrimitiv("r@",     RtoT  | TtoN | sup);
-    AddPrimitiv("carry",  carry | TtoN | sup);
-    AddPrimitiv("w",      WtoT  | TtoN | sup);
-    AddPrimitiv(">carry",  NtoT | co   | sdn);
-    AddPrimitiv(">w",     NtoT  | TtoW | sdn);
-    AddPrimitiv("rshift",  shr         | sdn);
-    AddPrimitiv("lshift",  shl         | sdn);
-    AddPrimitiv("_@",     read);
-    AddPrimitiv("_!",     write        | sdn);
-    AddPrimitiv("_io!",   iow          | sdn);
-    AddPrimitiv("_io@",   ior); // trigger a read
-    AddPrimitiv("_io@_",  input); // get data
-    AddPrimitiv("2dupand", Tand | TtoN | sup);
-    AddPrimitiv("2dupxor", eor  | TtoN | sup);
-    AddPrimitiv("2dup+",  add   | TtoN | sup);
-    AddPrimitiv("2dup-",  sub   | TtoN | sup);
+    AddPrimitiv("invert",  com);
+    AddPrimitiv("2*",      shl1  | co);
+    AddPrimitiv("2/",      shr1  | co);
+    AddPrimitiv("2*c",     shlx  | co);
+    AddPrimitiv("2/c",     shrx  | co);
+    AddPrimitiv("xor",     eor   |        sdn);
+    AddPrimitiv("and",     Tand  |        sdn);
+    AddPrimitiv("+",       add   | co   | sdn);
+    AddPrimitiv("-",       sub   | co   | sdn);
+    AddPrimitiv("dup",             TtoN | sup);
+    AddPrimitiv("over",    NtoT  | TtoN | sup);
+    AddPrimitiv("swap",    NtoT  | TtoN);
+    AddPrimitiv("drop",    NtoT  |        sdn);
+    AddPrimitiv("nip",                    sdn);
+    AddPrimitiv("0=",      zeq   );
+    AddPrimitiv("0<",      less0 );
+    AddPrimitiv(">r",      NtoT  | TtoR | sdn | rup);
+    AddPrimitiv("r>",      RtoT  | TtoN | sup | rdn);
+    AddPrimitiv("r@",      RtoT  | TtoN | sup);
+    AddPrimitiv("carry",   carry | TtoN | sup);
+    AddPrimitiv("w",       WtoT  | TtoN | sup);
+    AddPrimitiv(">carry",  NtoT  | co   | sdn);
+    AddPrimitiv(">w",      NtoT  | TtoW | sdn);
+    AddPrimitiv("rshift",  shr          | sdn);
+    AddPrimitiv("lshift",  shl          | sdn);
+    AddPrimitiv("_@",      read);
+    AddPrimitiv("_!",      write        | sdn);
+    AddPrimitiv("_io!",    iow          | sdn);
+    AddPrimitiv("_io@",    ior); // trigger a read
+    AddPrimitiv("_io@_",   input); // get data
+    AddPrimitiv("2dupand", Tand  | TtoN | sup);
+    AddPrimitiv("2dupxor", eor   | TtoN | sup);
+    AddPrimitiv("2dup+",   add   | TtoN | sup);
+    AddPrimitiv("2dup-",   sub   | TtoN | sup);
     AddPrimitiv("overand", Tand);
-    AddPrimitiv("overxor",  eor);
-    AddPrimitiv("over+",  add   | co);
-    AddPrimitiv("over-",  sub   | co);
-    AddPrimitiv("dup>r",  TtoR         | rup);
-    AddPrimitiv("rdrop",                 rdn);
-    AddPrimitiv("+c",     addc  | co   | sdn);
-    AddPrimitiv("tuck!",  write        | sdn);
-    AddPrimitiv("dup@",   read  | TtoN | sup);
+    AddPrimitiv("overxor", eor);
+    AddPrimitiv("over+",   add   | co);
+    AddPrimitiv("over-",   sub   | co);
+    AddPrimitiv("dup>r",   TtoR               | rup);
+    AddPrimitiv("rdrop",                        rdn);
+    AddPrimitiv("+c",      addc  | co   | sdn);
+    AddPrimitiv("tuck!",   write        | sdn);
+    AddPrimitiv("dup@",    read  | TtoN | sup);
 
     AddKeyword ("begin", noExecute, doBegin);
     AddKeyword ("again", noExecute, doAgain);

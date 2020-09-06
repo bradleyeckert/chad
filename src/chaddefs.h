@@ -186,3 +186,4 @@ int chadSpinFunction(void); // external function waiting for keyboard input
 #define BAD_BITFIELD    -73 // Bitfield is too wide for a cell
 #define BAD_IS          -74 // Trying to IS a non-DEFER
 #define BAD_WID_OVER    -75 // Too many WORDLISTs
+#define BAD_CREATEFILE -198

@@ -89,3 +89,14 @@ Cross compilers call it IDATA, but no need here.
 Hardware (or code) is expected to initialize data space at startup.
 A typical use case would keep initial data in SPI flash
 and load it into data space at boot.
+
+### Loading and Saving code and data spaces
+
+- `save-code` *( <filename> -- )* Saves the code space to a binary file.
+- `save-data` *( <filename> -- )* Saves the data space to a binary file.
+- `load-code` *( <filename> -- )* Loads the code space from a binary file.
+- `load-data` *( <filename> -- )* Loads the data space from a binary file.
+
+The word data types of code and data are simply cast to `char*` so the binary
+is not endian-agnostic. This only matters if your desktop is big-endian.
+The rest of the world is little-endian.
