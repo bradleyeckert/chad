@@ -16,10 +16,10 @@
 #define EnableCPUchecks         /* Simulator has more instrumentation       */
 
 #define LineBufferSize 256      /* Size of line buffer                      */
-#define MaxKeywords   1024      /* Number of headers                        */
-#define MaxNameSize     16      /* Number of chars in a name (less 1)       */
+#define MaxKeywords   2000      /* Number of headers                        */
+#define MaxNameSize     32      /* Number of chars in a name (less 1)       */
 #define MaxFiles        20      /* Max depth of file nesting                */
-#define MaxWordlists    16      /* Max number of wordlists                  */
+#define MaxWordlists    20      /* Max number of wordlists                  */
 
 #ifdef _MSC_VER                 /* Visual Studio wants "safe" functions.    */
 #define MORESAFE                /* Compiler supports them (C11, C17, etc).  */

@@ -14,6 +14,8 @@ decimal
 0 torg
 
 defer cold  \ a forward reference to resolve with `is`.
+defer bad_address_align
+
 
 CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
 1234 depth   1 assert  1234 assert  \ sanity check the stack
