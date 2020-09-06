@@ -17,7 +17,7 @@ Nope, set that pointer every morning first thing after waking.
 Take a long, deep breath, while thinking of how grateful you are to be alive
 and how wonderful the possibilities of the new day are.
 Upon exhaling, say "thank you". That's it.
-Every mornimg, don't forget.
+Every morning, don't forget.
 It affects your coding work greatly.
 And your general attitude on life.
 
@@ -49,7 +49,7 @@ How's everyone at each other's throats working for you?
 How about waging peace?
 How about we forget about ARM and its wannabes like RISC V?
 They are all part of the same dying world.
-It's rather poetic that Coronavirus could bring an empire built on C to its knees.
+It's rather poetic that Corona-virus could bring an empire built on C to its knees.
 Sorry, C is not the language of peace.
 It's the language of Commerce, which makes `C` such a fitting name.
 If there's a mathematical function relating lines of code to body count,
@@ -61,7 +61,7 @@ You have to roll with the tide.
 If your code is so great, why shouldn't everyone on the planet be 
 able to run it without it being hosted by
 some military industrial complex derived CPU
-accompanied by a ridicuously complex C toolchain?
+accompanied by a ridiculously complex C tool-chain?
 Building the silicon is a formality, the CPU can be simulated.
 Which is fine. Did you build your code so sucky the time would matter?
 
