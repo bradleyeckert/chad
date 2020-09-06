@@ -1,6 +1,6 @@
-# chad: welcome to your new cult
+# Welcome to your new cult
 
-Why not get real about what it means to ba a computer programmer?
+Why not get real about what it means to be a computer programmer?
 Maybe it's time for something new. If you're up for it...
 
 - A monastic lifestyle, meaning:
@@ -67,7 +67,7 @@ Which is fine. Did you build your code so sucky the time would matter?
 
 No, let's get real. Let's get simple. Let's just build code.
 
-## chad, a self-hosting Forth for J1-style CPUs
+## A self-hosting Forth for J1-style CPUs
 
 James Bowman's seminal paper on the 
 [J1 CPU](https://excamera.com/sphinx/fpga-j1.html "J1 CPU")
@@ -81,7 +81,7 @@ The code was 70% smaller than the equivalent C on a MicroBlaze.
 The code just wouldn't fit in memory, so the J1 was used instead.
 Chad improves on the J1 to facilitate bigger apps.
 
-Chad protects your software investment by targeting a very simple but
+`chad` protects your software investment by targeting a very simple but
 very powerful (for its size) stack computer.
 Modern desktop computers are fast enough to simulate the CPU on the order of at-speed.
 Simulation speed on my desktop depends on the compiler:
