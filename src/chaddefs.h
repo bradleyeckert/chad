@@ -36,6 +36,7 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 #define MSB      0x80000000
 #endif
 
+#define CELLS    (BYTE_ADDR(1))
 #define File FileStack[filedepth]
 #define RPMASK   (StackSize-1)
 #define RDEPTH   (rp & RPMASK)
@@ -166,6 +167,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_STACKUNDER   -4 // Stack underflow
 #define BAD_RSTACKOVER   -5 // Return stack overflow
 #define BAD_RSTACKUNDER  -6 // Return stack underflow
+#define DIV_BY_ZERO     -10 // Division by 0
 #define UNRECOGNIZED    -13 // Unrecognized word
 #define BAD_NOCOMPILE   -14 // Interpreting a compile-only word
 #define BAD_ROMWRITE    -20 // Write to a read-only location

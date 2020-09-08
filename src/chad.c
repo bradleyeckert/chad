@@ -32,11 +32,44 @@ static uint64_t GetMicroseconds() {
 #include "config.h"
 
 SI verbose = 0;
-CELL base = 10;
 uint8_t sp, rp;                         // stack pointers
 CELL t, pc, cy, lex, w;                 // registers
+CELL Data[DataSize];                    // data memory
 CELL Dstack[StackSize];                 // data stack
 CELL Raddr, RaddrD;                     // data memory read address
+SI error;                               // simulator and interpreter error code
+
+#define dpCell 0                        // define shared variables
+#define baseByte (dpCell + CELLS)
+#define stateByte (baseByte + 1)
+
+static uint8_t fetchByte(int caddr) {   // fetch byte from data memory
+    cell a = CELL_ADDR(caddr);
+    if (a & ~(DataSize - 1)) {
+        error = BAD_DATA_READ;  return 0;
+    }
+    int shift = (caddr & (CELLS - 1)) << 3;
+    return (Data[a] >> shift) & 0xFF;
+}
+
+SV storeByte(uint8_t c, int caddr) {    // store byte to data memory
+    cell a = CELL_ADDR(caddr);
+    if (a & ~(DataSize - 1)) {
+        error = BAD_DATA_WRITE;  return;
+    }
+    cell shift = 8 * (caddr & (CELLS - 1));
+    cell old = Data[a] & ~(0xFF << shift);
+    Data[a] = old + (c << shift);
+}
+
+static uint8_t baseFetch(void) { return fetchByte(baseByte); }
+SV baseStore(uint8_t c) { storeByte(c, baseByte); }
+static uint8_t stateFetch(void) { return fetchByte(stateByte); }
+SV stateStore(uint8_t c) { storeByte(c, stateByte); }
+SV Hex(void) { baseStore(16); }
+SV Decimal(void) { baseStore(10); }
+SV toImmediate(void) { stateStore(0); }
+SV toCompile(void) { stateStore(1); }
 
 SV Cdot(cell x) {  // cuz no itoa
     int32_t n = x;
@@ -44,7 +77,7 @@ SV Cdot(cell x) {  // cuz no itoa
     if (x & (1 << (CELLBITS - 1))) n -= 1 << CELLBITS;
     x &= CELLMASK; // unsigned
 #endif
-    if (base == 16) printf("%Xh ", x);
+    if (baseFetch() == 16) printf("%Xh ", x);
     else printf("%d ", n);
 }
 
@@ -63,10 +96,8 @@ SV PrintStack(void) {                   // ( ... -- ... )
 //##############################################################################
 // CPU simulator
 
-SI error;                               // simulator and interpreter error code
 CELL Rstack[StackSize];                 // return stack
 static uint16_t Code[CodeSize];         // code memory
-CELL Data[DataSize];                    // data memory
 uint8_t spMax, rpMax;                   // stack depth tracking
 static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;             // cycle counter
@@ -138,7 +169,7 @@ SI CPUsim(int single) {
             PrintStack();
             printf("w=%Xh, cy=%X, R=%Xh)\n", w & CELLMASK, cy, Rstack[RP]);
         }
-    once:   _pc = pc + 1;
+once:   _pc = pc + 1;
         cell _lex = 0;
         if (insn & 0x8000) {
             int target = (lex << 13) | (insn & 0x1fff);
@@ -204,9 +235,8 @@ SI CPUsim(int single) {
             case 0x15: _t = ~t;                              break; /*     ~T */
             case 0x06: _t = s & t;                           break; /*    T&N */
             case 0x16: _t = w & t;                           break; /*    T&W */
-            case 0x07: temp = (t >> CELLSIZE) & CELL_AMASK;
-                _t = BYTE_ADDR(t >> (2 * CELLSIZE));
-                w = ~(ALL_ONES << (temp + 1));               break; /*   mask */
+            case 0x07: _t = (t & (CELLS-1)) << 3; // {0,8,16,24}
+                w = 0xFF;                                    break; /*   mask */
             case 0x08: sum = (sum_t)s + (sum_t)t;
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    T+N */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
@@ -321,7 +351,7 @@ SV CompCall (cell xt) {
 }
 
 SI aligned(int n) {
-    int32_t cellbytes = BYTE_ADDR(1);
+    int32_t cellbytes = CELLS;
     return (n + cellbytes - 1) & (-cellbytes);
 }
 
@@ -385,7 +415,6 @@ SV doNext(void) {
 // The dictionary uses a static array of data structures loaded at startup.
 // Links are int indices into this array of Headers.
 
-CELL state = 0;
 SI hp;                                  // # of keywords in the Header list
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of found keyword
@@ -516,7 +545,7 @@ SI NotKeyword (char *key) {             // do a command, return 0 if found
     int i = FindWord(key);
     if (i < 0)
         return -1;                      // not found
-    if (state)
+    if (stateFetch())
         Header[i].CompFn();
     else
         Header[i].ExecFn();
@@ -836,7 +865,7 @@ SV doColon(void) {
         SetFns(cp, Def_Exec, Def_Comp);
         Header[hp].target = cp;
         DefMarkID = hp;                 // save for later reference
-        DefMark = cp;  state = 1;
+        DefMark = cp;  toCompile();
         fence = cp;                     // code starts here
         ConSP = 0;
     }
@@ -844,7 +873,7 @@ SV doColon(void) {
 
 SV doNoName(void) {
     Dpush(cp);  DefMarkID = 0;          // no length
-    state = 1;
+    toCompile();
     fence = cp;
     ConSP = 0;
 }
@@ -967,7 +996,7 @@ SV doSEE (void) {                       // ( <name> -- )
 }
 
 SV doDEFER(void) {
-    doColon();  state = 0;  toCode(jump);
+    doColon();  toImmediate();  toCode(jump);
     Header[hp].w2 = MAGIC_DEFER;
 }
 
@@ -979,17 +1008,13 @@ SV doIS(void) {                        // ( xt <name> -- )
 }
 
 SV doNothing (void) { }
-SV doCODE    (void) { doColon();  state = 0;  OrderPush(asm_wid);  Dpush(0);}
+SV doCODE    (void) { doColon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
 SV doENDCODE (void) { SaveLength();  OrderPop();  Dpop();  sane();}
 SV doBYE     (void) { error = BYE; }
-SV doHEX     (void) { base = 16; }
-SV doDEC     (void) { base = 10; }
 SV doComment (void) { toin = (int)strlen(buf); }
 SV doCmParen (void) { parseword(')'); }
 SV doComEcho (void) { doCmParen();  printf("%s",tok); }
 SV doCR      (void) { printf("\n"); }
-SV doToExec  (void) { state = 0; }
-SV doToComp  (void) { state = 1; }
 SV doTick    (void) { Dpush(tick()); }
 SV doTickImm (void) { Literal(tick()); }
 SV doThere   (void) { Dpush(cp); }
@@ -999,7 +1024,7 @@ SV doBorg    (void) { bp = Dpop(); }
 SV doDROP    (void) { Dpop(); }
 SV doTcomma  (void) { toCode(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
-SV doSemi    (void) { compExit();  SaveLength();  state = 0;  sane();}
+SV doSemi    (void) { compExit();  SaveLength();  toImmediate();  sane();}
 SV doSemiEX  (void) { SaveLength();  sane(); }
 SV doVerbose (void) { verbose = Dpop(); }
 SV doAligned (void) { Dpush(aligned(Dpop())); }
@@ -1125,9 +1150,8 @@ SV doSaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
 // There's not much you can do without compiling on the chad CPU.
 // For example CREATE here is not usable with DOES>.
 
-#define dpCell 64
-CELL dpFetch(void) { return Data[dpCell]; }
-SV dpStore(cell x) { Data[dpCell] = x; }
+CELL dpFetch(void) { return Data[CELL_ADDR(dpCell)]; }
+SV dpStore(cell x) { Data[CELL_ADDR(dpCell)] = x; }
 SV allot(int n) { dpStore(n + dpFetch()); }
 SV buffer(int n) { Dpush(dpFetch());  doEQU();  allot(n); }
 SV doBUFFER(void) { buffer(Dpop()); }
@@ -1135,6 +1159,8 @@ SV doCVARIABLE(void) { buffer(1); }
 SV doAlign(void) { dpStore(aligned(dpFetch())); }
 SV doVARIABLE(void) { doAlign();  buffer(4); }
 SV doCREATE(void) { doAlign();  buffer(0); }
+SV doCHAR(void) { parseword(' ');  Dpush(tok[0]); }
+SV doCHARimm(void) { parseword(' ');  Literal(tok[0]); }
 
 // Initialize the dictionary at startup
 
@@ -1171,9 +1197,9 @@ SV LoadKeywords(void) {
     AddKeyword ("set-current", doSetCurrent, noCompile);
     AddKeyword ("get-order", doGetOrder, noCompile);
     AddKeyword ("set-order", doSetOrder, noCompile);
-    AddKeyword ("stats", doStats, doToComp);
-    AddKeyword ("hex", doHEX, noCompile);
-    AddKeyword ("decimal", doDEC, noCompile);
+    AddKeyword ("stats", doStats, toCompile);
+    AddKeyword ("hex", Hex, noCompile);
+    AddKeyword ("decimal", Decimal, noCompile);
     AddKeyword ("drop", doDROP, noCompile);
     AddKeyword ("\\", doComment, doComment);
     AddKeyword ("(", doCmParen, doCmParen);
@@ -1191,12 +1217,12 @@ SV LoadKeywords(void) {
     AddKeyword ("sstep", doSteps, noCompile);
     AddKeyword ("inst", doInstruction, noCompile);
     AddKeyword ("write-protect", doWrProt, noCompile);
-    AddEquate  ("code-writable", BYTE_ADDR(CodeFence));
-    AddEquate  ("code-size", BYTE_ADDR(CodeSize));
-    AddEquate  ("data-size", BYTE_ADDR(DataSize));
+    AddEquate  ("cm-writable", BYTE_ADDR(CodeFence));
+    AddEquate  ("cm-size", BYTE_ADDR(CodeSize));
+    AddEquate  ("dm-size", BYTE_ADDR(DataSize));
     AddEquate  ("cellbits", CELLBITS);
-    AddEquate  ("cell", BYTE_ADDR(1));
-    AddEquate  ("dp", BYTE_ADDR(dpCell));
+    AddEquate  ("cell", CELLS);
+    AddEquate  ("dp", dpCell);
     AddKeyword ("calign", doNothing, doNothing);
     AddKeyword ("caligned", doNothing, doNothing);
     AddKeyword ("chars", doNothing, doNothing);
@@ -1209,12 +1235,14 @@ SV LoadKeywords(void) {
     AddKeyword ("variable", doVARIABLE, noCompile);
     AddKeyword ("cvariable", doCVARIABLE, noCompile);
     AddKeyword ("create", doCREATE, noCompile);
+    AddKeyword ("char", doCHAR, noCompile);
+    AddKeyword ("[char]", noExecute, doCHARimm);
     AddKeyword ("bvar", doBitfield, noCompile);
     AddKeyword ("balign", doBitAlign, noCompile);
     AddKeyword ("bhere", doBhere, noCompile);
     AddKeyword ("borg", doBorg, noCompile);
-    AddKeyword ("[", doToExec, doToExec);
-    AddKeyword ("]", doToComp, doToComp);
+    AddKeyword ("[", toImmediate, toImmediate);
+    AddKeyword ("]", toCompile, toCompile);
     AddKeyword ("'", doTick, noCompile);
     AddKeyword ("[']", noExecute, doTickImm);
     AddKeyword ("marker", doMARKER, noCompile);
@@ -1268,6 +1296,8 @@ SV LoadKeywords(void) {
     AddPrimitiv("2dupxor", eor   | TtoN | sup);
     AddPrimitiv("2dup+",   add   | TtoN | sup);
     AddPrimitiv("2dup-",   sub   | TtoN | sup);
+    AddPrimitiv("mask",    bmask);
+    AddPrimitiv("wand",    TandW);
     AddPrimitiv("overand", Tand);
     AddPrimitiv("overxor", eor);
     AddPrimitiv("over+",   add   | co);
@@ -1361,9 +1391,11 @@ int chad(char * line, int maxlength) {
     buf = line;  maxlen = maxlength;    // assign a working buffer
     LoadKeywords();
     filedepth = 0;
+    Decimal();
     while (1) {
         File.fp = stdin;                // keyboard input
-        fileID = error = state = 0;     // interpreter state
+        fileID = error = 0;             // interpreter state
+        toImmediate();
         cycles = spMax = rpMax = 0;     // CPU stats
         sp = rp = 0;                    // stacks
         while (!error) {
@@ -1374,8 +1406,10 @@ int chad(char * line, int maxlength) {
                 if (verbose) {
                     printf("  %s", tok);
                 }
+                if (baseFetch() == 0) 
+                    error = DIV_BY_ZERO;
                 if (NotKeyword(tok)) {  // try to convert to number
-                    int i = 0;   int radix = base;   char c = 0;
+                    int i = 0;   int radix = baseFetch();   char c = 0;
                     int64_t x = 0;  int cp = 0;  int neg = 0;
                     switch (tok[0]) {   // leading digit
                         case '-': i++;  neg = -1;    break;
@@ -1410,7 +1444,7 @@ bogus:                          error = UNRECOGNIZED;
                         if (cp) {
                             i = (x >> CELLBITS) & CELLMASK;
                             x &= CELLMASK;
-                            if (state) {
+                            if (stateFetch()) {
                                 Literal((cell)x);
                                 Literal((cell)i);
                             } else {
@@ -1419,7 +1453,7 @@ bogus:                          error = UNRECOGNIZED;
                             }
                         } else {
                             x &= CELLMASK;
-                            if (state) {
+                            if (stateFetch()) {
                                 Literal((cell)x);
                             } else {
                                 Dpush((cell)(x));
@@ -1473,7 +1507,7 @@ done:       elapsed_us = GetMicroseconds() - time0;
 // This is beyond the scope of the C side of Chad.
 // chadGetHeader would be used when building a header structure in flash.
 
-#define BYTES_PER_WORD  BYTE_ADDR(1)
+#define BYTES_PER_WORD  CELLS
 
 uint32_t chadGetSource (char delimiter) {
     size_t bytes;

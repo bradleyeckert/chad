@@ -6,6 +6,7 @@ decimal
 2 equ 'TXbusy \ UART transmit busy flag
 0 equ false   \ equates take up no code space. Have as many as you want.
 -1 equ true
+32 equ bl
 
 \ You can compile to either check address alignment or not.
 \ Set to 0 when everything looks stable. The difference is 25 instructions.
@@ -30,14 +31,15 @@ END-CODE
 : =     xor 0= ;
 : or    invert swap invert and invert ;
 : <>    xor 0= 0= ;
-: <     - 0< ; macro
+: <     - 0< ; \ macro
 : >     swap < ;
-: cell+ cell + ; macro
+: cell+ cell + ; \ macro
 : rot   >r swap r> swap ;
 
-cellbits 32 = [if]
+: c@    _@ dup@ swap mask rshift wand ;
+
+cell 4 = [if]
     : cells 2* 2* ; macro
-    : c@  _@ dup@ swap 3 and 3 lshift rshift $FF and ;
     : (x!)  ( u w-addr bitmask wordmask )
         >carry swap
         dup>r and 3 lshift dup>r lshift
@@ -70,7 +72,6 @@ cellbits 32 = [if]
     : @   _@ _@_ ; macro
     : !   _! drop ; macro
   [then]
-    : c@  _@ dup@ swap 1 and 3 lshift rshift $FF and ;
     : c! ( u c-addr -- )
         dup>r 1 and if
             8 lshift  $00FF
@@ -81,45 +82,6 @@ cellbits 32 = [if]
     ;
 [then]
 
-\ Bit field operators
-\ Read is easy: Read, shift, and mask.
-\ Write needs a read-modify-write: limit and align n, read and mask
-\ the old data, add the new data, and write back the result.
-
-CODE b@  \ bs -- n              \ Read a bit field from packed bitspec
-    mask    T->N    d+1     alu \ ( count addr )
-    T                       alu \ wait for read to settle
-    [T]                     alu \ read the cell
-    N       T->N            alu \ swap: ( data count )
-    N>>T            d-1     alu \ value
-    T&W             RET r-1 alu \ bits
-END-CODE
-
-CODE b!  \ n bs --              \ Write to a packed bitspec
-    N       T->N            alu \ swap
-    N       T->R    d-1 r+1 alu \ >r
-    mask    T->N    d+1     alu \ ( shift addr | n ) W = mask
-    N       T->N    d+1     alu \ over: ( shift addr shift | n )
-    R       T->N    d+1 r-1 alu \ r>
-    N       T->N            alu \ swap: ( shift addr n shift )
-    N<<T            d-1     alu \ lshift: ( shift addr n' )
-    N       T->R    d-1 r+1 alu \ >r: ( shift addr | n' )
-    N       T->N            alu \ swap
-    W       T->N    d+1     alu \ w: ( addr shift mask | n' )
-    N       T->N            alu \ swap
-    N<<T            d-1     alu \ lshift: ( addr mask' | n' )
-    ~T                      alu
-    N       T->N    d+1     alu \ over: ( addr mask' addr | n' )
-    T                       alu \ wait for read to settle
-    [T]                     alu \ @
-    T&N             d-1     alu \ and: ( addr data' | n' )
-    R       T->N    d+1 r-1 alu \ r>
-    T+N             d-1     alu \ +: ( addr data" )
-    N       T->N            alu \ swap
-    T       N->[T]  d-1     alu \ !
-    N       RET     d-1 r-1 alu
-END-CODE
-
 \ Your code can usually use + instead of OR, but if it's needed:
 : or     invert swap invert and invert ; \ n t -- n|t
 
@@ -127,8 +89,8 @@ END-CODE
 
 : 2dup   over over ; macro \ d -- d d
 : char+ [ ;
-: 1+     1 + ; macro
-: 1-     1 - ; macro
+: 1+     1 + ; \ macro
+: 1-     1 - ; \ macro
 : negate invert 1+ ;
 : tuck   swap over ;
 : +!     tuck @ + swap ! ;
@@ -205,7 +167,10 @@ END-CODE
 
 \ In order to use CREATE DOES>, we need ',' defined here.
 
-dp cell+ dp ! \ start variables after dp
+dp cell+ dp ! \ variables shared with chad's interpreter
+cvariable base
+cvariable state
+align
 : aligned  dup [ cell 1- ] literal + cell negate and ;
 : align    dp @ aligned dp ! ;
 : allot    dp +! ;
@@ -225,7 +190,7 @@ dp cell+ dp ! \ start variables after dp
 : max    over over- 0< if drop exit then  swap drop ; \ 6.1.1880
 : exec2: 2* [ ;             			\ for list of 2-inst literals
 : exec1: 2* r> + >r ;       			\ for list of 1-inst literals
-
+: 2drop  drop drop ;
 
 1000 100 xor  908 assert
 1000 100 and   96 assert
@@ -237,9 +202,9 @@ depth 0 assert
 123 456 over  123 assert 456 assert 123 assert
 depth 0 assert
 \ Note: Data memory is byte-addressed, allow 4-byte cells
-123 4 !  456 8 !
-4 @ 123 assert
-8 dup drop @ dup drop 456 assert
+123 24 !  456 28 !
+24 @ 123 assert
+28 dup drop @ dup drop 456 assert
 depth 0 assert
 
 \ Now let's get some I/O set up. ScreenProfile points to a table of xts.
@@ -279,17 +244,9 @@ variable ScreenProfile
 
 \ Try 25 fib, then stats
 
-
-\ Bit fields you can test with
-\ They got broken when I changed to byte addressing, need to be fixed.
-
-6 bvar base     10 base b!       \ to handle up to base 36
-1 bvar state     0 state b!      \ yup
-7 bvar percent  33 percent b!    \ for numbers 0 to 100
-8 bvar mybyte   47 mybyte b!     \ an actual byte
-16 bvar classic 12345 classic b! \ old school 16-bit value
-
 ' fib is cold
+
+include numout.fs
 
 there . .( instructions used) cr
 \ 0 there dasm

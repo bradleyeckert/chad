@@ -204,3 +204,16 @@ is busy. Once finished, you can read result registers into `COP`.
 - 0xE808 = Trigger multiplication of T and N
 - 0xE809 = Trigger division of T:N by W
 
+## Shift register stacks
+
+It took me a while to come around to shift register stacks.
+Not a circularly indexed register file, but actual bi-directional
+shift registers for the stack.
+One shift register for each bit in the cell.
+Power dissipation is caused by wires.
+In a shift register, the bits are right next to each other.
+It should synthesize nicely, with the business end where you want it.
+
+The simulator models stacks with circular buffers. 
+It reports overflow and underflow to avoid the difference in overflow and underflow
+behavior that you would see when using a shift register stack.
