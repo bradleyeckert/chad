@@ -1,7 +1,9 @@
 # Welcome to your new cult
 
 Why not get real about what it means to be a computer programmer?
-Maybe it's time for something new. If you're up for it...
+Maybe it's time for something new.
+Like programming as a way of being, a creative download from the Universe.
+So, if you're up for it...
 
 - A monastic lifestyle, meaning:
 - Celibacy, but including meditative practice.
@@ -38,12 +40,12 @@ If this is all just too much, stick with C.
 You know, the language for writing operating systems.
 Because computing had to pay the bills.
 Because of that, libraries.
-Because of that, it's not all you.
+Because of that, it's not your code.
 That's not a spiritual practice then, is it? It's business.
 
 Which is fine, but why does everyone on the planet have an ARM processor
 in their hands?
-Because ARMs are offensive weapons.
+Because arms are offensive weapons.
 How's everyone at each other's throats working for you?
 
 How about waging peace?
@@ -54,6 +56,7 @@ Sorry, C is not the language of peace.
 It's the language of Commerce, which makes `C` such a fitting name.
 If there's a mathematical function relating lines of code to body count,
 the C language and its libraries wouldn't exactly come out clean.
+Don't stop me, I'm on a roll.
 An Admiral in the US Navy starting off this whole business had its time.
 But here's the thing about planetary consciousness shifts.
 You have to roll with the tide.

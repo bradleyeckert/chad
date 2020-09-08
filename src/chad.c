@@ -33,19 +33,43 @@ static uint64_t GetMicroseconds() {
 #include "chaddefs.h"
 #include "iomap.h"
 #define NameOffset 0x20
+SI verbose = 0;
+CELL base = 10;
+uint8_t sp, rp;                         // stack pointers
+CELL t, pc, cy, lex, w;                 // registers
+CELL Dstack[StackSize];                 // data stack
+CELL Raddr, RaddrD;                     // data memory read address
 
+SV Cdot(cell x) {  // cuz no itoa
+    int32_t n = x;
+#if (CELLBITS < 32)
+    if (x & (1 << (CELLBITS - 1))) n -= 1 << CELLBITS;
+    x &= CELLMASK; // unsigned
+#endif
+    if (base == 16) printf("%Xh ", x);
+    else printf("%d ", n);
+}
+
+SV PrintStack(void) {                   // ( ... -- ... )
+    int depth = SDEPTH;                 // primitive of .s
+    for (int i = 0; i < depth; i++) {
+        if (i == (depth - 1)) {
+            Cdot(t);
+        }
+        else {
+            Cdot(Dstack[(i + 2) & SPMASK]);
+        }
+    }
+}
 
 //##############################################################################
 // CPU simulator
 
 SI error;                               // simulator and interpreter error code
-CELL Dstack[StackSize];                 // data stack
 CELL Rstack[StackSize];                 // return stack
 static uint16_t Code[CodeSize];         // code memory
 CELL Data[DataSize];                    // data memory
-uint8_t sp, rp;                         // stack pointers
 uint8_t spMax, rpMax;                   // stack depth tracking
-CELL t, pc, cy, lex, w;                 // registers
 static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;             // cycle counter
 static uint32_t latency = 0;            // maximum cycles between return
@@ -111,7 +135,12 @@ SI CPUsim(int single) {
     }
     do {
         insn = Code[pc & (CodeSize-1)];
-once:   _pc = pc + 1;
+        if (verbose & 8) {
+            printf("  Code[%03Xh]=%04Xh ( ", pc, insn);
+            PrintStack();
+            printf("w=%Xh, cy=%X, R=%Xh)\n", w & CELLMASK, cy, Rstack[RP]);
+        }
+    once:   _pc = pc + 1;
         cell _lex = 0;
         if (insn & 0x8000) {
             int target = (lex << 13) | (insn & 0x1fff);
@@ -194,8 +223,7 @@ once:   _pc = pc + 1;
 
             case 0x0D: _t = Rstack[RP];                      break; /*      R */
             case 0x1D: _t = Rstack[RP] - 1;                  break; /*    R-1 */
-            case 0x0E: if (t & ~(DataSize-1)) { single = BAD_DATA_READ; }
-                _t = Data[CELL_ADDR(t) & (DataSize - 1)];    break; /*    [T] */
+            case 0x0E: _t = Data[Raddr];                     break; /*    [T] */
             case 0x1E: _t = readIOmap(t);                    break; /*  io[T] */
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
@@ -205,16 +233,19 @@ once:   _pc = pc + 1;
             switch ((insn >> 4) & 7) {
             case  1: Dstack[SP] = t;                         break;   /* T->N */
             case  2: Rstack[RP] = t;                         break;   /* T->R */
-            case  3: if (t & ~(DataSize-1)) { single = BAD_DATA_WRITE; }
-                Data[CELL_ADDR(t) & (DataSize - 1)] = s;     break; /* N->[T] */
-            case  4: writeIOmap(t, s);                     break; /* N->io[T] */
-            case  6: cy = _c;                                break;   /*   co */
-            case  7: w = t;                                  break;   /* T->W */
+            case  3: temp = CELL_ADDR(t); 
+                if (temp & ~(DataSize - 1)) { single = BAD_DATA_WRITE; }
+                Data[temp & (DataSize - 1)] = s;             break; /* N->[T] */
+            case  4: Raddr = CELL_ADDR(t);                         /* _MEMRD_ */
+                if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
+            case  5: writeIOmap(t, s);                     break; /* N->io[T] */
+               // 6 = IORD strobe
+            case  7: cy = _c;  w = t;                        break;   /*   co */
             default: break;
             }
             t = _t & CELLMASK;
         }
-        pc = _pc;  lex = _lex;
+        pc = _pc;  lex = _lex;  RaddrD = Raddr;
         cycles++;
 #ifdef EnableCPUchecks
         if (sp > spMax) spMax = sp;
@@ -292,6 +323,11 @@ SV CompCall (cell xt) {
     toCode (call | (xt & 0x1fff));
 }
 
+SI aligned(int n) {
+    int32_t cellbytes = BYTE_ADDR(1);
+    return (n + cellbytes - 1) & (-cellbytes);
+}
+
 // Code space isn't randomly readable, so lookup tables are supported by jump
 // into a list of literals with their return bits set.
 // Use |bits| to set the size of your data. It's cellsize by default.
@@ -347,10 +383,19 @@ SV doNext(void) {
     toCode(alu | rdn);  fence = cp;      /* rdrop */
 }
 
-SV toData(cell x) {                     // compile to data space
-    if (x & ~(DataSize - 1))
+SV toData(cell x) {                     // compile cell to data space
+    if (dp & ~(DataSize - 1))
         error = BAD_DATA_WRITE;
-    Data[dp++ & (DataSize - 1)] = x;
+    Data[dp += BYTE_ADDR(1)] = x;
+}
+
+SV toDataC(uint8_t c) {                 // compile byte to data space
+    cell selmask = BYTE_ADDR(1) - 1;    // 1 or 3
+    cell shift = 8 * (dp & selmask);
+    cell n = c << shift;
+    cell u = Data[dp & ~selmask & (DataSize - 1)];
+    toData((u & ~(0xFF << shift)) + n);
+    dp += 1 - BYTE_ADDR(1);
 }
 
 //##############################################################################
@@ -358,12 +403,10 @@ SV toData(cell x) {                     // compile to data space
 // The dictionary uses a static array of data structures loaded at startup.
 // Links are int indices into this array of Headers.
 
-CELL base = 10;
 CELL state = 0;
 SI hp;                                  // # of keywords in the Header list
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of found keyword
-SI verbose = 0;
 
 // The search order is a lists of contexts with order[orders] searched first
 // order:   wid3 wid2 wid1
@@ -504,10 +547,16 @@ SV Equ_Comp   (void) { Literal(my()); }
 SV Equ_Exec   (void) { Dpush(my()); }
 SV Prim_Comp  (void) { toCode(my()); }
 SV Prim_Exec  (void) { CPUsim(0x10000 + my()); } // single step
-SV Def_Exec   (void) { Simulate(my()); }
-SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
 SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
+SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
+
+SV Def_Exec   (void) {
+    if (verbose & 2) {
+        printf(" <exec:%Xh>", my());
+    }
+    Simulate(my());
+}
 
 SI AddHead (char * s) {                 // add a header to the list
     int r = 1;
@@ -581,15 +630,6 @@ static char* TargetName (cell addr) {
     return NULL;
 }
 
-SV Cdot (cell x) {  // cuz no itoa
-    int32_t n = x;
-    #if (CELLBITS < 32)
-    if (x & (1<<(CELLBITS-1))) n -= 1<<CELLBITS;
-    x &= CELLMASK; // unsigned
-    #endif
-    if (base == 16) printf("%x ", x);
-    else printf("%d ", n);
-}
 SV diss (int id, char *str) {
     while (id--) { while (*str++); }
     if (str[0]) printf("%s ", str);
@@ -600,12 +640,12 @@ cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
     if (IR & 0x8000) {
         int target = IR & 0x1FFF;
         switch ((IR>>12) & 7) {
-        case 6: printf("%x litx", IR & 0x7FF);  break;
+        case 6: printf("%Xh litx", IR & 0x7FF);  break;
         case 7: if (IR & ret) {printf("RET ");}
-            printf("%x imm", (IR & 0x7F) | (IR & 0xF00)>>1);  break;
+            printf("%Xh imm", (IR & 0x7F) | (IR & 0xF00)>>1);  break;
         default:
             name = TargetName(target);
-            if (name == NULL) printf("%x ", target);
+            if (name == NULL) printf("%Xh ", target);
             diss((IR>>13)&3,"jump\0zjump\0call");
             if (name != NULL) printf("%s ", name);
         }
@@ -617,7 +657,7 @@ cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
         case 2: diss(id,"---\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
         default: diss(id,"T+Nc\0N-Tc\0---\0---\0---\0R-1\0io[T]\0---");
         }
-        diss((IR>>4)&7,"\0T->N\0T->R\0N->[T]\0N->io[T]\0_IORD_\0CO\0T->CNT");
+        diss((IR>>4)&7,"\0T->N\0T->R\0N->[T]\0_MEMRD_\0N->io[T]\0_IORD_\0CO");
         diss( IR&3,    "\0d+1\0d-2\0d-1");
         diss((IR>>2)&3,"\0r+1\0r-2\0r-1");
         if (IR & ret) printf("RET ");
@@ -714,17 +754,6 @@ SV doStats(void) {
     spMax = sp;  rpMax = rp;
 }
 
-SV PrintStack (void) {                  // ( ... -- ... )
-    int depth = SDEPTH;                 // primitive of .s
-    for (int i=0; i<depth; i++) {
-        if (i == (depth-1)) {
-            Cdot(t);
-        } else {
-            Cdot(Dstack[(i + 2) & SPMASK]);
-        }
-    }
-}
-
 SV dotESS (void) {                      // ( ... -- ... )
     PrintStack();                       // .s
     printf("<-Top\n");
@@ -775,7 +804,7 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
 #else
     File.fp = fopen(name, "r");
 #endif
-    File.LineNumber = 0;
+    File.LineNumber = 1;
     File.Line[0] = 0;
     File.FID = fileID;
     if (File.fp == NULL) {
@@ -985,6 +1014,7 @@ SV doCR      (void) { printf("\n"); }
 SV doToExec  (void) { state = 0; }
 SV doToComp  (void) { state = 1; }
 SV doTick    (void) { Dpush(tick()); }
+SV doTickImm (void) { Literal(tick()); }
 SV doThere   (void) { Dpush(cp); }
 SV doTorg    (void) { cp = Dpop(); }
 SV doHere    (void) { Dpush(dp); }
@@ -994,12 +1024,13 @@ SV doBorg    (void) { bp = Dpop(); }
 SV doDROP    (void) { Dpop(); }
 SV doTcomma  (void) { toCode(Dpop()); }
 SV doComma   (void) { toData(Dpop()); }
+SV doCommaC  (void) { toDataC(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
 SV doSemi    (void) { compExit();  SaveLength();  state = 0;  sane();}
 SV doSemiEX  (void) { SaveLength();  sane(); }
 SV doVerbose (void) { verbose = Dpop(); }
-
-// `;` in immediate mode assumes fall through to next word. Resolve the length.
+SV doAligned (void) { Dpush(aligned(Dpop())); }
+SV doAlign   (void) { dp = aligned(dp); }
 
 SI refill(void) {
     int result = -1;
@@ -1177,11 +1208,18 @@ SV LoadKeywords(void) {
     AddEquate  ("code-size", CodeSize);
     AddEquate  ("data-size", DataSize);
     AddEquate  ("cellbits", CELLBITS);
+    AddEquate  ("cell", BYTE_ADDR(1));
+    AddKeyword ("calign", doNothing, doNothing);
+    AddKeyword ("caligned", doNothing, doNothing);
+    AddKeyword ("chars", doNothing, doNothing);
     AddKeyword ("t,", doTcomma, noCompile);
     AddKeyword ("there", doThere, noCompile);
     AddKeyword ("torg", doTorg, noCompile);
     AddKeyword (",", doComma, noCompile);
+    AddKeyword ("c,", doCommaC, noCompile);
     AddKeyword ("here", doHere, noCompile);
+    AddKeyword ("align", doAlign, noCompile);
+    AddKeyword ("aligned", doAligned, noCompile);
     AddKeyword ("org", doOrg, noCompile);
     AddKeyword ("variable", doVARIABLE, noCompile);
     AddKeyword ("bvar", doBitfield, noCompile);
@@ -1191,6 +1229,7 @@ SV LoadKeywords(void) {
     AddKeyword ("[", doToExec, doToExec);
     AddKeyword ("]", doToComp, doToComp);
     AddKeyword ("'", doTick, noCompile);
+    AddKeyword ("[']", noExecute, doTickImm);
     AddKeyword ("marker", doMARKER, noCompile);
     AddKeyword ("equ", doEQU, noCompile);
     AddKeyword (":", doColon, noCompile);
@@ -1230,14 +1269,14 @@ SV LoadKeywords(void) {
     AddPrimitiv("carry",   carry | TtoN | sup);
     AddPrimitiv("w",       WtoT  | TtoN | sup);
     AddPrimitiv(">carry",  NtoT  | co   | sdn);
-    AddPrimitiv(">w",      NtoT  | TtoW | sdn);
     AddPrimitiv("rshift",  shr          | sdn);
     AddPrimitiv("lshift",  shl          | sdn);
-    AddPrimitiv("_@",      read);
-    AddPrimitiv("_!",      write        | sdn);
+    AddPrimitiv("_@",              memrd);  // start read
+    AddPrimitiv("_@_",     read);           // end read
+    AddPrimitiv("_!",      write |        sdn);
     AddPrimitiv("_io!",    iow          | sdn);
-    AddPrimitiv("_io@",    ior); // trigger a read
-    AddPrimitiv("_io@_",   input); // get data
+    AddPrimitiv("_io@",    ior);            // start io read
+    AddPrimitiv("_io@_",   input);          // end io read
     AddPrimitiv("2dupand", Tand  | TtoN | sup);
     AddPrimitiv("2dupxor", eor   | TtoN | sup);
     AddPrimitiv("2dup+",   add   | TtoN | sup);
@@ -1299,9 +1338,9 @@ SV LoadKeywords(void) {
     AddModifier("T->R", TtoR );
     AddModifier("N->[T]", write);
     AddModifier("N->io[T]", iow  );
-    AddModifier("_IORD_", ior  );
+    AddModifier("_IORD_", ior);
+    AddModifier("_MEMRD_", memrd);
     AddModifier("CO", co  );
-    AddModifier("T->W", TtoW);
     AddModifier("r+1",  rup  );  // stack pointer field
     AddModifier("r-1",  rdn  );
     AddModifier("r-2", rdn2 );
@@ -1345,6 +1384,9 @@ int chad(char * line, int maxlength) {
             uint64_t time0 = GetMicroseconds();
             uint64_t cycles0 = cycles;
             while (parseword(' ')) {
+                if (verbose) {
+                    printf("  %s", tok);
+                }
                 if (NotKeyword(tok)) {  // try to convert to number
                     int i = 0;   int radix = base;   char c = 0;
                     int64_t x = 0;  int cp = 0;  int neg = 0;
@@ -1369,6 +1411,7 @@ int chad(char * line, int maxlength) {
                                 c -= 7;
                                 if (c < 10) goto bogus;
                             }
+                            if (c > 41) c -= 32; // lower to upper
                             if (c >= radix) {
 bogus:                          error = UNRECOGNIZED;
                             }
@@ -1396,6 +1439,14 @@ bogus:                          error = UNRECOGNIZED;
                             }
                         }
                     }
+                }
+                if (verbose) {
+                    printf(" ( ");
+                    PrintStack();
+                    if (verbose & 2) {
+                        printf(") (%s", &buf[toin]);
+                    }
+                    printf(")\n");
                 }
                 if (sp == (StackSize - 1)) error = BAD_STACKUNDER;
                 if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER;

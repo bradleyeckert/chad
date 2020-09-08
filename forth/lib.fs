@@ -11,70 +11,72 @@ decimal
 
 1 equ check_alignment \ enable @, !, w@, and w! to check address alignment
 
+0 >verbose
+
 0 torg
+defer cold  	\ boots here
+defer exception \ error detected
 
-defer cold  \ a forward reference to resolve with `is`.
-defer bad_address_align
+CODE depth   
+	status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu  
+END-CODE
 
+1234 depth  1 assert  1234 assert  \ sanity check the stack
 
-CODE depth   status T->N d+1 alu  drop 31 imm  T&N d-1 RET alu  END-CODE
-1234 depth   1 assert  1234 assert  \ sanity check the stack
-
-: noop nop ;
-: io@  _io@ nop _io@_ ;
-: io!  _io! nop drop ;
-: =    xor 0= ;
-: or   invert swap invert and invert ;
-
-\ iomap.c throws errors to the Chad interpreter
-
-: exception  ( error -- )  $8002 io! ;
+: noop  nop ;
+: io@   _io@ nop _io@_ ;
+: io!   _io! nop drop ;
+: =     xor 0= ;
+: or    invert swap invert and invert ;
+: <>    xor 0= 0= ;
+: <     - 0< ; macro
+: >     swap < ;
+: cell+ cell + ; macro
+: rot   >r swap r> swap ;
 
 cellbits 32 = [if]
     : cells 2* 2* ; macro
-    : cell+ 4 + ; macro
     : c@  dup@ swap 3 and 3 lshift rshift $FF and ;
     : (x!)  ( u w-addr bitmask wordmask )
-        >w swap
+        >carry swap
         dup>r and 3 lshift dup>r lshift
         w r> lshift invert
-        r@ nop _@ and  + r> _! drop
+        r@ _@ _@_ and  + r> _! drop
     ;
     : c!  ( u c-addr -- )  3 $FF  (x!) ;
   check_alignment [if]
     : (ta)  ( a mask -- a )
 	      over and if  22 invert exception  then ;
-    : @   3 (ta)  _@ ;
+    : @   3 (ta)  _@ _@_ ;
     : !   3 (ta)  _! drop ;
     : w!  ( u w-addr -- )
           1 (ta) 2 $FFFF (x!) ;
     : w@  ( w-addr -- u )
-          1 (ta) dup@ swap 2 and 3 lshift rshift $FFFF and ;
+          1 (ta) _@ dup@ swap 2 and 3 lshift rshift $FFFF and ;
   [else]
-    : @   nop _@ ; macro
+    : @   _@ _@_ ; macro
     : !   _! drop ; macro
     : w!  2 $FFFF (x!) ;
-    : w@  dup@ swap 2 and 3 lshift rshift $FFFF and ;
+    : w@  _@ dup@ swap 2 and 3 lshift rshift $FFFF and ;
   [then]
 [else] \ 16-bit or 18-bit cells
     : cells 2* ; macro
-    : cell+ 2 + ; macro
   check_alignment [if]
     : (ta)  over and if  22 invert exception  then ;
-    : @   1 (ta)  _@ ;
+    : @   1 (ta)  _@ _@_ ;
     : !   1 (ta)  _! drop ;
   [else]
-    : @   nop _@ ; macro
+    : @   _@ _@_ ; macro
     : !   _! drop ; macro
   [then]
-    : c@  dup@ swap 1 and 3 lshift rshift $FF and ;
+    : c@  _@ dup@ swap 1 and 3 lshift rshift $FF and ;
     : c! ( u c-addr -- )
         dup>r 1 and if
             8 lshift  $00FF
         else
             255 and   $FF00
         then
-        r@ nop _@ and  + r> _! drop
+        r@ _@ _@_ and  + r> _! drop
     ;
 [then]
 
@@ -120,10 +122,16 @@ END-CODE
 \ Your code can usually use + instead of OR, but if it's needed:
 : or     invert swap invert and invert ; \ n t -- n|t
 
+: execute            cells >r ;   \ 6.1.1370  xt --
+
 : 2dup   over over ; macro \ d -- d d
+: char+ [ ;
 : 1+     1 + ; macro
 : 1-     1 - ; macro
 : negate invert 1+ ;
+: tuck   swap over ;
+: +!     tuck @ + swap ! ;
+
 
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
@@ -167,39 +175,11 @@ END-CODE
     drop swap 2*c invert                \ finish quotient
 ;
 
-: <>                xor 0= 0= ;   \ 6.2.0500  x y -- f
-: 0<>                   0= 0= ; macro   \ 6.2.0260  x y -- f
-: 0>                negate 0< ;   \ 6.2.0280  n -- f
-: abs   dup 0< if negate then ;   \ 6.1.0690  n -- u
-: execute            cells >r ;   \ 6.1.1370  xt --
-
-\ We're about at 256 instructions at this point.
-
-: d2*  swap 2* swap 2*c ;
-: d2/  2/ swap 2/c swap ;
+: *     um* drop ;
 : dnegate  invert swap invert 1 + swap 0 +c ;
+: abs   dup 0< if negate then ;
 : dabs  dup 0< if dnegate then ;
-: rot   >r swap r> swap ;
-: -rot  swap >r swap r> ;
-: tuck  swap over ;
-: 2drop drop drop ;
-: ?dup  dup if dup then ;
-: +!    tuck @ + swap ! ;
-: 2swap rot >r rot r> ;
-: 2over >r >r 2dup r> r> 2swap ;
 
-: sm/rem  \ d n -- rem quot             \ 6.1.2214
-   2dup xor >r  over >r  abs >r dabs r> um/mod
-   swap r> 0< if  negate  then
-   swap r> 0< if  negate  then ;
-
-: fm/mod  \ d n -- rem quot             \ 6.1.1561
-   dup >r  2dup xor >r  dup >r  abs >r dabs r> um/mod
-   swap r> 0< if  negate  then
-   swap r> 0< if  negate  over if  r@ rot -  swap 1-  then then
-   r> drop ;
-
-\ eForth model
 : m/mod
     dup 0< dup >r
     if negate  >r
@@ -215,8 +195,38 @@ END-CODE
 : mod    /mod drop ;                    \ 6.1.1890
 : /      /mod nip ;                     \ 6.1.0230
 
+: m*                                    \ 6.1.1810  n1 n2 -- d
+    2dup xor 0< >r
+    abs swap abs um*
+    r> if dnegate then
+;
+: */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- remainder n1*n2/n3
+: */     */mod swap drop ;              \ 6.1.0100  n1 n2 n3 -- n1*n2/n3
 
-: <   - 0< ;
+\ We're about at 300 instructions at this point.
+
+: d2*  swap 2* swap 2*c ;
+: d2/  2/ swap 2/c swap ;
+: -rot  swap >r swap r> ;
+: 2drop drop drop ;
+: ?dup  dup if dup then ;
+: 2swap rot >r rot r> ;
+: 2over >r >r 2dup r> r> 2swap ;
+
+: sm/rem  \ d n -- rem quot             \ 6.1.2214
+   2dup xor >r  over >r  abs >r dabs r> um/mod
+   swap r> 0< if  negate  then
+   swap r> 0< if  negate  then ;
+
+: fm/mod  \ d n -- rem quot             \ 6.1.1561
+   dup >r  2dup xor >r  dup >r  abs >r dabs r> um/mod
+   swap r> 0< if  negate  then
+   swap r> 0< if  negate  over if  r@ rot -  swap 1-  then then
+   r> drop ;
+
+\ eForth model
+
+
 : u<  - drop carry 0= 0= ;
 
 : min    over over- 0< if swap drop exit then  drop ; \ 6.1.1870
@@ -227,18 +237,6 @@ END-CODE
 
 : /string >r swap r@ + swap r> - ;      \ 17.6.1.0245  a u -- a+1 u-1
 : within  over - >r - r> u< ;           \ 6.2.2440  u ulo uhi -- flag
-: m*                                    \ 6.1.1810  n1 n2 -- d
-    2dup xor 0< >r
-    abs swap abs um*
-    r> if dnegate then
-;
-: */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- remainder n1*n2/n3
-: */     */mod swap drop ;              \ 6.1.0100  n1 n2 n3 -- n1*n2/n3
-
-\ Now let's get some I/O set up
-
-: emit  'TXbuf io! ; \ c -- \ To terminal
-
 
 1000 100 xor  908 assert
 1000 100 and   96 assert
@@ -252,10 +250,24 @@ depth 0 assert
 2 3 d2* 6 assert 4 assert
 -1 5 d2* 11 assert -2 assert
 -5 -7 d2/ -4 assert -3 assert
+
 depth 0 assert
 \ Note: Data memory is byte-addressed, allow 4-byte cells
-123 4 !  456 8 !  4 @ 123 assert  8 @ 456 assert
+123 4 !  456 8 !
+4 @ 123 assert
+8 dup drop @ dup drop 456 assert
 depth 0 assert
+
+\ Now let's get some I/O set up
+
+: emit  'TXbuf io! ; \ c -- \ To terminal
+
+\ iomap.c sends errors to the Chad interpreter
+\ A QUIT loop running on the CPU would do something different.
+
+:noname  ( error -- )  $8002 io! ; is exception
+
+\ Examples
 
 \ Use colorForth style of recursion
 \ This kind of recursion is non-ANS.

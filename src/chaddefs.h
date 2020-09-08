@@ -118,10 +118,10 @@ int chadSpinFunction(void); // external function waiting for keyboard input
 #define TtoN   (1 << 4)
 #define TtoR   (2 << 4)
 #define write  (3 << 4)
-#define iow    (4 << 4)
-#define ior    (5 << 4)
-#define co     (6 << 4)
-#define TtoW   (7 << 4)
+#define memrd  (4 << 4)
+#define iow    (5 << 4)
+#define ior    (6 << 4)
+#define co     (7 << 4)
 
 // The insn[3:2] field of the ALU instruction is return stack control:
 

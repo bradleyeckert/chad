@@ -1,5 +1,11 @@
 # Differences from ANS Forth
 
+A lot fewer words. You can define an ANS Forth in `chad`, but why?
+Code space is limited on purpose. Don't clutter it up with stuff you
+don't need. If your code needs an ANS word, then copy and paste.
+There is so much beautiful ANS Forth code out there.
+You don't have to reinvent the wheel, but you do have to think.
+
 ## Non-standard words
 
 - `assert` *( n1 n2 -- )* Displays an error message if n1 <> n2.

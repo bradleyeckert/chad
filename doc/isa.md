@@ -82,9 +82,9 @@ The `insn[6:4]` field of the ALU instruction is:
 - 010: `T->R` Write T to R
 - 011: `N->[T]` Write T to mem\[A]
 - 100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
-- 101: `_IORD_` Trigger read from the I/O port, wait if not ready
-- 110: `CO` Write to carry: Adder or shifter carry out
-- 111: `T->W` Write T to W
+- 101: `_MEMRD_` Trigger read from data memory
+- 110: `_IORD_` Trigger read from the I/O port
+- 111: `CO` Write to carry: Adder or shifter carry out; also save T to W
 
 The `insn[3:2]` field of the ALU instruction is return stack control:
 
@@ -107,7 +107,7 @@ that aren't stack-friendly.
 
 - `W` T = W
 - `T&W` T = W & T
-- `T->W` Write T to W
+- `CO` Write T to W
 
 **Double precision math:**
 
@@ -149,6 +149,12 @@ Most code that uses `or` can use `+` instead.
 If not, `or` is a cheap definition: `: or  invert swap invert and invert ;`.
 Thanks to Chuck Moore for discovering this in his MISC work
 and for disabusing me of smudge bits.
+
+**\_MEMRD_**
+
+The original J1 read from data memory all the time. Let's add a read strobe.
+It's decoded from three `insn` bits, so it's plenty fast.
+Simulation is set up to model a synchronous-read memory. 
 
 ### Memory Spaces
 
@@ -197,10 +203,4 @@ is busy. Once finished, you can read result registers into `COP`.
 - 0xE804 = Read division remainder
 - 0xE808 = Trigger multiplication of T and N
 - 0xE809 = Trigger division of T:N by W
-
-
-
-
-
-
 
