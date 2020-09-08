@@ -2,11 +2,11 @@
 // config.h
 // Basic configuration and function prototype for chad.c
 //===============================================================================
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
+#ifndef __CHADCONFIG_H__
+#define __CHADCONFIG_H__
 #include <stdint.h>
 
-#define CELLBITS        32      /* Width of a cell in bits, 16 to 32        */
+#define CELLBITS        18      /* Width of a cell in bits, 16 to 32        */
 // Sizes of memories in cells, should be an exact power of 2
 #define CodeSize      2048      /* Code memory cells                        */
 #define DataSize      1024      /* Data memory cells                        */

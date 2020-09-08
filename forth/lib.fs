@@ -2,8 +2,9 @@
 only forth definitions 
 decimal
 
-0 equ 'TXbuf \ UART send output register
-0 equ false  \ equates take up no code space. Have as many as you want.
+0 equ 'TXbuf  \ UART send output register
+2 equ 'TXbusy \ UART transmit busy flag
+0 equ false   \ equates take up no code space. Have as many as you want.
 -1 equ true
 
 \ You can compile to either check address alignment or not.
@@ -36,7 +37,7 @@ END-CODE
 
 cellbits 32 = [if]
     : cells 2* 2* ; macro
-    : c@  dup@ swap 3 and 3 lshift rshift $FF and ;
+    : c@  _@ dup@ swap 3 and 3 lshift rshift $FF and ;
     : (x!)  ( u w-addr bitmask wordmask )
         >carry swap
         dup>r and 3 lshift dup>r lshift
@@ -122,7 +123,7 @@ END-CODE
 \ Your code can usually use + instead of OR, but if it's needed:
 : or     invert swap invert and invert ; \ n t -- n|t
 
-: execute            cells >r ;   \ 6.1.1370  xt --
+: execute  2* >r ; notail   		\ 6.1.1370  xt --
 
 : 2dup   over over ; macro \ d -- d d
 : char+ [ ;
@@ -131,7 +132,6 @@ END-CODE
 : negate invert 1+ ;
 : tuck   swap over ;
 : +!     tuck @ + swap ! ;
-
 
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
@@ -203,40 +203,29 @@ END-CODE
 : */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- remainder n1*n2/n3
 : */     */mod swap drop ;              \ 6.1.0100  n1 n2 n3 -- n1*n2/n3
 
+\ In order to use CREATE DOES>, we need ',' defined here.
+
+dp cell+ dp ! \ start variables after dp
+: aligned  dup [ cell 1- ] literal + cell negate and ;
+: align    dp @ aligned dp ! ;
+: allot    dp +! ;
+: here     dp @ ;
+: ,        align here !  cell allot ;
+: c,       here c!  1 allot ;
+
 \ We're about at 300 instructions at this point.
+\ Paul Bennett's recommended minimum word set is mostly present.
+\ DO, I, J, and LOOP are not included. Use for next r@ instead.
+\ CATCH and THROW are not included. They use stack.
+\ DOES> needs a compilable CREATE.
 
-: d2*  swap 2* swap 2*c ;
-: d2/  2/ swap 2/c swap ;
-: -rot  swap >r swap r> ;
-: 2drop drop drop ;
-: ?dup  dup if dup then ;
-: 2swap rot >r rot r> ;
-: 2over >r >r 2dup r> r> 2swap ;
-
-: sm/rem  \ d n -- rem quot             \ 6.1.2214
-   2dup xor >r  over >r  abs >r dabs r> um/mod
-   swap r> 0< if  negate  then
-   swap r> 0< if  negate  then ;
-
-: fm/mod  \ d n -- rem quot             \ 6.1.1561
-   dup >r  2dup xor >r  dup >r  abs >r dabs r> um/mod
-   swap r> 0< if  negate  then
-   swap r> 0< if  negate  over if  r@ rot -  swap 1-  then then
-   r> drop ;
-
-\ eForth model
-
-
-: u<  - drop carry 0= 0= ;
-
+: u<     - drop carry 0= 0= ;
+: within over - >r - r> u< ;            \ 6.2.2440  u ulo uhi -- flag
 : min    over over- 0< if swap drop exit then  drop ; \ 6.1.1870
 : max    over over- 0< if drop exit then  swap drop ; \ 6.1.1880
-: (umin)  over over- drop carry ;
-: umin   (umin) if swap drop exit then  drop ;
-: umax   (umin) if drop exit then  swap drop ;
+: exec2: 2* [ ;             			\ for list of 2-inst literals
+: exec1: 2* r> + >r ;       			\ for list of 1-inst literals
 
-: /string >r swap r@ + swap r> - ;      \ 17.6.1.0245  a u -- a+1 u-1
-: within  over - >r - r> u< ;           \ 6.2.2440  u ulo uhi -- flag
 
 1000 100 xor  908 assert
 1000 100 and   96 assert
@@ -247,20 +236,30 @@ depth 0 assert
 123 456 swap  123 assert 456 assert
 123 456 over  123 assert 456 assert 123 assert
 depth 0 assert
-2 3 d2* 6 assert 4 assert
--1 5 d2* 11 assert -2 assert
--5 -7 d2/ -4 assert -3 assert
-
-depth 0 assert
 \ Note: Data memory is byte-addressed, allow 4-byte cells
 123 4 !  456 8 !
 4 @ 123 assert
 8 dup drop @ dup drop 456 assert
 depth 0 assert
 
-\ Now let's get some I/O set up
+\ Now let's get some I/O set up. ScreenProfile points to a table of xts.
 
-: emit  'TXbuf io! ; \ c -- \ To terminal
+variable ScreenProfile
+: ExecScreen  ( n -- ) ScreenProfile @ execute execute ;
+: emit  0 ExecScreen ;
+: cr    1 ExecScreen ;
+
+\ stdout is the screen:
+
+: _emit  begin 'TXbusy io@ while noop repeat 'TXbuf io! ;
+: _cr    13 _emit 10 _emit ; \ --
+
+11 |bits|
+: stdout_table  exec1: [	\ The xts are less than 2048
+    ' _emit | ' _cr 
+] literal ; 
+
+' stdout_table ScreenProfile !	\ assign it
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
@@ -280,20 +279,9 @@ depth 0 assert
 
 \ Try 25 fib, then stats
 
-\ sample lookup tables are built with code (you can't read code space)
-\ Notice the fall-through of exec2:.
-\ `;` in immediate mode does not compile a return.
-
-: exec2: 2* [ ;       \ for list of 2-cell literals
-: exec:  2* r> + >r ; \ for list of 1-cell literals
-
-cellbits |bits|
-: table  exec2: [ 123 | 456 | 789 | 321 ] literal ;
-11 |bits|
-: table1  exec: [ 123 | 456 | 789 | 321 ] literal ;
-cellbits |bits|
 
 \ Bit fields you can test with
+\ They got broken when I changed to byte addressing, need to be fixed.
 
 6 bvar base     10 base b!       \ to handle up to base 36
 1 bvar state     0 state b!      \ yup

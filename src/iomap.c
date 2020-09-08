@@ -25,7 +25,6 @@ static uint8_t nohostAPI;           // prohibit access to host API
 static int termKey(void);
 
 uint32_t readIOmap (uint32_t addr) {
-    printf("Reading from iomap[%x]\n", addr);
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {

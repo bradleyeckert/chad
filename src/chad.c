@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <errno.h>
-#include <conio.h>
 
 #ifdef _MSC_VER
-
+#include <conio.h>
 #include <Windows.h>
 static uint64_t GetMicroseconds() {
     FILETIME ft;
@@ -29,10 +27,10 @@ static uint64_t GetMicroseconds() {
 #include <string.h>
 #include <inttypes.h>
 #include <ctype.h>
-#include "config.h"
 #include "chaddefs.h"
 #include "iomap.h"
-#define NameOffset 0x20
+#include "config.h"
+
 SI verbose = 0;
 CELL base = 10;
 uint8_t sp, rp;                         // stack pointers
@@ -151,14 +149,14 @@ SI CPUsim(int single) {
                 if (!Dpop()) {_pc = target;}  break;
             case 6:                                                 /*   call */
                 RP = RPMASK & (RP + 1);
-                Rstack[RP & RPMASK] = BYTE_ADDR(_pc);
+                Rstack[RP & RPMASK] = _pc << 1;
                 _pc = target;
                 break;
             default:
                 if (insn & 0x1000) {                                /*    imm */
                     Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
                     if (insn & 0x100) {                             /*  r->pc */
-                        _pc = CELL_ADDR(Rstack[RP]);
+                        _pc = Rstack[RP] >> 1;
                         if (RDEPTH == mark) single = 1;
                         RP = RPMASK & (RP - 1);
 #ifdef EnableCPUchecks
@@ -174,7 +172,7 @@ SI CPUsim(int single) {
             }
         } else { // ALU
             if (insn & 0x100) {                                     /*  r->pc */
-                _pc = CELL_ADDR(Rstack[RP]);
+                _pc = Rstack[RP] >> 1;
                 if (RDEPTH == mark) single = 1;
 #ifdef EnableCPUchecks
                 uint16_t time = (uint16_t)cycles - retMark;
@@ -267,7 +265,6 @@ SV Simulate(cell xt) {
 // Compiler
 
 CELL cp = 0;                            // dictionary pointer for code space
-CELL dp = 0;                            // dictionary pointer for data space
 CELL bp = 0;                            // bitfield pointer
 CELL fence = 0;                         // latest writable code word
 SI notail = 0;                          // tail recursion inhibited for call
@@ -284,7 +281,7 @@ SV compExit (void) {                    // compile an exit
     if (((old & 0x8000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
         Code[a] = rdn | old | ret;      // make the ALU instruction return
     } else if ((old & lit) == lit) {    // literal?
-        Code[a] = old | ret;            // lake the literal return
+        Code[a] = old | ret;            // make the literal return
     } else if ((!notail) && ((old & 0xE000) == call)) {
         Code[a] = (old & 0x1FFF) | jump; // tail recursion (call -> jump)
     } else {
@@ -371,8 +368,8 @@ SV doUntil(void) { ResolveRev(zjump); }
 SV doIf(void) { MarkFwd();  toCode(zjump); }
 SV doThen(void) { ResolveFwd(); }
 SV doElse(void) { MarkFwd();  toCode(jump);  ControlSwap();  ResolveFwd(); }
-SV doWhile(void) { MarkFwd();  ControlSwap(); }
-SV doRepeat(void) { doElse();  doAgain();  doThen(); }
+SV doWhile(void) { doIf();  ControlSwap(); }
+SV doRepeat(void) { doAgain();  doThen(); }
 SV doFor(void) { toCode(alu | NtoT | TtoR | sdn | rup);  MarkFwd(); }
 SV noCompile(void) { error = BAD_NOCOMPILE; }
 SV noExecute(void) { error = BAD_UNSUPPORTED; }
@@ -381,21 +378,6 @@ SV doNext(void) {
     toCode(alu | RM1toT | TtoN | sup);   /* (R-1)@ */
     toCode(alu | zeq | TtoR);  ResolveRev(zjump);
     toCode(alu | rdn);  fence = cp;      /* rdrop */
-}
-
-SV toData(cell x) {                     // compile cell to data space
-    if (dp & ~(DataSize - 1))
-        error = BAD_DATA_WRITE;
-    Data[dp += BYTE_ADDR(1)] = x;
-}
-
-SV toDataC(uint8_t c) {                 // compile byte to data space
-    cell selmask = BYTE_ADDR(1) - 1;    // 1 or 3
-    cell shift = 8 * (dp & selmask);
-    cell n = c << shift;
-    cell u = Data[dp & ~selmask & (DataSize - 1)];
-    toData((u & ~(0xFF << shift)) + n);
-    dp += 1 - BYTE_ADDR(1);
 }
 
 //##############################################################################
@@ -804,7 +786,7 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
 #else
     File.fp = fopen(name, "r");
 #endif
-    File.LineNumber = 1;
+    File.LineNumber = 0;
     File.Line[0] = 0;
     File.FID = fileID;
     if (File.fp == NULL) {
@@ -877,11 +859,6 @@ SV doLexicon(void) {                    // named wordlist
     AddEquate(tok, AddWordlist(tok));
 }
 
-SV doVARIABLE(void) {
-    Dpush(dp);  doEQU();
-    dp += BYTE_ADDR(1);
-}
-
 SV doBitfield(void) {
     cell width = Dpop();
     if ((width == 0) || (width > CELLBITS))
@@ -946,18 +923,18 @@ SV doNoTail (void) {
 }
 
 SV SaveMarker(uint16_t* dest) {
-    dest[0] = hp;    dest[1] = cp;    dest[2] = dp;
+    dest[0] = hp;    dest[1] = cp;
     dest[3] = bp;    dest[4] = wordlists;
     memcpy(&dest[5], wordlist, sizeof(uint16_t) * MaxWordlists);
 }
 
 SV LoadMarker(uint16_t* src) {
-    hp = src[0];     cp = src[1];     dp = src[2];
+    hp = src[0];     cp = src[1];       // src[2] was dp
     bp = src[3];     wordlists = src[4];
     memcpy(wordlist, &src[5], sizeof(uint16_t) * MaxWordlists);
 }
 
-SV Marker_Exec(void) {                 // execution semantics of a marker
+SV Marker_Exec(void) {                  // execution semantics of a marker
     uint16_t* pad = Header[me].aux;
     LoadMarker(pad);
     free(pad);
@@ -1017,20 +994,15 @@ SV doTick    (void) { Dpush(tick()); }
 SV doTickImm (void) { Literal(tick()); }
 SV doThere   (void) { Dpush(cp); }
 SV doTorg    (void) { cp = Dpop(); }
-SV doHere    (void) { Dpush(dp); }
-SV doOrg     (void) { dp = Dpop(); }
 SV doBhere   (void) { Dpush(bp); }
 SV doBorg    (void) { bp = Dpop(); }
 SV doDROP    (void) { Dpop(); }
 SV doTcomma  (void) { toCode(Dpop()); }
-SV doComma   (void) { toData(Dpop()); }
-SV doCommaC  (void) { toDataC(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
 SV doSemi    (void) { compExit();  SaveLength();  state = 0;  sane();}
 SV doSemiEX  (void) { SaveLength();  sane(); }
 SV doVerbose (void) { verbose = Dpop(); }
 SV doAligned (void) { Dpush(aligned(Dpop())); }
-SV doAlign   (void) { dp = aligned(dp); }
 
 SI refill(void) {
     int result = -1;
@@ -1149,6 +1121,21 @@ SV doSaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
 SV doLoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
 SV doSaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
 
+// Data space compilation assigns `dp` to a fixed RAM address.
+// There's not much you can do without compiling on the chad CPU.
+// For example CREATE here is not usable with DOES>.
+
+#define dpCell 64
+CELL dpFetch(void) { return Data[dpCell]; }
+SV dpStore(cell x) { Data[dpCell] = x; }
+SV allot(int n) { dpStore(n + dpFetch()); }
+SV buffer(int n) { Dpush(dpFetch());  doEQU();  allot(n); }
+SV doBUFFER(void) { buffer(Dpop()); }
+SV doCVARIABLE(void) { buffer(1); }
+SV doAlign(void) { dpStore(aligned(dpFetch())); }
+SV doVARIABLE(void) { doAlign();  buffer(4); }
+SV doCREATE(void) { doAlign();  buffer(0); }
+
 // Initialize the dictionary at startup
 
 SV LoadKeywords(void) {
@@ -1197,31 +1184,31 @@ SV LoadKeywords(void) {
     AddKeyword ("bye", doBYE, noCompile);
     AddKeyword ("words", doWoords, noCompile);
     AddKeyword (".s", dotESS, noCompile);
-    AddKeyword (".", dot, noCompile);               // ( n -- )
-    AddKeyword ("d.", ddot, noCompile);             // ( d -- )
+    AddKeyword (".", dot, noCompile);
+    AddKeyword ("d.", ddot, noCompile);
     AddKeyword ("dasm", doDASM, noCompile);
     AddKeyword ("see", doSEE, noCompile);
     AddKeyword ("sstep", doSteps, noCompile);
     AddKeyword ("inst", doInstruction, noCompile);
     AddKeyword ("write-protect", doWrProt, noCompile);
-    AddEquate  ("code-writable", CodeFence);
-    AddEquate  ("code-size", CodeSize);
-    AddEquate  ("data-size", DataSize);
+    AddEquate  ("code-writable", BYTE_ADDR(CodeFence));
+    AddEquate  ("code-size", BYTE_ADDR(CodeSize));
+    AddEquate  ("data-size", BYTE_ADDR(DataSize));
     AddEquate  ("cellbits", CELLBITS);
     AddEquate  ("cell", BYTE_ADDR(1));
+    AddEquate  ("dp", BYTE_ADDR(dpCell));
     AddKeyword ("calign", doNothing, doNothing);
     AddKeyword ("caligned", doNothing, doNothing);
     AddKeyword ("chars", doNothing, doNothing);
     AddKeyword ("t,", doTcomma, noCompile);
     AddKeyword ("there", doThere, noCompile);
     AddKeyword ("torg", doTorg, noCompile);
-    AddKeyword (",", doComma, noCompile);
-    AddKeyword ("c,", doCommaC, noCompile);
-    AddKeyword ("here", doHere, noCompile);
-    AddKeyword ("align", doAlign, noCompile);
     AddKeyword ("aligned", doAligned, noCompile);
-    AddKeyword ("org", doOrg, noCompile);
+    AddKeyword ("align", doAlign, noCompile);
+    AddKeyword ("buffer:", doBUFFER, noCompile);
     AddKeyword ("variable", doVARIABLE, noCompile);
+    AddKeyword ("cvariable", doCVARIABLE, noCompile);
+    AddKeyword ("create", doCREATE, noCompile);
     AddKeyword ("bvar", doBitfield, noCompile);
     AddKeyword ("balign", doBitAlign, noCompile);
     AddKeyword ("bhere", doBhere, noCompile);
@@ -1275,7 +1262,7 @@ SV LoadKeywords(void) {
     AddPrimitiv("_@_",     read);           // end read
     AddPrimitiv("_!",      write |        sdn);
     AddPrimitiv("_io!",    iow          | sdn);
-    AddPrimitiv("_io@",    ior);            // start io read
+    AddPrimitiv("_io@",            ior);    // start io read
     AddPrimitiv("_io@_",   input);          // end io read
     AddPrimitiv("2dupand", Tand  | TtoN | sup);
     AddPrimitiv("2dupxor", eor   | TtoN | sup);
@@ -1528,9 +1515,8 @@ uint32_t chadGetHeader (uint32_t select) {
     case 7: return Header[ID].link;
     case 8: return Header[ID].references;
     case 16: return cp;
-    case 17: return dp;
-    case 18: return bp;
-    case 19: return hp;
+    case 17: return bp;
+    case 18: return hp;
     default:
         if ((select < 0x20) || (select >= (0x20 + MaxNameSize)))
             return 0;
