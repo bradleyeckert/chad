@@ -1,9 +1,11 @@
 # Welcome to your new cult
 
-Why not get real about what it means to be a computer programmer?
 Maybe it's time for something new.
+Why not get real about what it means to be a computer programmer?
 Like programming as a way of being, a creative download from the Universe.
-So, if you're up for it...
+Why isn't computer programming treated as a monastic calling?
+Maybe that's where it all went wrong.
+If you're up for it, you might consider...
 
 - A monastic lifestyle, meaning:
 - Celibacy, but including meditative practice.

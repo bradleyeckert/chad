@@ -1,5 +1,5 @@
 [defined] -kernel [if] -kernel [else] marker -kernel
-only forth definitions 
+only forth definitions
 decimal
 
 0 equ 'TXbuf  	\ UART send output register
@@ -14,8 +14,8 @@ decimal
 0 equ check_alignment \ enable @, !, w@, and w! to check address alignment
 
 0 torg
-defer cold  	\ boots here
-defer exception \ error detected
+later cold  	\ boots here
+later exception \ error detected
 
 : noop  nop ;							\ call to reduce interrupt latency
 : io@   _io@ nop _io@_ ;				\ addr -- n \ I/O read
@@ -183,8 +183,8 @@ align
 : exec1: 2* r> + >r ;       			\ for list of 1-inst literals
 : 2drop  drop drop ;
 
-CODE depth   
-	status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu  
+CODE depth
+	status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu
 END-CODE
 
 1234 depth  1 assert  1234 assert  		\ sanity check the stack

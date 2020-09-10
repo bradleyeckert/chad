@@ -79,14 +79,14 @@ SV Cdot(cell x) {  // cuz no itoa
     int32_t n = x;
 #if (CELLBITS < 32)
     if (x & (1 << (CELLBITS - 1))) n -= 1 << CELLBITS;
-    x &= CELLMASK; // unsigned
+    x &= CELLMASK; // make unsigned
 #endif
     if (baseFetch() == 16) printf("%Xh ", x);
     else printf("%d ", n);
 }
 
-SV PrintStack(void) {                   // ( ... -- ... )
-    int depth = SDEPTH;                 // primitive of .s
+SV PrintDataStack(void) {
+    int depth = SDEPTH; 
     for (int i = 0; i < depth; i++) {
         if (i == (depth - 1)) {
             Cdot(t);
@@ -97,7 +97,7 @@ SV PrintStack(void) {                   // ( ... -- ... )
     }
 }
 
-SV PrintRStack(void) { 
+SV PrintReturnStack(void) { 
     int depth = RDEPTH;
     if (depth == (RPMASK - 1)) depth = 0;
     for (int i = 0; i < depth; i++) {
@@ -108,10 +108,10 @@ SV PrintRStack(void) {
 SV TraceLine(cell pc, uint16_t insn) {
     DisassembleInsn(insn);
     printf("%03Xh: %04Xh ( ", pc, insn);
-    PrintStack();
+    PrintDataStack();
     printf(")");
     if (RDEPTH) {
-        printf(" (R: ");  PrintRStack();
+        printf(" (R: ");  PrintReturnStack();
         printf(")");
     }
     printf(" \\ w=%Xh, cy=%X\n", w & CELLMASK, cy);
@@ -121,12 +121,12 @@ SV TraceLine(cell pc, uint16_t insn) {
 // CPU simulator
 
 static uint16_t Code[CodeSize];         // code memory
-uint8_t spMax, rpMax;                   // stack depth tracking
+static uint8_t spMax, rpMax;            // stack depth tracking
 static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;             // cycle counter
 static uint32_t latency = 0;            // maximum cycles between return
 
-// The C host uses this to write to code space.
+// The C host uses this (externally) to write to code space.
 // Forth code can only write to code space using iomap.c.
 
 void chadToCode (uint32_t addr, uint32_t x) {
@@ -139,14 +139,14 @@ void chadToCode (uint32_t addr, uint32_t x) {
     Code[addr & (CodeSize-1)] = (cell)x;
 }
 
-SV Dpush(cell v) // push v on the data stack
+SV Dpush(cell v)                        // push to on the data stack
 {
     SP = SPMASK & (SP + 1);
     Dstack[SP] = t;
     t = v;
 }
 
-CELL Dpop(void) // pop value from the data stack and return it
+CELL Dpop(void)                         // pop from the data stack
 {
     cell v = t;
     t = Dstack[SP];
@@ -154,7 +154,7 @@ CELL Dpop(void) // pop value from the data stack and return it
     return v;
 }
 
-SV Rpush(cell v) // push v on the return stack
+SV Rpush(cell v)                        // push to the return stack
 {
     RP = RPMASK & (RP + 1);
     Rstack[RP] = v;
@@ -336,7 +336,7 @@ SI notail = 0;                          // tail recursion inhibited for call
 SV toCode (cell x) {                    // compile to code space
     chadToCode(cp++, x);
 }
-SV compExit (void) {                    // compile an exit
+SV CompExit (void) {                    // compile an exit
     if (fence == cp) {                  // code run is empty
         goto plain;                     // nothing to optimize
     }
@@ -395,8 +395,8 @@ SI aligned(int n) {
 // Syntax is  : tjmp 2* r> + >r ;  : mytable tjmp [ 12 | 34 | 56 ] literal ;
 
 CELL tablebits = CELLBITS;
-SV doSetBits(void) { tablebits = Dpop(); }
-SV doTableEntry(void) {
+SV SetTableBitWidth(void) { tablebits = Dpop(); }
+SV TableEntry(void) {
     int bits = tablebits;
     cell x = Dpop();
 #if (CELLBITS > 22)
@@ -480,7 +480,7 @@ SV printWID(int wid) {
         printf("%d ", wid);
 }
 
-SV doORDER(void) {
+SV Order(void) {
     printf(" Context : ");
     for (int i = 1; i <= orders; i++)  printWID(order[i]);
     printf("\n Current : ");  printWID(current);
@@ -535,7 +535,7 @@ SV ListWords(int wid) {                 // in a given wordlist
         i = Header[i].link;             // traverse from oldest
     }
 }
-SV doWoords(void) {
+SV Words(void) {
     ListWords(context());           // top of wordlist
     printf("\n");
 }
@@ -551,22 +551,23 @@ SI OrderPop(void) {
     return r;
 }
 
-SV doONLY(void) { orders = 0; OrderPush(root_wid); OrderPush(forth_wid); }
-SV doFORTH(void) { order[orders] = forth_wid; }
-SV doASSEMBLER(void) { order[orders] = asm_wid; }
-SV doDEFINITIONS(void) { current = context(); }
-SV doPlusOrder(void) { OrderPush(Dpop()); }
-SV doPrevious(void) { OrderPop(); }
-SV doSetCurrent(void) { current = Dpop(); }
-SV doGetCurrent(void) { Dpush(current); }
+SV Only       (void) { orders = 0; OrderPush(root_wid); OrderPush(forth_wid); }
+SV ForthLex   (void) { order[orders] = forth_wid; }
+SV AsmLex     (void) { order[orders] = asm_wid; }
+SV Definitions(void) { current = context(); }
+SV PlusOrder  (void) { OrderPush(Dpop()); }
+SV Previous   (void) { OrderPop(); }
+SV Also       (void) { int v = OrderPop();  OrderPush(v);  OrderPush(v); }
+SV SetCurrent (void) { current = Dpop(); }
+SV GetCurrent (void) { Dpush(current); }
 
-SV doGetOrder(void) {
+SV GetOrder(void) {
     for (int i = 0; i < orders; i++)
         Dpush(order[i]);
     Dpush(orders);
 }
 
-SV doSetOrder(void) {
+SV SetOrder(void) {
     uint8_t len = Dpop();
     orders = 0;
     for (int i = 0; i < len; i++)
@@ -756,7 +757,7 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
     return 0;
 }
 
-SV doDASM (void) { // ( addr len -- )
+SV Dasm (void) { // ( addr len -- )
     int length = Dpop() & 0x0FFF;
     int addr = Dpop();
     char* name;
@@ -771,7 +772,7 @@ SV doDASM (void) { // ( addr len -- )
     }
 }
 
-SV doSteps(void) {                      // ( addr steps -- )
+SV Steps(void) {                      // ( addr steps -- )
     uint16_t cnt = (uint16_t)Dpop();    // single step debugger gives a listing
     pc = Dpop();
     verbose |= VERBOSE_TRACE;
@@ -782,7 +783,7 @@ SV doSteps(void) {                      // ( addr steps -- )
     verbose &= ~VERBOSE_TRACE;
 }
 
-SV doAssert(void) {                     // for test code
+SV Assert(void) {                     // for test code
     int expected = Dpop();
     int actual = Dpop();
     if (expected != actual) {
@@ -796,7 +797,7 @@ SV doAssert(void) {                     // for test code
 uint64_t elapsed_us;
 uint64_t elapsed_cycles;
 
-SV doStats(void) {
+SV Stats(void) {
     printf("%" PRId64 " cycles, MaxSP=%d, MaxRP=%d, latency=%d",
         elapsed_cycles, spMax, rpMax, latency);
     if (elapsed_us > 99) {
@@ -807,7 +808,7 @@ SV doStats(void) {
 }
 
 SV dotESS (void) {                      // ( ... -- ... )
-    PrintStack();                       // .s
+    PrintDataStack();                       // .s
     printf("<-Top\n");
 }
 
@@ -893,14 +894,14 @@ SV ParseFilename(void) {
     }
 }
 
-SV doINCLUDE(void) {                    // Nest into a source file
+SV Include(void) {                    // Nest into a source file
     ParseFilename();
     OpenNewFile(tok);
 }
 
 int DefMark, DefMarkID;
 
-SV doColon(void) {
+SV Colon(void) {
     parseword(' ');
     if (AddHead(tok)) {                 // define a word that simulates
         SetFns(cp, Def_Exec, Def_Comp);
@@ -912,35 +913,30 @@ SV doColon(void) {
     }
 }
 
-SV doNoName(void) {
+SV NoName(void) {
     Dpush(cp);  DefMarkID = 0;          // no length
     toCompile();
     fence = cp;
     ConSP = 0;
 }
 
-SV doEQU(void) {
+SV Constant(void) {
     parseword(' ');
     AddEquate(tok, Dpop());
 }
 
-SV doLexicon(void) {                    // named wordlist
+SV Lexicon(void) {                    // named wordlist
     parseword(' ');
     AddEquate(tok, AddWordlist(tok));
 }
 
-SV doDEFINED(void) {                    // [defined]
+SV BrackDefined(void) {
     parseword(' ');
     int r = (FindWord(tok) < 0) ? 0 : 1;
     if (r) {
         if (Header[me].target == 0) r = 0;
     }
     Dpush(r);
-}
-
-SV doUNDEFINED(void) {                  // [undefined]
-    doDEFINED();
-    Dpush(~Dpop());
 }
 
 SV SaveLength(void) {                   // resolve length of definition
@@ -960,15 +956,15 @@ SV CompMacro(void) {
     }
 }
 
-SV doMACRO(void) {
+SV Macro(void) {
     Header[DefMarkID].CompFn = CompMacro;
 }
 
-SV doIMMEDIATE(void) {
+SV Immediate(void) {
     Header[DefMarkID].CompFn = Header[DefMarkID].ExecFn;
 }
 
-SV doNoTail (void) {
+SV NoTailRecursion (void) {
     Header[DefMarkID].notail = 1;
 }
 
@@ -990,7 +986,7 @@ SV Marker_Exec(void) {                  // execution semantics of a marker
     free(pad);
 }
 
-SV doMARKER (void) {
+SV Marker (void) {
     parseword(' ');
     if (AddHead(tok)) {
         SetFns(cp, Marker_Exec, noCompile);
@@ -1009,44 +1005,49 @@ SI tick (void) {                        // get the w field of the word
     return Header[me].target;           // W field of found word
 }
 
-SV doSEE (void) {                       // ( <name> -- )
+SV See (void) {                         // ( <name> -- )
     int addr;
     if ((addr = tick())) {
-        Dpush(addr);  Dpush(Header[me].length);  doDASM();
+        Dpush(addr);  Dpush(Header[me].length);  Dasm();
     }
 }
 
-SV doDEFER(void) {
-    doColon();  toImmediate();  toCode(jump);
+SV Later(void) {
+    Colon();  toImmediate();  toCode(jump);
     Header[hp].w2 = MAGIC_DEFER;
 }
 
-SV doIS(void) {                        // ( xt <name> -- )
+SV LaterThen(void) {
+    Colon();  toImmediate();  toCode(call);
+    Header[hp].w2 = MAGIC_DEFER;
+}
+
+SV Resolves(void) {                     // ( xt <name> -- )
     int addr = tick();
     if (Header[me].w2 != MAGIC_DEFER) error = BAD_IS;
     cell insn = jump | (Dpop() & 0x1fff);
     chadToCode(addr, insn);
 }
 
-SV doNothing (void) { }
-SV doCODE    (void) { doColon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
-SV doENDCODE (void) { SaveLength();  OrderPop();  Dpop();  sane();}
-SV doBYE     (void) { error = BYE; }
-SV doComment (void) { toin = (int)strlen(buf); }
-SV doCmParen (void) { parseword(')'); }
-SV doComEcho (void) { doCmParen();  printf("%s",tok); }
-SV doCR      (void) { printf("\n"); }
-SV doTick    (void) { Dpush(tick()); }
-SV doTickImm (void) { Literal(tick()); }
-SV doThere   (void) { Dpush(cp); }
-SV doTorg    (void) { cp = Dpop(); }
-SV doDROP    (void) { Dpop(); }
-SV doTcomma  (void) { toCode(Dpop()); }
-SV doWrProt  (void) { writeprotect = CodeFence; }
-SV doSemi    (void) { compExit();  SaveLength();  toImmediate();  sane();}
-SV doSemiEX  (void) { SaveLength();  sane(); }
-SV doVerbose (void) { verbose = Dpop(); }
-SV doAligned (void) { Dpush(aligned(Dpop())); }
+SV Nothing   (void) { }
+SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
+SV EndCode   (void) { SaveLength();  OrderPop();  Dpop();  sane();}
+SV Bye       (void) { error = BYE; }
+SV SkipToEOL (void) { toin = (int)strlen(buf); }
+SV SkipToPar (void) { parseword(')'); }
+SV EchoToPar (void) { SkipToPar();  printf("%s", tok); }
+SV Cr        (void) { printf("\n"); }
+SV Tick      (void) { Dpush(tick()); }
+SV BrackTick (void) { Literal(tick()); }
+SV There     (void) { Dpush(cp); }
+SV Torg      (void) { cp = Dpop(); }
+SV Tcomma    (void) { toCode(Dpop()); }
+SV WrProtect (void) { writeprotect = CodeFence; }
+SV SemiComp  (void) { CompExit();  SaveLength();  toImmediate();  sane();}
+SV Semicolon (void) { SaveLength();  sane(); }
+SV Verbosity (void) { verbose = Dpop(); }
+SV Aligned   (void) { Dpush(aligned(Dpop())); }
+SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
 
 SI refill(void) {
     int result = -1;
@@ -1093,7 +1094,7 @@ ask: toin = 0;
 
 // [IF ] [ELSE] [THEN]
 
-static void do_ELSE(void) {
+static void BrackElse(void) {
     int level = 1;
     while (level) {
         parseword(' ');
@@ -1117,10 +1118,10 @@ static void do_ELSE(void) {
         }
     }
 }
-static void do_IF(void) {
+static void BrackIf(void) {
     int flag = Dpop();
     if (!flag) {
-        do_ELSE();
+        BrackElse();
     }
 }
 
@@ -1160,24 +1161,24 @@ SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
     }
 };
 
-SV doLoadCodeBin(void) { LoadMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
-SV doSaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
-SV doLoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
-SV doSaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
+SV LoadCodeBin(void) { LoadMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
+SV SaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
+SV LoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
+SV SaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
 
 // Data space compilation assigns `dp` to a fixed RAM address.
 // There's not much you can do without compiling on the chad CPU.
 // For example CREATE here is not usable with DOES>.
 
-SV allot(int n) { dpStore(n + dpFetch()); }
-SV buffer(int n) { Dpush(dpFetch());  doEQU();  allot(n); }
-SV doBUFFER(void) { buffer(Dpop()); }
-SV doCVARIABLE(void) { buffer(1); }
-SV doAlign(void) { dpStore(aligned(dpFetch())); }
-SV doVARIABLE(void) { doAlign();  buffer(CELLS); }
-SV doCREATE(void) { doAlign();  buffer(0); }
-SV doCHAR(void) { parseword(' ');  Dpush(tok[0]); }
-SV doCHARimm(void) { parseword(' ');  Literal(tok[0]); }
+SV allot   (int n) { dpStore(n + dpFetch()); }
+SV buffer  (int n) { Dpush(dpFetch());  Constant();  allot(n); }
+SV Buffer   (void) { buffer(Dpop()); }
+SV Cvariable(void) { buffer(1); }
+SV Align    (void) { dpStore(aligned(dpFetch())); }
+SV Variable (void) { Align();  buffer(CELLS); }
+SV Create   (void) { Align();  buffer(0); }
+SV Char     (void) { parseword(' ');  Dpush(tok[0]); }
+SV BrackChar(void) { parseword(' ');  Literal(tok[0]); }
 
 // Initialize the dictionary at startup
 
@@ -1187,7 +1188,7 @@ SV LoadKeywords(void) {
     // Forth definitions
     root_wid = AddWordlist("root");
     forth_wid = AddWordlist("forth");
-    doONLY(); // order = root _forth
+    Only(); // order = root _forth
     current = root_wid;
     AddEquate("root", root_wid);
     AddEquate("_forth", forth_wid);
@@ -1197,82 +1198,82 @@ SV LoadKeywords(void) {
     AddEquate("cellbits", CELLBITS);
     AddEquate("cell", CELLS);
     AddEquate("dp", dpCell);
-    AddKeyword("assert", doAssert, noCompile);     // ( n1 n2 -- )
-    AddKeyword("verbosity", doVerbose, noCompile);
-    AddKeyword("load-code", doLoadCodeBin, noCompile);
-    AddKeyword("save-code", doSaveCodeBin, noCompile);
-    AddKeyword("load-data", doLoadDataBin, noCompile);
-    AddKeyword("save-data", doSaveDataBin, noCompile);
-    AddKeyword("equ", doEQU, noCompile);
-    AddKeyword("constant", doEQU, noCompile);
-    AddKeyword("[if]", do_IF, noCompile);
-    AddKeyword("[then]", doNothing, noCompile);
-    AddKeyword("[else]", do_ELSE, noCompile);
-    AddKeyword("[undefined]", doUNDEFINED, noCompile);
-    AddKeyword("[defined]", doDEFINED, noCompile);
-    AddKeyword("forth", doFORTH, noCompile);
-    AddKeyword("assembler", doASSEMBLER, noCompile);
-    AddKeyword("lexicon", doLexicon, noCompile);
-    AddKeyword("definitions", doDEFINITIONS, noCompile);
-    AddKeyword("only", doONLY, noCompile);
-    AddKeyword("+order", doPlusOrder, noCompile);
-    AddKeyword("previous", doPrevious, noCompile);
-    AddKeyword("previous", doPrevious, noCompile);
-    AddKeyword("get-current", doGetCurrent, noCompile);
-    AddKeyword("set-current", doSetCurrent, noCompile);
-    AddKeyword("get-order", doGetOrder, noCompile);
-    AddKeyword("set-order", doSetOrder, noCompile);
-    AddKeyword("stats", doStats, toCompile);
+    AddKeyword("assert", Assert, noCompile);     // ( n1 n2 -- )
+    AddKeyword("verbosity", Verbosity, noCompile);
+    AddKeyword("load-code", LoadCodeBin, noCompile);
+    AddKeyword("save-code", SaveCodeBin, noCompile);
+    AddKeyword("load-data", LoadDataBin, noCompile);
+    AddKeyword("save-data", SaveDataBin, noCompile);
+    AddKeyword("equ", Constant, noCompile);
+    AddKeyword("constant", Constant, noCompile);
+    AddKeyword("[if]", BrackIf, noCompile);
+    AddKeyword("[then]", Nothing, noCompile);
+    AddKeyword("[else]", BrackElse, noCompile);
+    AddKeyword("[undefined]", BrackUndefined, noCompile);
+    AddKeyword("[defined]", BrackDefined, noCompile);
+    AddKeyword("forth", ForthLex, noCompile);
+    AddKeyword("assembler", AsmLex, noCompile);
+    AddKeyword("lexicon", Lexicon, noCompile);
+    AddKeyword("definitions", Definitions, noCompile);
+    AddKeyword("only", Only, noCompile);
+    AddKeyword("+order", PlusOrder, noCompile);
+    AddKeyword("previous", Previous, noCompile);
+    AddKeyword("also", Also, noCompile);
+    AddKeyword("get-current", GetCurrent, noCompile);
+    AddKeyword("set-current", SetCurrent, noCompile);
+    AddKeyword("get-order", GetOrder, noCompile);
+    AddKeyword("set-order", SetOrder, noCompile);
+    AddKeyword("stats", Stats, toCompile);
     AddKeyword("hex", Hex, noCompile);
     AddKeyword("decimal", Decimal, noCompile);
-    AddKeyword("drop", doDROP, noCompile);
-    AddKeyword("\\", doComment, doComment);
-    AddKeyword("(", doCmParen, doCmParen);
-    AddKeyword(".(", doComEcho, noCompile);
-    AddKeyword("order", doORDER, noCompile);
-    AddKeyword("cr", doCR, noCompile);
-    AddKeyword("include", doINCLUDE, noCompile);
-    AddKeyword("bye", doBYE, noCompile);
-    AddKeyword("words", doWoords, noCompile);
+    AddKeyword("\\", SkipToEOL, SkipToEOL);
+    AddKeyword("(", SkipToPar, SkipToPar);
+    AddKeyword(".(", EchoToPar, noCompile);
+    AddKeyword("order", Order, noCompile);
+    AddKeyword("cr", Cr, noCompile);
+    AddKeyword("include", Include, noCompile);
+    AddKeyword("bye", Bye, noCompile);
+    AddKeyword("words", Words, noCompile);
     AddKeyword(".s", dotESS, noCompile);
     AddKeyword(".", dot, noCompile);
     AddKeyword("d.", ddot, noCompile);
-    AddKeyword("dasm", doDASM, noCompile);
-    AddKeyword("see", doSEE, noCompile);
-    AddKeyword("sstep", doSteps, noCompile);
-    AddKeyword("write-protect", doWrProt, noCompile);
-    AddKeyword("calign", doNothing, doNothing);
-    AddKeyword("caligned", doNothing, doNothing);
-    AddKeyword("chars", doNothing, doNothing);
-    AddKeyword("t,", doTcomma, noCompile);
-    AddKeyword("there", doThere, noCompile);
-    AddKeyword("torg", doTorg, noCompile);
-    AddKeyword("aligned", doAligned, noCompile);
-    AddKeyword("align", doAlign, noCompile);
-    AddKeyword("buffer:", doBUFFER, noCompile);
-    AddKeyword("variable", doVARIABLE, noCompile);
-    AddKeyword("cvariable", doCVARIABLE, noCompile);
-    AddKeyword("create", doCREATE, noCompile);
-    AddKeyword("char", doCHAR, noCompile);
-    AddKeyword("[char]", noExecute, doCHARimm);
+    AddKeyword("dasm", Dasm, noCompile);
+    AddKeyword("see", See, noCompile);
+    AddKeyword("sstep", Steps, noCompile);
+    AddKeyword("write-protect", WrProtect, noCompile);
+    AddKeyword("calign", Nothing, Nothing);
+    AddKeyword("caligned", Nothing, Nothing);
+    AddKeyword("chars", Nothing, Nothing);
+    AddKeyword("t,", Tcomma, noCompile);
+    AddKeyword("there", There, noCompile);
+    AddKeyword("torg", Torg, noCompile);
+    AddKeyword("aligned", Aligned, noCompile);
+    AddKeyword("align", Align, noCompile);
+    AddKeyword("buffer:", Buffer, noCompile);
+    AddKeyword("variable", Variable, noCompile);
+    AddKeyword("cvariable", Cvariable, noCompile);
+    AddKeyword("create", Create, noCompile);
+    AddKeyword("char", Char, noCompile);
+    AddKeyword("[char]", noExecute, BrackChar);
     AddKeyword("[", toImmediate, toImmediate);
     AddKeyword("]", toCompile, toCompile);
-    AddKeyword("'", doTick, noCompile);
-    AddKeyword("[']", noExecute, doTickImm);
-    AddKeyword("marker", doMARKER, noCompile);
-    AddKeyword(":", doColon, noCompile);
-    AddKeyword(":noname", doNoName, noCompile);
-    AddKeyword("defer", doDEFER, noCompile);
-    AddKeyword("is", doIS, noCompile);
-    AddKeyword("CODE", doCODE, noCompile);
-    AddKeyword("exit", noExecute, compExit);
-    AddKeyword(";", doSemiEX, doSemi);
+    AddKeyword("'", Tick, noCompile);
+    AddKeyword("[']", noExecute, BrackTick);
+    AddKeyword("marker", Marker, noCompile);
+    AddKeyword(":", Colon, noCompile);
+    AddKeyword(":noname", NoName, noCompile);
+    AddKeyword("later", Later, noCompile);
+    AddKeyword("later-then", LaterThen, noCompile);
+    AddKeyword("resolves", Resolves, noCompile);
+    AddKeyword("CODE", BeginCode, noCompile);
+    AddKeyword("exit", noExecute, CompExit);
+    AddKeyword(";", Semicolon, SemiComp);
     AddKeyword("literal", noExecute, doLITERAL);
-    AddKeyword("macro", doMACRO, noCompile);
-    AddKeyword("immediate", doIMMEDIATE, noCompile);
-    AddKeyword("no-tail-recursion", doNoTail, noCompile);
-    AddKeyword("|bits|", doSetBits, noCompile);
-    AddKeyword("|", doTableEntry, noCompile);
+    AddKeyword("macro", Macro, noCompile);
+    AddKeyword("immediate", Immediate, noCompile);
+    AddKeyword("no-tail-recursion", NoTailRecursion, noCompile);
+    AddKeyword("|bits|", SetTableBitWidth, noCompile);
+    AddKeyword("|", TableEntry, noCompile);
     // primitives
     AddALUinst("nop", 0);
     AddALUinst("invert",  com);
@@ -1341,7 +1342,7 @@ SV LoadKeywords(void) {
     asm_wid = AddWordlist("asm");
     AddEquate("asm", asm_wid);
     current = asm_wid;
-    AddKeyword("END-CODE", doENDCODE, noCompile);
+    AddKeyword("END-CODE", EndCode, noCompile);
     AddModifier("T",    alu  );  // Instruction fields
     AddModifier("COP",  cop  );
     AddModifier("T0<",  less0);
@@ -1482,7 +1483,7 @@ bogus:                          error = UNRECOGNIZED;
                 }
                 if (verbose & VERBOSE_TOKEN) {
                     printf(" ( ");
-                    PrintStack();
+                    PrintDataStack();
                     printf(")\n");
                 }
                 if (verbose & VERBOSE_SRC) {
@@ -1510,7 +1511,7 @@ done:       elapsed_us = GetMicroseconds() - time0;
             if (File.fp == stdin) {
                 if (SDEPTH) {
                     printf("\\ ");
-                    PrintStack();
+                    PrintDataStack();
                 }
             }
             refill();
@@ -1538,7 +1539,7 @@ uint32_t chadGetSource (char delimiter) {
     } else {
         src = &buf[toin];               // use the rest of the line
         bytes = strlen(buf) - toin;
-        doComment();
+        SkipToEOL();
     }
     size_t words = (bytes + BYTES_PER_WORD - 1) / BYTES_PER_WORD;
     size_t addr = DataSize - words;

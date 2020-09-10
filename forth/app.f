@@ -1,14 +1,14 @@
 \ Application example
 
-include nucleus.fs
-include redirect.fs
-include numout.fs
-include frame.fs
+include nucleus.f
+include redirect.f
+include numout.f
+include frame.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
 
-:noname  ( error -- )  $8002 io! ; is exception
+:noname  ( error -- )  $8002 io! ; resolves exception
 
 
 
@@ -25,9 +25,9 @@ include frame.fs
 
 \ Try 25 fib, then stats
 
-' fib is cold
+' fib resolves cold
 
-: frtest1  2 >r 1 >r  6 5 4 3  2 frame  spstat . cr 
+: frtest1  2 >r 1 >r  6 5 4 3  2 frame  spstat . cr
           unframe r> . r> .  . . . . ;
 
 .( Total instructions: ) there . cr

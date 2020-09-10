@@ -20,17 +20,15 @@ You don't have to reinvent the wheel, but you do have to think.
 This allows the definition to fall through to the next definition.
 Forths that separate code and header spaces allow this Non-ANS trick.
 
-### Defer and is
+### Forward references
 
-- `defer` *( <name> -- )* Defines a forward reference.
-- `is` *( xt <name> -- )* Resolves a forward reference.
+Rather than use DEFER and IS for forward references, we use:
 
-`defer` and `is` are strictly for forward references.
+- `later` *( <name> -- )* Defines a forward reference.
+- `resolves` *( xt <name> -- )* Resolves a forward reference.
+
 Forward references are compiled as a single `jmp` instruction whose
-address is resolved by `is`.
-Do not use `defer` for indirection where `is` changes it at run time.
-For indirection, declare a variable to hold the *xt*.
-Better yet, use an array of *xt* to control a personality.
+address is resolved by `resolves`.
 
 ### Wordlist management
 
@@ -41,6 +39,8 @@ Better yet, use an array of *xt* to control a personality.
 - `_forth` *( -- wid )* The Forth wordlist.
 - `forth` *( -- )* Replaces the top of the search order with `forth`.
 - `only` *( -- )* Sets the search order to "root forth".
+- `also` *( -- )* Duplicates the top of the search order.
+- `previous` *( -- )* Drops the top of the search order.
 
 `lexicon` is similar to "WORDLIST CONSTANT" but it also saves the name
 so that `order` lists it.
@@ -53,7 +53,7 @@ You can list different sets of words by typing:
 
 - `forth words`
 - `assembler words`
-- `root 1 set-order words`
+- `only previous words`
 
 To put definitions in a new wordlist, you can:
 
