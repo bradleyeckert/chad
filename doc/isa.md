@@ -1,15 +1,7 @@
 # Novix Stack Computer architecture, Chad style
 
-Data and return stacks don't need to be deep. A frame stack abstraction should
-be used by library code to move excess stack contents to and from the frame
-stack (in data memory) to prevent possible stack overflow.
-A complex chunk of code would be preceded by `f[` *( depth -- )* to minimize
-stacks and `]f` would restore the stacks.
-For example, `2 f[` would leave nothing but two items on the data stack and
-an empty return stack. `stats` tells you how deep your code is actually stacking.
-
 The Chad ISA was inspired by the J1 architecture.
-How did Bowman come up with the J1?
+How did James Bowman come up with the J1?
 Somehow the stars lined up and out popped the J1.
 What a big architecture for the future of little computing.
 Some small tweaks to the J1 facilitate double precision math, looping,
@@ -215,5 +207,49 @@ In a shift register, the bits are right next to each other.
 It should synthesize nicely, with the business end where you want it.
 
 The simulator models stacks with circular buffers. 
-It reports overflow and underflow to avoid the difference in overflow and underflow
-behavior that you would see when using a shift register stack.
+It reports overflow and underflow to avoid the difference in overflow and
+underflow behavior that you would see when using a shift register stack.
+
+Data and return stacks don't need to be deep.
+A frame stack abstraction should
+be used by library code to move excess stack contents to and from the frame
+stack (in data memory) to prevent possible stack overflow.
+A complex chunk of code would be preceded by `f[` *( depth -- )* to minimize
+stacks and `]f` would restore the stacks.
+For example, `2 f[` would leave nothing but two items on the data stack and
+an empty return stack.
+The simulator word `stats` tells you how deep your code is
+actually stacking.
+
+## chad vs MISC
+
+The MISC architecture is based on 5-bit instructions
+with four instructions packed into an 18-bit word.
+With a 5:5:5:3 format, opcodes that need immediate data can take up to
+13 bits of data from the remainder of the word. Same as `chad`.
+
+MISC is designed to accept relatively slow code fetch in relation to the
+speed of execution of the sequence of MISC instructions.
+That's the allure of asynchronous computing.
+When ported to the synchronous world of clock edges
+(which is how we play well together),
+the advantages of MISC evaporate.
+The super simple opcodes spend most of their time waiting for
+the next clock edge.
+
+MISC is great if you can simulate it, but there's the rub.
+Commercial chip design tools just aren't up to doing
+that kind of simulation. If you can't simulate it, you can't build it.
+GreenArrays built their own simulation tools.
+They can't build an entire chip industry.
+
+Any synthesis tool,
+which you can get for free if you are targeting an FPGA,
+or can get at all if you are targeting an ASIC,
+will readily synthesize a `chad` processor
+out of 200 or so lines of Verilog.
+
+What Chuck Moore demonstrated with MISC was the utility of small stacks.
+His Novix architecture from the 1980s had stacks made of 256-cell
+memories. It turns out smaller is better.
+James Bowman's use of shift register stacks in the J1 was a great idea.

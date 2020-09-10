@@ -62,6 +62,7 @@ Don't stop me, I'm on a roll.
 An Admiral in the US Navy starting off this whole business had its time.
 But here's the thing about planetary consciousness shifts.
 You have to roll with the tide.
+Stop coding for war machines.
 
 If your code is so great, why shouldn't everyone on the planet be 
 able to run it without it being hosted by
