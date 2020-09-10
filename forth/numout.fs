@@ -1,19 +1,20 @@
 \ Numeric conversion and text I/O
 \ The buffer for numeric conversion is at the very top of data space.
+\ The output string grows downward in memory.
 
 there
-variable hld \ numeric conversion pointer
+decimal
+variable hld 							\ numeric conversion pointer
 
-: count   dup 1+ swap c@ ;  \ a -- a+1 c
-: hex     16 base c! ;
-: decimal 10 base c! ;
+: count   dup 1+ swap c@ ; 				\ 17.6.1.0245  a u -- a+1 u-1
+: decimal 10 base c! ;                  \ 6.1.1170  --
+: hex     16 base c! ;                  \ 6.2.1660  --
 
-: type  \ addr len --                   \ 6.1.2310  send chars
-          dup if  for  count emit  next  drop
+: type    dup if                        \ 6.1.2310  addr len -- 
+			for  count emit  next  drop
           else  2drop
           then
 ;
-
 : s>d     dup 0< ;                      \ 6.1.2170  n -- d
 : space   bl emit ;                     \ 6.1.2220  --
 : spaces  dup 1- 0< if  drop exit  then \ 6.1.2230  n --
@@ -26,7 +27,7 @@ variable hld \ numeric conversion pointer
 : hold    hld dup >r @ 1- dup r> ! c! ; \ 6.1.1670
 : _#_     um/mod swap digit hold ;
 : #       dup  base c@ >r  if           \ ud -- ud/base
-            0 r@ um/mod r> swap         \ 6.1.0030
+              0 r@ um/mod r> swap       \ 6.1.0030
               >r _#_ r> exit
           then  r> _#_ 0
 ;
@@ -34,7 +35,7 @@ variable hld \ numeric conversion pointer
 : sign    0< if [char] - hold then ;    \ 6.1.2210
 : #>      2drop hld @ dm-size over - ;  \ 6.1.0040
 : s.r     over - spaces type ;          \ length width --  
-: d.r     >r dup >r dabs                \ 8.6.1.1070  d width --
+: d.r     >r dup >r dabs         		\ 8.6.1.1070  d width --
           <# #s r> sign #> r> s.r ;
 : u.r     0 swap d.r ;                  \ 6.2.2330  u width --
 : .r      >r s>d r> d.r ;               \ 6.2.0210  n width --

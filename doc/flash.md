@@ -14,18 +14,18 @@ SPI flash is cheap and plentiful. Those things are everywhere.
 They come in an 8-pin package, transfer 4 bits per clock, and can be clocked
 at over 100 MHz.
 
-The fundamental unit of SPI flash is the 256-byte page.
+The fundamental unit of SPI flash is the 4KB sector.
 It's a simple enough abstraction. On-chip flash could be adapted to it.
-A 16-bit cell will address 16M bytes of flash.
-You have to erase a 4K sector before writing it.
-The basic primitives for writing to flash use a 256-byte page buffer:
+A 16-bit cell will address 64K sectors, or 256M bytes of flash.
+We would rather not tie up 4K bytes of RAM on a buffer for an entire sector.
+A 256-byte page buffer is more workable, compatible with the "page program" command.
+The basic primitives for writing to flash are:
 
 - `fwall` *( sector magic -- )* Set the first writable 4K flash sector.
 *magic* works like a PIN number.
-- `fpage` *( -- u-addr )* Address of the current page number.
-- `fidx` *( -- c-addr )* Address of an 8-bit index into the page buffer.
-- `fnew` *( sector -- )* Set the flash page to sector*16, idx to 0,
-and erase the 4K sector.
+- `sector` *( -- u-addr )* Address of the current flash sector number number.
+- `ep` *( -- u-addr )* Address of a 12-bit index into the sector.
+- `fnew` *( u -- ior )* Set `sector` to u, `fp` to 0, and erase the 4K sector.
 - `fc,` *( c -- )* Append a byte to the page buffer. If the page is full,
 write the page to flash. If it's the first page in a sector, erase it first.
 - `fw,` *( w -- )* Append a 16-bit word to the page buffer in little-endian order.
@@ -62,17 +62,6 @@ write whatever remains in the page buffer.
 
 \[3] `fbuf` *( -- a-addr )* is the address of the page buffer. You can assign it to anywhere in RAM you want. For example:
 
-```
-$200 fbuf !		\ the page working buffer is now at 200h.
-0 fidx c!		\ reset the page buffer
-```
-
-This would be useful when compiling code to run at a particular address,
-in this case 200h.
-Control structures need to be able to resolve jump addresses.
-`if` and `then` would use `fbuf` and `fidx` to compile.
-To run that code, you would read into code memory and then call it.
-
 ## Implementation
 
 Flash transfer to and from memory can be done by either software or hardware.
@@ -83,7 +72,7 @@ For other kinds of flash, such as on-chip, change the flash simulator.
 Having a Forth kernel in masked ROM is very area-efficient.
 You can have a lot of code in little space.
 Masked ROM is a little slow compared to RAM.
-Maybe it takes 2 or 3 cycles to settle.
+It takes maybe 2 or 3 cycles to settle.
 No problem, just use a very wide word and mux the output down to 16-bit.
 If the very wide word changes address, assert the HOLD line on the CPU
 to let it settle.

@@ -2,77 +2,68 @@
 only forth definitions 
 decimal
 
-0 equ 'TXbuf  \ UART send output register
-2 equ 'TXbusy \ UART transmit busy flag
-0 equ false   \ equates take up no code space. Have as many as you want.
+0 equ 'TXbuf  	\ UART send output register
+2 equ 'TXbusy 	\ UART transmit busy flag
+0 equ false   	\ equates take up no code space. Have as many as you want.
 -1 equ true
 32 equ bl
 
 \ You can compile to either check address alignment or not.
 \ Set to 0 when everything looks stable. The difference is 25 instructions.
 
-1 equ check_alignment \ enable @, !, w@, and w! to check address alignment
-
-0 >verbose
+0 equ check_alignment \ enable @, !, w@, and w! to check address alignment
 
 0 torg
 defer cold  	\ boots here
 defer exception \ error detected
 
-CODE depth   
-	status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu  
-END-CODE
-
-1234 depth  1 assert  1234 assert  \ sanity check the stack
-
-: noop  nop ;
-: io@   _io@ nop _io@_ ;
-: io!   _io! nop drop ;
+: noop  nop ;							\ call to reduce interrupt latency
+: io@   _io@ nop _io@_ ;				\ addr -- n \ I/O read
+: io!   _io! nop drop ;					\ n addr -- \ I/O write
 : =     xor 0= ;
-: or    invert swap invert and invert ;
 : <>    xor 0= 0= ;
-: <     - 0< ; \ macro
+: <     - 0< ; macro
 : >     swap < ;
-: cell+ cell + ; \ macro
+: cell+ cell + ; macro
 : rot   >r swap r> swap ;
 
 : c@    _@ dup@ swap mask rshift wand ;
 
 cell 4 = [if]
-    : cells 2* 2* ; macro
+    : cells 2* 2* ; macro				\ 6.1.0890  n -- n*4
     : (x!)  ( u w-addr bitmask wordmask )
         >carry swap
         dup>r and 3 lshift dup>r lshift
         w r> lshift invert
         r@ _@ _@_ and  + r> _! drop
     ;
-    : c!  ( u c-addr -- )  3 $FF  (x!) ;
+    : c!  ( u c-addr -- ) 3 $FF  (x!) ; \ 6.1.0850  c addr --
   check_alignment [if]
     : (ta)  ( a mask -- a )
 	      over and if  22 invert exception  then ;
     : @   3 (ta)  _@ _@_ ;
-    : !   3 (ta)  _! drop ;
+    : !   3 (ta)  _! drop ;				\ 6.1.0010  x addr --
     : w!  ( u w-addr -- )
           1 (ta) 2 $FFFF (x!) ;
     : w@  ( w-addr -- u )
           1 (ta) _@ dup@ swap 2 and 3 lshift rshift $FFFF and ;
   [else]
     : @   _@ _@_ ; macro
-    : !   _! drop ; macro
+    : !   _! drop ; macro				\ 6.1.0010  x addr --
     : w!  2 $FFFF (x!) ;
     : w@  _@ dup@ swap 2 and 3 lshift rshift $FFFF and ;
   [then]
 [else] \ 16-bit or 18-bit cells
-    : cells 2* ; macro
+    : cells 2* ; macro					\ 6.1.0890  n -- n*2
   check_alignment [if]
     : (ta)  over and if  22 invert exception  then ;
     : @   1 (ta)  _@ _@_ ;
-    : !   1 (ta)  _! drop ;
+    : !   1 (ta)  _! drop ;				\ 6.1.0010  x addr --
   [else]
     : @   _@ _@_ ; macro
-    : !   _! drop ; macro
+    : !   _! drop ; macro				\ 6.1.0010  x addr --
   [then]
-    : c! ( u c-addr -- )
+    : c! ( u c-addr -- )				\ 6.1.0850  c addr --
         dup>r 1 and if
             8 lshift  $00FF
         else
@@ -83,17 +74,17 @@ cell 4 = [if]
 [then]
 
 \ Your code can usually use + instead of OR, but if it's needed:
-: or     invert swap invert and invert ; \ n t -- n|t
+: or    invert swap invert and invert ; \ 6.1.1980  n m -- n|m
 
-: execute  2* >r ; notail   		\ 6.1.1370  xt --
+: execute  2* >r ; no-tail-recursion 	\ 6.1.1370  xt --
 
 : 2dup   over over ; macro \ d -- d d
 : char+ [ ;
 : 1+     1 + ; \ macro
-: 1-     1 - ; \ macro
-: negate invert 1+ ;
+: 1-     1 - ; \ macro					\ 6.1.0300  n -- n-1
+: negate invert 1+ ;					\ 6.1.1910  n -- -n
 : tuck   swap over ;
-: +!     tuck @ + swap ! ;
+: +!     tuck @ + swap ! ;				\ 6.1.0130  x addr --
 
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
@@ -162,7 +153,7 @@ cell 4 = [if]
     abs swap abs um*
     r> if dnegate then
 ;
-: */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- remainder n1*n2/n3
+: */mod  >r m* r> m/mod ;               \ 6.1.0110  n1 n2 n3 -- rem n1*n2/n3
 : */     */mod swap drop ;              \ 6.1.0100  n1 n2 n3 -- n1*n2/n3
 
 \ In order to use CREATE DOES>, we need ',' defined here.
@@ -171,7 +162,7 @@ dp cell+ dp ! \ variables shared with chad's interpreter
 cvariable base
 cvariable state
 align
-: aligned  dup [ cell 1- ] literal + cell negate and ;
+: aligned  [ cell 1- ] literal + cell negate and ;
 : align    dp @ aligned dp ! ;
 : allot    dp +! ;
 : here     dp @ ;
@@ -192,61 +183,11 @@ align
 : exec1: 2* r> + >r ;       			\ for list of 1-inst literals
 : 2drop  drop drop ;
 
-1000 100 xor  908 assert
-1000 100 and   96 assert
-1000 100 +   1100 assert
-1000 100 -    900 assert
-100 dup  100 assert  drop
-depth 0 assert
-123 456 swap  123 assert 456 assert
-123 456 over  123 assert 456 assert 123 assert
-depth 0 assert
-\ Note: Data memory is byte-addressed, allow 4-byte cells
-123 24 !  456 28 !
-24 @ 123 assert
-28 dup drop @ dup drop 456 assert
-depth 0 assert
+CODE depth   
+	status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu  
+END-CODE
 
-\ Now let's get some I/O set up. ScreenProfile points to a table of xts.
+1234 depth  1 assert  1234 assert  		\ sanity check the stack
 
-variable ScreenProfile
-: ExecScreen  ( n -- ) ScreenProfile @ execute execute ;
-: emit  0 ExecScreen ;
-: cr    1 ExecScreen ;
 
-\ stdout is the screen:
-
-: _emit  begin 'TXbusy io@ while noop repeat 'TXbuf io! ;
-: _cr    13 _emit 10 _emit ; \ --
-
-11 |bits|
-: stdout_table  exec1: [	\ The xts are less than 2048
-    ' _emit | ' _cr 
-] literal ; 
-
-' stdout_table ScreenProfile !	\ assign it
-
-\ iomap.c sends errors to the Chad interpreter
-\ A QUIT loop running on the CPU would do something different.
-
-:noname  ( error -- )  $8002 io! ; is exception
-
-\ Examples
-
-\ Use colorForth style of recursion
-\ This kind of recursion is non-ANS.
-\ We don't hide a word within its definition.
-
-: fib ( n1 -- n2 )
-    dup 2 < if drop 1 exit then
-    dup  1 - fib
-    swap 2 - fib  + ;
-
-\ Try 25 fib, then stats
-
-' fib is cold
-
-include numout.fs
-
-there . .( instructions used) cr
-\ 0 there dasm
+there . .( instructions used by nucleus) cr

@@ -70,8 +70,9 @@ struct Keyword {
     cell target;                        // target address if used
     uint16_t references;
     uint16_t link;                      // enough for 64k headers
-    uint16_t *aux;                      // pointer to aux C data 
+    cell *aux;                          // pointer to aux C data 
     uint8_t notail;                     // inhibit tail recursion
+    uint8_t isALU;                      // is an ALU word
 };
 
 int chadSpinFunction(void);             // external function waiting for keyboard input
@@ -192,3 +193,9 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_CREATEFILE -198
 #define BAD_OPENFILE   -199 // Can't open file
 #define BYE            -299
+
+// verbose flags
+#define VERBOSE_SOURCE  1
+#define VERBOSE_TOKEN   2
+#define VERBOSE_TRACE   4
+#define VERBOSE_SRC     8

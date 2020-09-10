@@ -36,7 +36,8 @@ uint8_t sp, rp;                         // stack pointers
 CELL t, pc, cy, lex, w;                 // registers
 CELL Data[DataSize];                    // data memory
 CELL Dstack[StackSize];                 // data stack
-CELL Raddr, RaddrD;                     // data memory read address
+CELL Rstack[StackSize];                 // return stack
+CELL Raddr;                             // data memory read address
 SI error;                               // simulator and interpreter error code
 
 #define dpCell 0                        // define shared variables
@@ -66,10 +67,13 @@ static uint8_t baseFetch(void) { return fetchByte(baseByte); }
 SV baseStore(uint8_t c) { storeByte(c, baseByte); }
 static uint8_t stateFetch(void) { return fetchByte(stateByte); }
 SV stateStore(uint8_t c) { storeByte(c, stateByte); }
+CELL dpFetch(void) { return Data[CELL_ADDR(dpCell)]; }
+SV dpStore(cell x) { Data[CELL_ADDR(dpCell)] = x; }
 SV Hex(void) { baseStore(16); }
 SV Decimal(void) { baseStore(10); }
 SV toImmediate(void) { stateStore(0); }
 SV toCompile(void) { stateStore(1); }
+CELL DisassembleInsn(cell IR);
 
 SV Cdot(cell x) {  // cuz no itoa
     int32_t n = x;
@@ -93,10 +97,29 @@ SV PrintStack(void) {                   // ( ... -- ... )
     }
 }
 
+SV PrintRStack(void) { 
+    int depth = RDEPTH;
+    if (depth == (RPMASK - 1)) depth = 0;
+    for (int i = 0; i < depth; i++) {
+        Cdot(Rstack[(i + 1) & RPMASK]);
+    }
+}
+
+SV TraceLine(cell pc, uint16_t insn) {
+    DisassembleInsn(insn);
+    printf("%03Xh: %04Xh ( ", pc, insn);
+    PrintStack();
+    printf(")");
+    if (RDEPTH) {
+        printf(" (R: ");  PrintRStack();
+        printf(")");
+    }
+    printf(" \\ w=%Xh, cy=%X\n", w & CELLMASK, cy);
+}
+
 //##############################################################################
 // CPU simulator
 
-CELL Rstack[StackSize];                 // return stack
 static uint16_t Code[CodeSize];         // code memory
 uint8_t spMax, rpMax;                   // stack depth tracking
 static uint32_t writeprotect = 0;       // highest writable code address
@@ -144,9 +167,10 @@ SV Rpush(cell v) // push v on the return stack
 #endif
 
 // The simulator used https://github.com/samawati/j1eforth as a template.
-// single = 0: Run until the return stack empties, returns 1 if ok else error.
+// single = 0: Run until the return stack empties, returns 2 if ok else error.
 // single = 1: Execute one instruction (single step) from Code[PC].
 // single = 10000h + instruction: Execute instruction. Returns the instruction.
+// MoreInstrumentation slows down the code by 40%.
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
 
@@ -154,7 +178,7 @@ SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
     cell _pc;
     uint16_t insn;
-#ifdef EnableCPUchecks
+#ifdef MoreInstrumentation
     uint16_t retMark = (uint16_t)cycles;
 #endif
     uint8_t mark = RDEPTH;
@@ -164,12 +188,13 @@ SI CPUsim(int single) {
     }
     do {
         insn = Code[pc & (CodeSize-1)];
-        if (verbose & 8) {
-            printf("  Code[%03Xh]=%04Xh ( ", pc, insn);
-            PrintStack();
-            printf("w=%Xh, cy=%X, R=%Xh)\n", w & CELLMASK, cy, Rstack[RP]);
+    once:   
+#ifdef MoreInstrumentation
+        if (verbose & VERBOSE_TRACE) {
+            TraceLine(pc, insn);
         }
-once:   _pc = pc + 1;
+#endif
+        _pc = pc + 1;
         cell _lex = 0;
         if (insn & 0x8000) {
             int target = (lex << 13) | (insn & 0x1fff);
@@ -182,15 +207,20 @@ once:   _pc = pc + 1;
                 RP = RPMASK & (RP + 1);
                 Rstack[RP & RPMASK] = _pc << 1;
                 _pc = target;
+#ifdef MoreInstrumentation
+                if (verbose & VERBOSE_TRACE) {
+                    printf("Call to %Xh\n", target); 
+                } 
+#endif
                 break;
             default:
                 if (insn & 0x1000) {                                /*    imm */
                     Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
                     if (insn & 0x100) {                             /*  r->pc */
                         _pc = Rstack[RP] >> 1;
-                        if (RDEPTH == mark) single = 1;
+                        if (RDEPTH == mark) single = 2;
                         RP = RPMASK & (RP - 1);
-#ifdef EnableCPUchecks
+#ifdef MoreInstrumentation
                         uint16_t time = (uint16_t)cycles - retMark;
                         retMark = (uint16_t)cycles;
                         if (time > latency)
@@ -204,8 +234,8 @@ once:   _pc = pc + 1;
         } else { // ALU
             if (insn & 0x100) {                                     /*  r->pc */
                 _pc = Rstack[RP] >> 1;
-                if (RDEPTH == mark) single = 1;
-#ifdef EnableCPUchecks
+                if (RDEPTH == mark) single = 2;
+#ifdef MoreInstrumentation
                 uint16_t time = (uint16_t)cycles - retMark;
                 retMark = (uint16_t)cycles;
                 if (time > latency)
@@ -251,7 +281,10 @@ once:   _pc = pc + 1;
 
             case 0x0D: _t = Rstack[RP];                      break; /*      R */
             case 0x1D: _t = Rstack[RP] - 1;                  break; /*    R-1 */
-            case 0x0E: _t = Data[Raddr];                     break; /*    [T] */
+            case 0x0E: _t = Data[Raddr];
+                if (verbose & VERBOSE_TRACE) {
+                    printf("Reading %Xh from cell %Xh\n", _t, Raddr); 
+                } break;                                            /*    [T] */
             case 0x1E: _t = readIOmap(t);                    break; /*  io[T] */
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
@@ -263,7 +296,9 @@ once:   _pc = pc + 1;
             case  2: Rstack[RP] = t;                         break;   /* T->R */
             case  3: temp = CELL_ADDR(t); 
                 if (temp & ~(DataSize - 1)) { single = BAD_DATA_WRITE; }
-                Data[temp & (DataSize - 1)] = s;             break; /* N->[T] */
+                if (verbose & VERBOSE_TRACE) {
+                    printf("Storing %Xh to cell %Xh\n", s, temp); 
+                } Data[temp & (DataSize - 1)] = s;           break; /* N->[T] */
             case  4: Raddr = CELL_ADDR(t);                         /* _MEMRD_ */
                 if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
             case  5: writeIOmap(t, s);                     break; /* N->io[T] */
@@ -273,9 +308,9 @@ once:   _pc = pc + 1;
             }
             t = _t & CELLMASK;
         }
-        pc = _pc;  lex = _lex;  RaddrD = Raddr;
+        pc = _pc;  lex = _lex;
         cycles++;
-#ifdef EnableCPUchecks
+#ifdef MoreInstrumentation
         if (sp > spMax) spMax = sp;
         if (rp > rpMax) rpMax = rp;
 #endif
@@ -295,7 +330,6 @@ SV Simulate(cell xt) {
 // Compiler
 
 CELL cp = 0;                            // dictionary pointer for code space
-CELL bp = 0;                            // bitfield pointer
 CELL fence = 0;                         // latest writable code word
 SI notail = 0;                          // tail recursion inhibited for call
 
@@ -352,7 +386,7 @@ SV CompCall (cell xt) {
 
 SI aligned(int n) {
     int32_t cellbytes = CELLS;
-    return (n + cellbytes - 1) & (-cellbytes);
+    return (n + (cellbytes - 1)) & (-cellbytes);
 }
 
 // Code space isn't randomly readable, so lookup tables are supported by jump
@@ -429,9 +463,9 @@ CELL me;                                // index of found keyword
 
 SI order[32];                           // search order list
 SI orders;                              // items in the search order list
-static uint16_t wordlist[MaxWordlists]; // head pointers to linked lists
+static cell wordlist[MaxWordlists];     // head pointers to linked lists
 static char wordlistname[MaxWordlists][16];// optional name string
-static uint16_t wordlists;
+static cell wordlists;
 SI root_wid;                            // the basic wordlists
 SI forth_wid;
 SI asm_wid;
@@ -482,7 +516,7 @@ SI FindWord(char* key) {                // find in context
 void strmove(char* dest, char* src, int maxlen) {
     for (int i = 0; i < maxlen; i++) {
         char c = *src++;  *dest++ = c;
-        if (c == 0) return;
+        if (c == 0) return;             // up to and including the terminator
     }
     *--dest = 0;                        // max reached, add terminator
 }
@@ -539,8 +573,6 @@ SV doSetOrder(void) {
         OrderPush(Dpop());
 }
 
-// REMOVE this, ccontext, header context field
-
 SI NotKeyword (char *key) {             // do a command, return 0 if found
     int i = FindWord(key);
     if (i < 0)
@@ -563,7 +595,7 @@ SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
 SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
 
 SV Def_Exec   (void) {
-    if (verbose & 2) {
+    if (verbose & VERBOSE_TOKEN) {
         printf(" <exec:%Xh>", my());
     }
     Simulate(my());
@@ -578,6 +610,7 @@ SI AddHead (char * s) {                 // add a header to the list
         Header[hp].notail = 0;
         Header[hp].target = 0;
         Header[hp].notail = 0;
+        Header[hp].isALU = 0;
         Header[hp].link = wordlist[current];
         Header[hp].references = 0;
         wordlist[current] = hp;
@@ -600,9 +633,10 @@ SV AddKeyword (char *name, void (*xte)(), void (*xtc)()) {
     }
 }
 
-SV AddPrimitiv(char* name, cell value) {
+SV AddALUinst(char* name, cell value) {
     if (AddHead(name)) {
         SetFns(value, Prim_Exec, Prim_Comp);
+        Header[hp].isALU = 1;
     }
 }
 
@@ -641,39 +675,84 @@ static char* TargetName (cell addr) {
     return NULL;
 }
 
-SV diss (int id, char *str) {
-    while (id--) { while (*str++); }
-    if (str[0]) printf("%s ", str);
+char DAbuf[256];                        // disassembling to a buffer
+
+SV appendDA(char* s) {                  // append string to DA buffer
+    size_t i = strlen(DAbuf);
+    size_t len = strlen(s);
+    strmove(&DAbuf[i], s, len + 1);
+    i += len;
+    DAbuf[i++] = ' ';                   // trailing space
+    DAbuf[i++] = '\0';
 }
 
-cell DisassembleInsn(cell IR) { // see chad.h for instruction set summary
+SV HexToDA(cell x) {                    // append hex number to DA buffer
+    char buf[16];
+    int  i = 16;  buf[--i] = 0;
+    do {
+        char c = x & 15;
+        x >>= 4;
+        if (c > 9) c += 7;
+        buf[--i] = c + '0';
+    } while (x && (i >= 0));
+    appendDA(&buf[i]);
+}
+
+SV diss (int id, char *str) {
+    while (id--) { while (*str++); }
+    if (str[0]) appendDA(str);
+}
+
+SI ALUlabel(uint16_t insn) {            // try to match to a predefined ALUinst 
+    for (int i = 0; i < hp; i++) {
+        if (insn & ret) {               // strip RET and rdn
+            if ((insn & rdn) == rdn)
+                insn &= ~(ret | rdn);
+        }
+        if ((Header[i].isALU) && (Header[i].w == insn)) {
+            appendDA(Header[i].name);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summary
     char* name;
+    DAbuf[0] = '\0'; 
     if (IR & 0x8000) {
         int target = IR & 0x1FFF;
         switch ((IR>>12) & 7) {
-        case 6: printf("%Xh litx", IR & 0x7FF);  break;
-        case 7: if (IR & ret) {printf("RET ");}
-            printf("%Xh imm", (IR & 0x7F) | (IR & 0xF00)>>1);  break;
+        case 6: HexToDA(IR & 0x7FF);  appendDA("litx");  break;
+        case 7: 
+            HexToDA((IR & 0x7F) | (IR & 0xF00)>>1);  appendDA("imm");
+            if (IR & ret) { appendDA("exit"); }  break;
         default:
             name = TargetName(target);
-            if (name == NULL) printf("%Xh ", target);
+            if (name == NULL) HexToDA(target);
             diss((IR>>13)&3,"jump\0zjump\0call");
-            if (name != NULL) printf("%s ", name);
+            if (name != NULL) appendDA(name);
         }
     } else { // ALU
-        int id = (IR>>9) & 7;
-        switch ((IR>>12) & 3) {
-        case 0: diss(id,"T\0T0<\0T2/\0T2*\0N\0T^N\0T&N\0mask"); break;
-        case 1: diss(id,"T+N\0N-T\0T0=\0N>>T\0N<<T\0R\0[T]\0status"); break;
-        case 2: diss(id,"---\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
-        default: diss(id,"T+Nc\0N-Tc\0---\0---\0---\0R-1\0io[T]\0---");
+        if (ALUlabel(IR)) {
+            if (IR & ret) appendDA("exit");
         }
-        diss((IR>>4)&7,"\0T->N\0T->R\0N->[T]\0_MEMRD_\0N->io[T]\0_IORD_\0CO");
-        diss( IR&3,    "\0d+1\0d-2\0d-1");
-        diss((IR>>2)&3,"\0r+1\0r-2\0r-1");
-        if (IR & ret) printf("RET ");
-        printf("alu");
+        else {
+            int id = (IR >> 9) & 7;
+            switch ((IR >> 12) & 3) {
+            case 0: diss(id, "T\0T0<\0T2/\0T2*\0N\0T^N\0T&N\0mask"); break;
+            case 1: diss(id, "T+N\0N-T\0T0=\0N>>T\0N<<T\0R\0[T]\0status"); break;
+            case 2: diss(id, "---\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
+            default: diss(id, "T+Nc\0N-Tc\0---\0---\0---\0R-1\0io[T]\0---");
+            }
+            diss((IR >> 4) & 7, "\0T->N\0T->R\0N->[T]\0_MEMRD_\0N->io[T]\0_IORD_\0CO");
+            diss(IR & 3, "\0d+1\0d-2\0d-1");
+            diss((IR >> 2) & 3, "\0r+1\0r-2\0r-1");
+            if (IR & ret) appendDA("RET");
+            appendDA("alu");
+        }
     }
+    printf("%16s", DAbuf);
     return 0;
 }
 
@@ -692,56 +771,18 @@ SV doDASM (void) { // ( addr len -- )
     }
 }
 
-static char format[260];                // format string depends on cell width
-uint8_t fmtptr;                         // so we need to construct it...
-
-SV AppendFmt(char* s) {
-    size_t len = strlen(s);
-    for (size_t i = 0; i < len; i++)
-        format[fmtptr++] = *s++;
-}
-
-SV AddFormat(char* label, int width) {
-    char tmp[2];
-    AppendFmt(label);
-    AppendFmt("_%0");
-    tmp[0] = '0' + (char)((width + 3) >> 2);
-    tmp[1] = '\0';
-    AppendFmt(tmp);
-    AppendFmt("X ");
-}
-
-SV RegDump(void) {
-    fmtptr = 0;
-    AddFormat("N", CELLBITS);     AddFormat("T", CELLBITS);
-    AddFormat("R", CELLBITS);     AddFormat("W", CELLBITS);
-    AddFormat("c", 1);            AddFormat("SP", StackAwidth);
-    AddFormat("RP", StackAwidth); AddFormat("PC", CELLBITS);
-    AddFormat("inst", 16);        AppendFmt("\\ ");
-    format[fmtptr] = '\0';
-    uint16_t insn = Code[pc & (CodeSize - 1)];
-    printf(format, Dstack[SP], t, Rstack[RP], w, cy, sp, rp, pc, insn);
-    DisassembleInsn(insn);
-    printf("\n");
-}
-
 SV doSteps(void) {                      // ( addr steps -- )
     uint16_t cnt = (uint16_t)Dpop();    // single step debugger gives a listing
     pc = Dpop();
-    RegDump();
-    for (int i = 0; i < cnt; i++) {
+    verbose |= VERBOSE_TRACE;
+    for (uint16_t i = 0; i < cnt; i++) {
         CPUsim(1);
-        RegDump();
         if (rp == (StackSize - 1)) break;
     }
+    verbose &= ~VERBOSE_TRACE;
 }
 
-SV doInstruction(void) {                // ( instruction -- )
-    CPUsim(0x10000 | Dpop());           // execute the instruction on the stack
-    RegDump();
-}
-
-SV doAssert(void) {                   // for test code
+SV doAssert(void) {                     // for test code
     int expected = Dpop();
     int actual = Dpop();
     if (expected != actual) {
@@ -888,26 +929,6 @@ SV doLexicon(void) {                    // named wordlist
     AddEquate(tok, AddWordlist(tok));
 }
 
-SV doBitfield(void) {
-    cell width = Dpop();
-    if ((width == 0) || (width > CELLBITS))
-        error = BAD_BITFIELD;
-    int shft = bp % CELLBITS;
-    int addr = bp / CELLBITS;
-    if ((shft + width) > CELLBITS) {
-        shft = 0;                       // doesn't fit
-        addr++;
-        bp = addr * CELLBITS;           // start a new cell
-    }
-    Dpush((addr << (CELLSIZE*2)) | ((width-1) << CELLSIZE) | shft);
-    doEQU();
-    bp += width;
-}
-
-SV doBitAlign(void) {
-    bp = ((bp / CELLBITS) + 1) * CELLBITS;
-}
-
 SV doDEFINED(void) {                    // [defined]
     parseword(' ');
     int r = (FindWord(tok) < 0) ? 0 : 1;
@@ -951,20 +972,20 @@ SV doNoTail (void) {
     Header[DefMarkID].notail = 1;
 }
 
-SV SaveMarker(uint16_t* dest) {
+SV SaveMarker(cell* dest) {
     dest[0] = hp;    dest[1] = cp;
-    dest[3] = bp;    dest[4] = wordlists;
-    memcpy(&dest[5], wordlist, sizeof(uint16_t) * MaxWordlists);
+    dest[2] = wordlists;  dest[3] = dpFetch();
+    memcpy(&dest[4], wordlist, sizeof(cell) * MaxWordlists);
 }
 
-SV LoadMarker(uint16_t* src) {
-    hp = src[0];     cp = src[1];       // src[2] was dp
-    bp = src[3];     wordlists = src[4];
-    memcpy(wordlist, &src[5], sizeof(uint16_t) * MaxWordlists);
+SV LoadMarker(cell* src) {
+    hp = src[0];     cp = src[1];
+    wordlists = src[2];  dpStore(src[3]);
+    memcpy(wordlist, &src[4], sizeof(cell) * MaxWordlists);
 }
 
 SV Marker_Exec(void) {                  // execution semantics of a marker
-    uint16_t* pad = Header[me].aux;
+    cell* pad = Header[me].aux;
     LoadMarker(pad);
     free(pad);
 }
@@ -973,7 +994,7 @@ SV doMARKER (void) {
     parseword(' ');
     if (AddHead(tok)) {
         SetFns(cp, Marker_Exec, noCompile);
-        uint16_t* pad = malloc(sizeof(uint16_t) * (MaxWordlists + 8));
+        cell* pad = malloc(sizeof(cell) * (MaxWordlists + 4));
         Header[hp].aux = pad;
         SaveMarker(pad);
     }
@@ -1019,8 +1040,6 @@ SV doTick    (void) { Dpush(tick()); }
 SV doTickImm (void) { Literal(tick()); }
 SV doThere   (void) { Dpush(cp); }
 SV doTorg    (void) { cp = Dpop(); }
-SV doBhere   (void) { Dpush(bp); }
-SV doBorg    (void) { bp = Dpop(); }
 SV doDROP    (void) { Dpop(); }
 SV doTcomma  (void) { toCode(Dpop()); }
 SV doWrProt  (void) { writeprotect = CodeFence; }
@@ -1067,7 +1086,7 @@ ask: toin = 0;
     }
     // save the line for error reporting
     strmove(File.Line, buf, LineBufferSize);
-    if (verbose)
+    if (verbose & VERBOSE_SOURCE)
         printf("%d: %s\n", lineno, buf);
     return result;
 }
@@ -1150,14 +1169,12 @@ SV doSaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
 // There's not much you can do without compiling on the chad CPU.
 // For example CREATE here is not usable with DOES>.
 
-CELL dpFetch(void) { return Data[CELL_ADDR(dpCell)]; }
-SV dpStore(cell x) { Data[CELL_ADDR(dpCell)] = x; }
 SV allot(int n) { dpStore(n + dpFetch()); }
 SV buffer(int n) { Dpush(dpFetch());  doEQU();  allot(n); }
 SV doBUFFER(void) { buffer(Dpop()); }
 SV doCVARIABLE(void) { buffer(1); }
 SV doAlign(void) { dpStore(aligned(dpFetch())); }
-SV doVARIABLE(void) { doAlign();  buffer(4); }
+SV doVARIABLE(void) { doAlign();  buffer(CELLS); }
 SV doCREATE(void) { doAlign();  buffer(0); }
 SV doCHAR(void) { parseword(' ');  Dpush(tok[0]); }
 SV doCHARimm(void) { parseword(' ');  Literal(tok[0]); }
@@ -1172,157 +1189,159 @@ SV LoadKeywords(void) {
     forth_wid = AddWordlist("forth");
     doONLY(); // order = root _forth
     current = root_wid;
-    AddEquate  ("root", root_wid);
-    AddEquate  ("_forth", forth_wid);
-    AddKeyword ("assert", doAssert, noCompile);     // ( n1 n2 -- )
-    AddKeyword (">verbose", doVerbose, noCompile);
-    AddKeyword ("load-code", doLoadCodeBin, noCompile);
-    AddKeyword ("save-code", doSaveCodeBin, noCompile);
-    AddKeyword ("load-data", doLoadDataBin, noCompile);
-    AddKeyword ("save-data", doSaveDataBin, noCompile);
-    AddKeyword ("[if]", do_IF, noCompile);
-    AddKeyword ("[then]", doNothing, noCompile);
-    AddKeyword ("[else]", do_ELSE, noCompile);
-    AddKeyword ("[undefined]", doUNDEFINED, noCompile);
-    AddKeyword ("[defined]", doDEFINED, noCompile);
-    AddKeyword ("forth", doFORTH, noCompile);
-    AddKeyword ("assembler", doASSEMBLER, noCompile);
-    AddKeyword ("lexicon", doLexicon, noCompile);
-    AddKeyword ("definitions", doDEFINITIONS, noCompile);
-    AddKeyword ("only", doONLY, noCompile);
-    AddKeyword ("+order", doPlusOrder, noCompile);
-    AddKeyword ("previous", doPrevious, noCompile);
-    AddKeyword ("previous", doPrevious, noCompile);
-    AddKeyword ("get-current", doGetCurrent, noCompile);
-    AddKeyword ("set-current", doSetCurrent, noCompile);
-    AddKeyword ("get-order", doGetOrder, noCompile);
-    AddKeyword ("set-order", doSetOrder, noCompile);
-    AddKeyword ("stats", doStats, toCompile);
-    AddKeyword ("hex", Hex, noCompile);
-    AddKeyword ("decimal", Decimal, noCompile);
-    AddKeyword ("drop", doDROP, noCompile);
-    AddKeyword ("\\", doComment, doComment);
-    AddKeyword ("(", doCmParen, doCmParen);
-    AddKeyword (".(", doComEcho, noCompile);
-    AddKeyword ("order", doORDER, noCompile);
-    AddKeyword ("cr", doCR, noCompile);
-    AddKeyword ("include", doINCLUDE, noCompile);
-    AddKeyword ("bye", doBYE, noCompile);
-    AddKeyword ("words", doWoords, noCompile);
-    AddKeyword (".s", dotESS, noCompile);
-    AddKeyword (".", dot, noCompile);
-    AddKeyword ("d.", ddot, noCompile);
-    AddKeyword ("dasm", doDASM, noCompile);
-    AddKeyword ("see", doSEE, noCompile);
-    AddKeyword ("sstep", doSteps, noCompile);
-    AddKeyword ("inst", doInstruction, noCompile);
-    AddKeyword ("write-protect", doWrProt, noCompile);
-    AddEquate  ("cm-writable", BYTE_ADDR(CodeFence));
-    AddEquate  ("cm-size", BYTE_ADDR(CodeSize));
-    AddEquate  ("dm-size", BYTE_ADDR(DataSize));
-    AddEquate  ("cellbits", CELLBITS);
-    AddEquate  ("cell", CELLS);
-    AddEquate  ("dp", dpCell);
-    AddKeyword ("calign", doNothing, doNothing);
-    AddKeyword ("caligned", doNothing, doNothing);
-    AddKeyword ("chars", doNothing, doNothing);
-    AddKeyword ("t,", doTcomma, noCompile);
-    AddKeyword ("there", doThere, noCompile);
-    AddKeyword ("torg", doTorg, noCompile);
-    AddKeyword ("aligned", doAligned, noCompile);
-    AddKeyword ("align", doAlign, noCompile);
-    AddKeyword ("buffer:", doBUFFER, noCompile);
-    AddKeyword ("variable", doVARIABLE, noCompile);
-    AddKeyword ("cvariable", doCVARIABLE, noCompile);
-    AddKeyword ("create", doCREATE, noCompile);
-    AddKeyword ("char", doCHAR, noCompile);
-    AddKeyword ("[char]", noExecute, doCHARimm);
-    AddKeyword ("bvar", doBitfield, noCompile);
-    AddKeyword ("balign", doBitAlign, noCompile);
-    AddKeyword ("bhere", doBhere, noCompile);
-    AddKeyword ("borg", doBorg, noCompile);
-    AddKeyword ("[", toImmediate, toImmediate);
-    AddKeyword ("]", toCompile, toCompile);
-    AddKeyword ("'", doTick, noCompile);
-    AddKeyword ("[']", noExecute, doTickImm);
-    AddKeyword ("marker", doMARKER, noCompile);
-    AddKeyword ("equ", doEQU, noCompile);
-    AddKeyword (":", doColon, noCompile);
-    AddKeyword (":noname", doNoName, noCompile);
-    AddKeyword ("defer", doDEFER, noCompile);
-    AddKeyword ("is", doIS, noCompile);
-    AddKeyword ("CODE", doCODE, noCompile);
-    AddKeyword ("exit", noExecute, compExit);
-    AddKeyword (";", doSemiEX, doSemi);
-    AddKeyword ("literal", noExecute, doLITERAL);
-    AddKeyword ("macro", doMACRO, noCompile);
-    AddKeyword ("immediate", doIMMEDIATE, noCompile);
-    AddKeyword ("notail", doNoTail, noCompile);
-    AddKeyword ("|bits|", doSetBits, noCompile);
-    AddKeyword ("|", doTableEntry, noCompile);
+    AddEquate("root", root_wid);
+    AddEquate("_forth", forth_wid);
+    AddEquate("cm-writable", BYTE_ADDR(CodeFence));
+    AddEquate("cm-size", BYTE_ADDR(CodeSize));
+    AddEquate("dm-size", BYTE_ADDR(DataSize));
+    AddEquate("cellbits", CELLBITS);
+    AddEquate("cell", CELLS);
+    AddEquate("dp", dpCell);
+    AddKeyword("assert", doAssert, noCompile);     // ( n1 n2 -- )
+    AddKeyword("verbosity", doVerbose, noCompile);
+    AddKeyword("load-code", doLoadCodeBin, noCompile);
+    AddKeyword("save-code", doSaveCodeBin, noCompile);
+    AddKeyword("load-data", doLoadDataBin, noCompile);
+    AddKeyword("save-data", doSaveDataBin, noCompile);
+    AddKeyword("equ", doEQU, noCompile);
+    AddKeyword("constant", doEQU, noCompile);
+    AddKeyword("[if]", do_IF, noCompile);
+    AddKeyword("[then]", doNothing, noCompile);
+    AddKeyword("[else]", do_ELSE, noCompile);
+    AddKeyword("[undefined]", doUNDEFINED, noCompile);
+    AddKeyword("[defined]", doDEFINED, noCompile);
+    AddKeyword("forth", doFORTH, noCompile);
+    AddKeyword("assembler", doASSEMBLER, noCompile);
+    AddKeyword("lexicon", doLexicon, noCompile);
+    AddKeyword("definitions", doDEFINITIONS, noCompile);
+    AddKeyword("only", doONLY, noCompile);
+    AddKeyword("+order", doPlusOrder, noCompile);
+    AddKeyword("previous", doPrevious, noCompile);
+    AddKeyword("previous", doPrevious, noCompile);
+    AddKeyword("get-current", doGetCurrent, noCompile);
+    AddKeyword("set-current", doSetCurrent, noCompile);
+    AddKeyword("get-order", doGetOrder, noCompile);
+    AddKeyword("set-order", doSetOrder, noCompile);
+    AddKeyword("stats", doStats, toCompile);
+    AddKeyword("hex", Hex, noCompile);
+    AddKeyword("decimal", Decimal, noCompile);
+    AddKeyword("drop", doDROP, noCompile);
+    AddKeyword("\\", doComment, doComment);
+    AddKeyword("(", doCmParen, doCmParen);
+    AddKeyword(".(", doComEcho, noCompile);
+    AddKeyword("order", doORDER, noCompile);
+    AddKeyword("cr", doCR, noCompile);
+    AddKeyword("include", doINCLUDE, noCompile);
+    AddKeyword("bye", doBYE, noCompile);
+    AddKeyword("words", doWoords, noCompile);
+    AddKeyword(".s", dotESS, noCompile);
+    AddKeyword(".", dot, noCompile);
+    AddKeyword("d.", ddot, noCompile);
+    AddKeyword("dasm", doDASM, noCompile);
+    AddKeyword("see", doSEE, noCompile);
+    AddKeyword("sstep", doSteps, noCompile);
+    AddKeyword("write-protect", doWrProt, noCompile);
+    AddKeyword("calign", doNothing, doNothing);
+    AddKeyword("caligned", doNothing, doNothing);
+    AddKeyword("chars", doNothing, doNothing);
+    AddKeyword("t,", doTcomma, noCompile);
+    AddKeyword("there", doThere, noCompile);
+    AddKeyword("torg", doTorg, noCompile);
+    AddKeyword("aligned", doAligned, noCompile);
+    AddKeyword("align", doAlign, noCompile);
+    AddKeyword("buffer:", doBUFFER, noCompile);
+    AddKeyword("variable", doVARIABLE, noCompile);
+    AddKeyword("cvariable", doCVARIABLE, noCompile);
+    AddKeyword("create", doCREATE, noCompile);
+    AddKeyword("char", doCHAR, noCompile);
+    AddKeyword("[char]", noExecute, doCHARimm);
+    AddKeyword("[", toImmediate, toImmediate);
+    AddKeyword("]", toCompile, toCompile);
+    AddKeyword("'", doTick, noCompile);
+    AddKeyword("[']", noExecute, doTickImm);
+    AddKeyword("marker", doMARKER, noCompile);
+    AddKeyword(":", doColon, noCompile);
+    AddKeyword(":noname", doNoName, noCompile);
+    AddKeyword("defer", doDEFER, noCompile);
+    AddKeyword("is", doIS, noCompile);
+    AddKeyword("CODE", doCODE, noCompile);
+    AddKeyword("exit", noExecute, compExit);
+    AddKeyword(";", doSemiEX, doSemi);
+    AddKeyword("literal", noExecute, doLITERAL);
+    AddKeyword("macro", doMACRO, noCompile);
+    AddKeyword("immediate", doIMMEDIATE, noCompile);
+    AddKeyword("no-tail-recursion", doNoTail, noCompile);
+    AddKeyword("|bits|", doSetBits, noCompile);
+    AddKeyword("|", doTableEntry, noCompile);
     // primitives
-    AddPrimitiv("nop", 0);
-    AddPrimitiv("invert",  com);
-    AddPrimitiv("2*",      shl1  | co);
-    AddPrimitiv("2/",      shr1  | co);
-    AddPrimitiv("2*c",     shlx  | co);
-    AddPrimitiv("2/c",     shrx  | co);
-    AddPrimitiv("xor",     eor   |        sdn);
-    AddPrimitiv("and",     Tand  |        sdn);
-    AddPrimitiv("+",       add   | co   | sdn);
-    AddPrimitiv("-",       sub   | co   | sdn);
-    AddPrimitiv("dup",             TtoN | sup);
-    AddPrimitiv("over",    NtoT  | TtoN | sup);
-    AddPrimitiv("swap",    NtoT  | TtoN);
-    AddPrimitiv("drop",    NtoT  |        sdn);
-    AddPrimitiv("nip",                    sdn);
-    AddPrimitiv("0=",      zeq   );
-    AddPrimitiv("0<",      less0 );
-    AddPrimitiv(">r",      NtoT  | TtoR | sdn | rup);
-    AddPrimitiv("r>",      RtoT  | TtoN | sup | rdn);
-    AddPrimitiv("r@",      RtoT  | TtoN | sup);
-    AddPrimitiv("carry",   carry | TtoN | sup);
-    AddPrimitiv("w",       WtoT  | TtoN | sup);
-    AddPrimitiv(">carry",  NtoT  | co   | sdn);
-    AddPrimitiv("rshift",  shr          | sdn);
-    AddPrimitiv("lshift",  shl          | sdn);
-    AddPrimitiv("_@",              memrd);  // start read
-    AddPrimitiv("_@_",     read);           // end read
-    AddPrimitiv("_!",      write |        sdn);
-    AddPrimitiv("_io!",    iow          | sdn);
-    AddPrimitiv("_io@",            ior);    // start io read
-    AddPrimitiv("_io@_",   input);          // end io read
-    AddPrimitiv("2dupand", Tand  | TtoN | sup);
-    AddPrimitiv("2dupxor", eor   | TtoN | sup);
-    AddPrimitiv("2dup+",   add   | TtoN | sup);
-    AddPrimitiv("2dup-",   sub   | TtoN | sup);
-    AddPrimitiv("mask",    bmask);
-    AddPrimitiv("wand",    TandW);
-    AddPrimitiv("overand", Tand);
-    AddPrimitiv("overxor", eor);
-    AddPrimitiv("over+",   add   | co);
-    AddPrimitiv("over-",   sub   | co);
-    AddPrimitiv("dup>r",   TtoR               | rup);
-    AddPrimitiv("rdrop",                        rdn);
-    AddPrimitiv("+c",      addc  | co   | sdn);
-    AddPrimitiv("tuck!",   write        | sdn);
-    AddPrimitiv("dup@",    read  | TtoN | sup);
+    AddALUinst("nop", 0);
+    AddALUinst("invert",  com);
+    AddALUinst("2*",      shl1  | co);
+    AddALUinst("2/",      shr1  | co);
+    AddALUinst("2*c",     shlx  | co);
+    AddALUinst("2/c",     shrx  | co);
+    AddALUinst("xor",     eor   |        sdn);
+    AddALUinst("and",     Tand  |        sdn);
+    AddALUinst("_+",      add   | sdn);
+    AddALUinst("+",       add   | co   | sdn);
+    AddALUinst("-",       sub   | co   | sdn);
+    AddALUinst("dup",             TtoN | sup);
+    AddALUinst("over",    NtoT  | TtoN | sup);
+    AddALUinst("swap",    NtoT  | TtoN);
+    AddALUinst("drop",    NtoT  |        sdn);
+    AddALUinst("nip",                    sdn);
+    AddALUinst("0=",      zeq   );
+    AddALUinst("0<",      less0 );
+    AddALUinst(">r",      NtoT  | TtoR | sdn | rup);
+    AddALUinst("r>",      RtoT  | TtoN | sup | rdn);
+    AddALUinst("r@",      RtoT  | TtoN | sup);
+    AddALUinst("carry",   carry | TtoN | sup);
+    AddALUinst("w",       WtoT  | TtoN | sup);
+    AddALUinst(">carry",  NtoT  | co   | sdn);
+    AddALUinst("rshift",  shr          | sdn);
+    AddALUinst("lshift",  shl          | sdn);
+    AddALUinst("_@",              memrd);  // start read
+    AddALUinst("_@_",     read);           // end read
+    AddALUinst("_!",      write |        sdn); // = tuck!
+    AddALUinst("_io!",    iow          | sdn);
+    AddALUinst("_io@",            ior);    // start io read
+    AddALUinst("_io@_",   input);          // end io read
+    AddALUinst("2dupand", Tand  | TtoN | sup);
+    AddALUinst("2dupxor", eor   | TtoN | sup);
+    AddALUinst("2dup+",   add   | TtoN | sup);
+    AddALUinst("2dup-",   sub   | TtoN | sup);
+    AddALUinst("mask",    bmask);
+    AddALUinst("wand",    TandW);
+    AddALUinst("overand", Tand);
+    AddALUinst("overxor", eor);
+    AddALUinst("over+",   add   | co);
+    AddALUinst("over-",   sub   | co);
+    AddALUinst("dup>r",   TtoR               | rup);
+    AddALUinst("rdrop",                        rdn);
+    AddALUinst("+c",      addc  | co   | sdn);
+    AddALUinst("dup@",    read  | TtoN | sup);
+    AddALUinst("spstat",  who   | TtoN | sup);
+    AddALUinst("(R-1)@", RM1toT | TtoN | sup);
+    AddALUinst("_next_",  zeq   | TtoR);
 
-    AddKeyword ("begin", noExecute, doBegin);
-    AddKeyword ("again", noExecute, doAgain);
-    AddKeyword ("until", noExecute, doUntil);
-    AddKeyword ("if",    noExecute, doIf);
-    AddKeyword ("else",  noExecute, doElse);
-    AddKeyword ("then",  noExecute, doThen);
-    AddKeyword ("while",  noExecute, doWhile);
-    AddKeyword ("repeat",  noExecute, doRepeat);
-    AddKeyword ("for",  noExecute, doFor);
-    AddKeyword ("next",  noExecute, doNext);
+//   toCode(alu | RM1toT | TtoN | sup);   /* (R-1)@ */
+//   toCode(alu | zeq | TtoR);  ResolveRev(zjump);
+
+    AddKeyword("begin", noExecute, doBegin);
+    AddKeyword("again", noExecute, doAgain);
+    AddKeyword("until", noExecute, doUntil);
+    AddKeyword("if",    noExecute, doIf);
+    AddKeyword("else",  noExecute, doElse);
+    AddKeyword("then",  noExecute, doThen);
+    AddKeyword("while",  noExecute, doWhile);
+    AddKeyword("repeat",  noExecute, doRepeat);
+    AddKeyword("for",  noExecute, doFor);
+    AddKeyword("next",  noExecute, doNext);
     // assembler
     asm_wid = AddWordlist("asm");
-    AddEquate  ("asm", asm_wid);
+    AddEquate("asm", asm_wid);
     current = asm_wid;
-    AddKeyword ("END-CODE", doENDCODE, noCompile);
+    AddKeyword("END-CODE", doENDCODE, noCompile);
     AddModifier("T",    alu  );  // Instruction fields
     AddModifier("COP",  cop  );
     AddModifier("T0<",  less0);
@@ -1364,21 +1383,21 @@ SV LoadKeywords(void) {
     AddModifier("d+1", sup  );
     AddModifier("d-1", sdn  );
     AddModifier("d-2", sdn2 );
-    AddLitOp   ("alu", alu );
-    AddLitOp   ("branch", jump );
-    AddLitOp   ("0branch", zjump);
-    AddLitOp   ("scall", call );
-    AddLitOp   ("litx", litx );
-    AddLitOp   ("copid", copid );
-    AddLitOp   ("imm", lit  );
-    AddKeyword ("begin", doBegin, noCompile);
-    AddKeyword ("again", doAgain, noCompile);
-    AddKeyword ("until", doUntil, noCompile);
-    AddKeyword ("if",    doIf, noCompile);
-    AddKeyword ("else",  doElse, noCompile);
-    AddKeyword ("then",  doThen, noCompile);
-    AddKeyword ("while",  doWhile, noCompile);
-    AddKeyword ("repeat",  doRepeat, noCompile);
+    AddLitOp("alu", alu );
+    AddLitOp("branch", jump );
+    AddLitOp("0branch", zjump);
+    AddLitOp("scall", call );
+    AddLitOp("litx", litx );
+    AddLitOp("copid", copid );
+    AddLitOp("imm", lit  );
+    AddKeyword("begin", doBegin, noCompile);
+    AddKeyword("again", doAgain, noCompile);
+    AddKeyword("until", doUntil, noCompile);
+    AddKeyword("if",    doIf, noCompile);
+    AddKeyword("else",  doElse, noCompile);
+    AddKeyword("then",  doThen, noCompile);
+    AddKeyword("while",  doWhile, noCompile);
+    AddKeyword("repeat",  doRepeat, noCompile);
     current = forth_wid;
 }
 
@@ -1403,7 +1422,7 @@ int chad(char * line, int maxlength) {
             uint64_t time0 = GetMicroseconds();
             uint64_t cycles0 = cycles;
             while (parseword(' ')) {
-                if (verbose) {
+                if (verbose & 2) {
                     printf("  %s", tok);
                 }
                 if (baseFetch() == 0) 
@@ -1461,13 +1480,13 @@ bogus:                          error = UNRECOGNIZED;
                         }
                     }
                 }
-                if (verbose) {
+                if (verbose & VERBOSE_TOKEN) {
                     printf(" ( ");
                     PrintStack();
-                    if (verbose & 2) {
-                        printf(") (%s", &buf[toin]);
-                    }
                     printf(")\n");
+                }
+                if (verbose & VERBOSE_SRC) {
+                    printf(") (%s", &buf[toin]);
                 }
                 if (sp == (StackSize - 1)) error = BAD_STACKUNDER;
                 if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER;
@@ -1549,8 +1568,7 @@ uint32_t chadGetHeader (uint32_t select) {
     case 7: return Header[ID].link;
     case 8: return Header[ID].references;
     case 16: return cp;
-    case 17: return bp;
-    case 18: return hp;
+    case 17: return hp;
     default:
         if ((select < 0x20) || (select >= (0x20 + MaxNameSize)))
             return 0;
@@ -1559,6 +1577,8 @@ uint32_t chadGetHeader (uint32_t select) {
     return 0;
 }
 
-void chadError (int errorcode) {
-    error = errorcode;
+void chadError (uint32_t errorcode) {
+    int n = errorcode;
+    if (n & MSB) n |= ~CELLMASK;        // sign extend errorcode
+    error = n;
 }

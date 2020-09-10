@@ -2,8 +2,8 @@
 // config.h
 // Basic configuration and function prototype for chad.c
 //===============================================================================
-#ifndef __CHADCONFIG_H__
-#define __CHADCONFIG_H__
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 #include <stdint.h>
 
 #define CELLBITS        18      /* Width of a cell in bits, 16 to 32        */
@@ -13,7 +13,7 @@
 #define StackAwidth      5      /* log2(Stack cells)                        */
 #define CodeFence     1024      /* Beginning of RAM-based Code space        */
 
-#define EnableCPUchecks         /* Simulator has more instrumentation       */
+#define MoreInstrumentation     /* Simulator has more instrumentation       */
 
 #define LineBufferSize 256      /* Size of line buffer                      */
 #define MaxKeywords   2000      /* Number of headers                        */

@@ -1,3 +1,4 @@
+
 : ?dup  dup if dup then ;
 : d2*   swap 2* swap 2*c ;
 : d2/   2/ swap 2/c swap ;
