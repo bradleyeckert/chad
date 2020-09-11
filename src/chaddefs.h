@@ -62,6 +62,7 @@ typedef void (*VoidFn)();
 
 struct Keyword {
     char name[MaxNameSize];             // word name, local copy is needed
+    char help[MaxAnchorSize];           // help anchor name
     VoidFn ExecFn;                      // C functions for compile/execute
     VoidFn CompFn;
     cell length;                        // size of definition in code space
@@ -143,7 +144,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define zjump  (5 << 13)
 #define call   (6 << 13)
 #define litx   (28 << 11)
-#define copid  (29 << 11)
+#define copop  (29 << 11)
 #define lit    (15 << 12)
 
 #endif

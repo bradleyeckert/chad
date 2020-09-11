@@ -1,10 +1,15 @@
 \ Now let's get some I/O set up. ScreenProfile points to a table of xts.
 
 there
-variable ScreenProfile
+
+\ Equates take up no code space. Have as many as you want.
+0 equ 'TXbuf  							<a 1.6100 -- ioa> \ output register
+2 equ 'TXbusy 							<a 1.6110 -- ioa> \ tx busy flag
+
+variable ScreenProfile					<a 1.7000 -- addr>
 : ExecScreen  ( n -- ) ScreenProfile @ execute execute ;
-: emit  0 ExecScreen ;
-: cr    1 ExecScreen ;
+: emit  0 ExecScreen ;					<a 6.1.1320 x -->
+: cr    1 ExecScreen ;					<a 6.1.0990 -->
 
 \ stdout is the screen:
 
@@ -13,8 +18,8 @@ variable ScreenProfile
 
 11 |bits|
 : stdout_table  exec1: [	\ The xts are less than 2048
-    ' _emit | ' _cr 
-] literal ; 
+    ' _emit | ' _cr
+] literal ;
 
 ' stdout_table ScreenProfile !	\ assign it
 

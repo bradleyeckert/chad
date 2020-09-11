@@ -18,6 +18,7 @@
 #define LineBufferSize 256      /* Size of line buffer                      */
 #define MaxKeywords   2000      /* Number of headers                        */
 #define MaxNameSize     32      /* Number of chars in a name (less 1)       */
+#define MaxAnchorSize   32      /* Number of chars in an anchor string (-1) */
 #define MaxFiles        20      /* Max depth of file nesting                */
 #define MaxWordlists    20      /* Max number of wordlists                  */
 

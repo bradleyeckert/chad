@@ -1,9 +1,14 @@
 \ Application example
 
-include nucleus.f
-include redirect.f
-include numout.f
-include frame.f
+\ To load: With your working directory here, type:
+\ ..\chad include myapp.f  (in Windows), or
+\ ../chad include myapp.f  (in Linux)
+
+include ../core.f
+include ../coreext.f
+include ../redirect.f
+include ../numout.f
+include ../frame.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
@@ -27,8 +32,8 @@ include frame.f
 
 ' fib resolves cold
 
-: frtest1  2 >r 1 >r  6 5 4 3  2 frame  spstat . cr
-          unframe r> . r> .  . . . . ;
+: frtest1  2 >r 1 >r  6 5 4 3  2 f[  spstat . cr
+          ]f r> . r> .  . . . . ;
 
 .( Total instructions: ) there . cr
 \ 0 there dasm

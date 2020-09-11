@@ -5,48 +5,48 @@
 there
 decimal
 variable hld 							\ numeric conversion pointer
+32 equ bl								<a 6.1.0770 -- ' '>
 
-: count   dup 1+ swap c@ ; 				\ 17.6.1.0245  a u -- a+1 u-1
-: decimal 10 base c! ;                  \ 6.1.1170  --
-: hex     16 base c! ;                  \ 6.2.1660  --
-
-: type    dup if                        \ 6.1.2310  addr len -- 
+: count   dup 1+ swap c@ ; 				<a 17.6.1.0245 a u -- a+1 u-1>
+: decimal 10 base ! ;                   <a 6.1.1170 -->
+: hex     16 base ! ;                   <a 6.2.1660 -->
+: type    dup if                        <a 6.1.2310 addr len -->
 			for  count emit  next  drop
           else  2drop
           then
 ;
-: s>d     dup 0< ;                      \ 6.1.2170  n -- d
-: space   bl emit ;                     \ 6.1.2220  --
-: spaces  dup 1- 0< if  drop exit  then \ 6.1.2230  n --
-          for space next ;    
+: s>d     dup 0< ;                      <a 6.1.2170 n -- d>
+: space   bl emit ;                     <a 6.1.2220 -->
+: spaces  dup 1- 0< if  drop exit  then <a 6.1.2230 n -->
+          for space next ;
 
 \ Numeric conversion, from eForth mostly.
 
 : digit   dup 10 - 0< 6 invert and + [char] 7 + ;
-: <#      dm-size  hld ! ;              \ 6.1.0490
-: hold    hld dup >r @ 1- dup r> ! c! ; \ 6.1.1670
+: <#      dm-size  hld ! ;              <a 6.1.0490 ud -- ud'>
+: hold    hld dup >r @ 1- dup r> ! c! ; <a 6.1.1670 c -->
 : _#_     um/mod swap digit hold ;
-: #       dup  base c@ >r  if           \ ud -- ud/base
-              0 r@ um/mod r> swap       \ 6.1.0030
+: #       dup  base @ >r  if            <a 6.1.0030 ud -- ud/base>
+              0 r@ um/mod r> swap
               >r _#_ r> exit
           then  r> _#_ 0
 ;
-: #s      begin # 2dup or 0= until ;    \ 6.1.0050
-: sign    0< if [char] - hold then ;    \ 6.1.2210
-: #>      2drop hld @ dm-size over - ;  \ 6.1.0040
-: s.r     over - spaces type ;          \ length width --  
-: d.r     >r dup >r dabs         		\ 8.6.1.1070  d width --
+: #s      begin # 2dup or 0= until ;    <a 6.1.0050 d -- 00>
+: sign    0< if [char] - hold then ;    <a 6.1.2210 n -->
+: #>      2drop hld @ dm-size over - ;  <a 6.1.0040 d -- addr u>
+: s.r     over - spaces type ;          \ length width --
+: d.r     >r dup >r dabs         		<a 8.6.1.1070 d width -->
           <# #s r> sign #> r> s.r ;
-: u.r     0 swap d.r ;                  \ 6.2.2330  u width --
-: .r      >r s>d r> d.r ;               \ 6.2.0210  n width --
-: d.      0 d.r space ;                 \ 8.6.1.1060  d --
-: u.      0 d. ;                        \ 6.1.2320  u --
-: .       base c@ 10 xor if             \ 6.1.0180  n|u
+: u.r     0 swap d.r ;                  <a 6.2.2330 u width -->
+: .r      >r s>d r> d.r ;               <a 6.2.0210 n width -->
+: d.      0 d.r space ;                 <a 8.6.1.1060 d -->
+: u.      0 d. ;                        <a 6.1.2320 u -->
+: .       base @ 10 xor if              <a 6.1.0180 n|u -->
              u. exit                    \           unsigned if hex
           then  s>d d. ;                \           signed if decimal
-: ?       @ . ;                         \ 15.6.1.0220  a --
+: ?       @ . ;                         <a 15.6.1.0220 a -->
 : <#>     >r  <# negate begin # next #s #> ;  \ ud digits-1
-: h.x     base c@ >r hex  0 swap <#> r> base c!  type space ;
+: h.x     base @ >r hex  0 swap <#> r> base !  type space ;
 
 there swap - . .( instructions used by numeric output) cr
 
