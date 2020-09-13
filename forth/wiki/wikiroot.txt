@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <title>Root Reference</title>
+    <link rel="stylesheet" href="doc.css">
+    <!--[if IE]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+<body>
+<h1>Root Reference</h1>
+<hr>
+<p>
+This wordlist is provided by <tok>chad</tok> to enable you to compile 
+and execute Forth code in a way that's binary compatible with the
+<tok>chad</tok> processor.
+<tok>chad</tok> is a simulation environment and development platform.
+</p>
+<p>
+Root words can't be compiled into in definitions.
+If you need to compile one, define its equivalent in Forth.
+It's possible to invent a mechanism by which <tok>chad</tok>
+would compile C functions into Forth definitions.
+Unfortunately, that opens a Pandora's box.
+So, we don't do it. 
+</p>
+<hr>
+\
+=1.0000: root ( -- wid )
+ chad's built-in words (defined in `chad.c`) use this wordlist.
+=1.0010: _forth ( -- wid )
+ The wordlist used by most Forth definitions.
+=1.0020: cm-writable ( -- addr )
+ The first writable address in code memory.
+ This is usually 0 when the ROM is being built.
+ Use the write-protect command to end access to ROM.
+=1.0030: cm-size ( -- n )
+ Size of code memory space in bytes
+=1.0040: dm-size ( -- n )
+ Size of data memory space in bytes
+=1.0050: cellbits ( -- n )
+ Bits per cell, between 16 and 32.
+=1.0060: cell ( -- n )
+ Number of bytes in a cell.
+ Used for addressing cells when address units are in bytes.
+=1.0070: dp ( -- addr )
+ A variable pointing to the next free byte in data space.
+=1.0080: stats ( -- )
+ Prints simulator statistics.
+=1.0090: verbosity ( flags -- )
+ There are four bit flags in the verbosity setting that control what the
+ interpreter prints out.
+
+H<ul>
+-`1` enables line printing. Each line of input text is echoed.
+-`2` enables printing of each blank delimited token and its stack effects.
+-`4` enables machine level instruction trace in the simulator.
+-`8` prints out the source remaining after >IN.
+H</ul>
+
+ Options `1` and `2` (or both, `1` | `2` = `3`) show you what's going on
+ in the chad interpreter (known in Forth as the QUIT loop).
+
+ Option `4` is a machine level trace.
+ You get a detailed output log to the terminal.
+ If you use it, you are probably making your code too complex.
+ Maybe you should re-factor or try something different.
+ Stackrobatics usually means you need to re-think your approach.
+ But it does look cool and it's an easy way to see what your code is doing
+ in each instruction.
+=1.0100: load-code ( <filename> -- )
+ Loads the code space from a binary file.
+
+ The word data types of code and data are simply cast to `char*` so the
+ binary is not endian-agnostic. This only matters if your desktop is
+ big-endian. The rest of the world is little-endian.
+
+=1.0110: save-code ( <filename> -- )
+ Saves the code space to a binary file.
+=1.0120: load-data ( <filename> -- )
+ Loads the data space from a binary file.
+=1.0130: save-data ( <filename> -- )
+ Saves the data space to a binary file.
+=1.0140: equ ( x <name> -- )
+ A synonym of constant that's guaranteed to not use any target resources
+ for its definition. It creates a word that pushes x onto the stack.
+=1.0150: assert ( n1 n2 -- )
+ Displays an error message if n1 <> n2. n1 is actual, n2 is expected.
+=1.0200: .s ( ? -- ? )
+ Copy and display the values currently on the data stack.
+ The interpreter does this for you if the stack is not empty:
+ The stack is printed between `\` and `ok>`.
+=1.0210: see ( <name> -- )
+ Display the named word’s definition.
+=1.0220: dasm ( xt len -- )
+ Disassemble `len` words of the code space starting at `xt`.
+=1.0230: sstep ( xt len -- )
+ Runs the simulator one step at a time for the number of steps
+ or until the return stack underflows, whichever comes first.
+ It does this by setting bit 2 in the verbosity setting during stepping.
+
+ `4 verbosity` does the same thing.
+ In that mode, invoking the simulator produces a log output listing.
+ Make sure you use `0 verbosity` after getting the log because it's easy
+ to trigger a lot more data than you want.
+=1.0240: words ( -- )
+ List the definition names in the first word list of the search order.
+=1.0250: bye ( -- )
+ Return control to the host operating system.
+=1.0260: [if] ( flag -- )
+ If flag is true, do nothing. Otherwise, skipping leading spaces, parse and
+ discard space delimited words from the parse area, including nested
+ occurrences of `[if] ... [then]` and `[if] ... [else] ... [then]`, until
+ either `[else]` or `[then]` has been parsed and discarded.
+ if the parse area becomes exhausted, it is refilled.
+ If the end of the input buffer is reached and cannot be refilled before
+ the terminating `[else]` or `[then]` is parsed, an error message is issued.
+=1.0270: [then] ( -- )
+ Does nothing. `[if]`, `[then]`, and `[else]` are immediate words.
+=1.0280: [else] ( -- )
+ Parse and discard space-delimited words from the parse area,
+ including nested occurrences of `[if] ... [then]`
+ and `[if] ... [else] ... [then]`,
+ until the word `[then]` has been parsed and discarded.
+
+=1.0290: [undefined] ( <name> -- flag )
+ Parse name delimited by a space. Return a false flag if name is the name
+ of a definition in code space; otherwise return a true flag.
+ `[undefined]` is an immediate word.
+=1.0300: [defined] ( <name> -- flag )
+ Parse name delimited by a space. Return a true flag if name is the name
+ of a definition in code space; otherwise return a false flag.
+ `[defined]` is an immediate word.
+=1.0400: . ( n -- )
+ Display signed `n` using the current `base`. The range of `n` is:
+H<ul>
+--32768 to 32767 for 16-bit cells
+--131072 to 131071 for 18-bit cells
+--2147483648 to 2147483647 for 32-bit cells
+H</ul>
+=1.0410: d. ( d -- )
+ Display signed `d` using the current `base`. The range of `d` is:
+H<ul>
+--2147483648 to 2147483647 for 16-bit cells
+--17179869184 to 17179869183 for 18-bit cells
+--9223372036854775808 to 9223372036854775807 for 32-bit cells
+H</ul>
+=1.0420: forth ( -- )
+ Replace the top of the search order with the `forth-wordlist` wid.
+ You can see the search order at any time by typing `order`.
+=1.0430: assembler ( -- )
+ Replace the top of the search order with the `asm` wid.
+ You can see the search order at any time by typing `order`.
+=1.0440: definitions ( -- )
+ Make the compilation word list the same as the first word list in the
+ search order. The names of subsequent definitions will be placed in the
+ compilation word list. Subsequent changes in the search order will not
+ affect the compilation word list.
+=1.0450: get-current ( -- wid )
+ Return `wid`, the identifier of the compilation word list.
+=1.0460: set-current ( wid -- )
+ Set the compilation word list to the word list identified by `wid`.
+=1.0470: get-order ( -- widN..wid1 N )
+ Returns the number of word lists `N` in the search order and the word list
+ identifiers `widN` ... `wid1` identifying these word lists.
+ `wid1` identifies the word list that is searched first, and
+ `widN` the word list that is searched last. The search order is unaffected.
+=1.0480: set-order ( widN..wid1 N -- )
+ Set the search order to the word lists identified by `widN` ... `wid1`.
+ Subsequently, word list `wid1` will be searched first, and word list
+ `widN` searched last.
+ If `N` is zero, empty the search order.
+ If `N` is minus one, set the search order to the implementation-defined
+ minimum search order. The minimum search order shall include the words
+ `forth-wordlist` and `set-order`.
+=1.0490: only ( -- )
+ Set the search order to the implementation-defined minimum search order.
+ In this case, `root` `forth-wordlist`.
+=1.0500: previous ( -- )
+ Perform the equivalent of `drop` on the search order.
+ Transform the search order consisting of `widN` ... `wid2`,`wid1`
+ (where `wid1` is searched first) into `widN` ... `wid2`.
+ An ambiguous condition exists if the search order was already empty.
+=1.0510: also ( -- )
+ Perform the equivalent of `dup` on the search order.
+ Transform the search order consisting of `widN` ... `wid1`
+ (where `wid1` is searched first) into `widN` ... `wid1`,`wid1`.
+=1.0520: order ( -- )
+ Display the word lists in the search order in their search order
+ sequence, from first searched to last searched.
+ Also display the word list into which new definitions will be placed.
+=1.0530: +order ( wid -- )
+ Append `wid` to the top of the search order.
+=1.0540: lexicon ( <name> -- )
+ Create a new wordlist `name` whose `wid` has `name` associated with
+ such that `order` will display it. When executed, `name` overwrites the
+ top of the search order with `wid`.
+=1.1000: include ( <filename> -- )
+ Open the file specified by `filename` and make it the input source.
+ Repeat until end of file: read a line from the file, fill the input
+ buffer from the contents of that line, set >IN to zero, and interpret.
+ Text interpretation begins at the start of the file.
+
+ `include` maintains a file stack. When the end of the file is reached,
+ close the file and drop back to the previous file (or stdin).
+ If an error occurs, pop and close each open file, reporting the offending
+ line numbers and contents.
+=1.1010: ( ( ccc<paren> -- )
+ Parse ccc delimited by `)` (right parenthesis) and discard it.
+ If there is no `)`, the effect is the same as `\`.
+ `(` is an immediate word.
+=1.1020: \ ( ccc<EOL> -- )
+ Parse ccc to end-of-line and discard it.
+ `\` is an immediate word.
+=1.1030: .( ( ccc) -- )
+ Parse ccc delimited by `)` (right parenthesis) and print it.
+ If there is no `)`, print the remainder of the line.
+=1.1040: constant ( x <name> -- )
+ Create a word that pushes `x` onto the stack. Same as `equ`.
+=1.1050: aligned ( addr -- a-addr )
+ `a-addr` is the first aligned address greater than or equal to `addr`.
+=1.1060: align ( -- )
+ If the data-space pointer is not aligned, reserve enough space to align it.
+=1.1070: char ( <c> -- n )
+ Parse name delimited by a space. Put the value of its first UTF-8
+ character onto the stack.
+=1.1080: chars ( n1 -- n2 )
+ `n2` is the size in address units of `n1` characters.
+ In byte-addressed machines like `chad`, it has no effect.
+=1.1090: cr ( -- )
+ Cause subsequent output to appear at the beginning of the next line.
+=1.1100: create ( <name> -- )
+ Parse name delimited by a space. Create a definition for name whose
+ execution semantics return the current `dp`.
+ If the data-space pointer is not aligned, reserve enough data space to
+ align it. The new data-space pointer defines name’s data field.
+
+ Since `create` can't be used in definitions, it can't be used with
+ `does>`.
+=1.1110: decimal ( -- )
+ Set the numeric conversion radix (`base`) to ten (decimal).
+=1.1120: hex ( -- )
+ Set `base` to 16.
+=1.1130: variable ( <name> -- )
+ Create a definition for `name` with the execution semantics defined below.
+ Reserve one cell of data space at an aligned address.
+
+ `name` is referred to as a “variable”.
+
+ `name` Execution: ( -- a-addr ) where
+ `a-addr` is the address of the reserved cell.
+=1.1140: cvariable ( <name> -- )
+ Create a definition for `name` with the execution semantics defined below.
+ Reserve one byte of data space.
+
+ `name` Execution: ( -- c-addr ) where
+ `c-addr` is the address of the reserved byte.
+=1.1150: buffer: ( n <name> -- )
+ Create a definition for `name` with the execution semantics defined below.
+ Reserve `n` bytes of data space.
+
+ `name` Execution: ( -- c-addr ) where
+ `c-addr` is the address of the reserved byte.
+ The program is responsible for initializing the contents.
+=1.1160: [char] ( <c> -- )
+ Parse name delimited by a space. Put the value of its first UTF-8
+ character onto the stack.
+=1.1170: [ ( -- )
+ Enter interpretation state. `[` is an immediate word.
+=1.1180: ] ( -- )
+ Enter compilation state. `]` is an immediate word.
+=1.1190: ' ( <name> -- xt )
+ Parse name delimited by a space.
+ Find name and return `xt`, the execution token for name.
+ An error is reported if name is not found.
+ When interpreting, `' xyz execute` is equivalent to `xyz`.
+=1.1200: ['] ( <name> -- )
+ Parse name delimited by a space. Find name. Append the run-time semantics
+ given below to the current definition.
+ An error is reported if name is not found.
+
+ Run-time: ( -- xt ) Place name’s execution token xt on the stack.
+ The execution token returned by the compiled phrase
+ `['] X` is the same value returned by `' X` outside of compilation state.
+=1.1210: : ( <name> -- )
+ Parse name delimited by a space. Create a definition for name,
+ called a “colon definition”. Enter compilation state and start the
+ current definition, producing colon-sys.
+ Append the initiation semantics given below to the current definition.
+
+ The execution semantics of name will be determined by the words compiled
+ into the body of the definition. The current definition is findable in the dictionary, unlike ANS Forth.
+
+ `:` does not change the stack, another entitlement not given by ANS.
+ You can feed in literal data from the outside, such as:
+
+ `123 : foo literal + ;`
+
+ `chad` uses separate code and header spaces, so definitions that compile
+ without return can fall through to the next definition.
+
+ Execution: ( i * x -- j * x )
+ Execute the definition name. The stack effects i * x and j * x represent
+ arguments to and results from name, respectively.
+=1.1220: :noname ( -- xt )
+ Push the code pointer onto the stack. This is your `xt`.
+ Start a new definition in compilation state.
+ The execution semantics of `xt` will be determined by the words compiled
+ into the body, just like `:`.
+ This definition can be executed later by using `xt` `execute`.
+=1.1230: exit ( -- )
+ If the previous instruction was a call to a word not marked by
+ `no-tail-recursion`, convert it to a jump; if the previous instruction
+ was a literal, set its `RET` bit; if the previous instruction was an
+ ALU instruction that didn't change the return stack pointer,
+ set its `RET` bit. Otherwise, compile a `RET` instruction.
+=1.1240: ; ( -- )
+ Compile an `exit` and return to interpret state.
+=1.1250: CODE ( <name> -- 0 )
+ Similar to `:` except that it pushes the `asm` wordlist to the top of the
+ search order and leaves a 0 on the stack. Instruction modifiers "or" data
+ to the stack to build the instruction(s).
+=1.1260: literal ( x -- )
+ Compilation: ( x -- )
+ Append the run-time semantics given below to the current definition.
+
+ Run-time: ( -- x ) Place x on the stack.
+=1.1270: immediate ( -- )
+ Make the most recent definition an immediate word.
+ It changes the compilation semantics to match the execution semantics.
+=1.1280: marker ( <name> -- )
+ Parse name delimited by a space. Create a definition for name with the
+ execution semantics defined below.
+
+ `name` Execution: ( -- )
+ Restore all dictionary allocation and search order pointers to the state
+ they had just prior to the definition of name.
+ Remove the definition of name and all subsequent definitions.
+ Restoration of any structures still existing that could refer to deleted
+ definitions or deallocated data space is not necessarily provided.
+
+ Typical usage: `[defined] -foo [if] -foo [else] marker -foo [then]`
+=1.1290: there ( -- taddr )
+ Push the code pointer onto the stack.
+=1.1300: torg ( taddr -- )
+ Set the code pointer.
+=1.1310: later ( <name> -- )
+ Define a forward reference. Compile a jump instruction whose address
+ will be resolved later by `resolves`. For example:
+
+ Some Forths use `ahead` for forward references, but that's kind of a
+ control stack hack if you span a lot of code before resolving the
+ reference.
+=1.1320: resolves ( xt <name> -- )
+ Resolve a forward reference created by `later` by patching its jump
+ address. An error occurs if `name` wasn't created by `later`.
+=1.1330: macro ( -- )
+ Make the most recent definition a macro. When a macro is compiled,
+ its code is copied verbatim and the trailing RET bit is stripped.
+=1.1340: write-protect ( -- )
+ Write protect the bottom of code space. This freezes the design so that
+ further writes will trigger an error. You would use this to boot up as
+ if you're running a target system without the `chad` interpreter.
+=1.1350: no-tail-recursion ( -- )
+ Mark the most recent definition as call-only. When an `exit` compiles
+ or `;` ends a definition, it won't convert the call to a jump.
+=1.1360: |bits| ( n -- )
+ Sets the number of bits your lookup table will need,
+ based on the largest value in the table. It's used by `|`.
+
+ Code space is not randomly readable.
+ As a result, lookup tables that aren't in data space are built with code.
+ If `|bits|` is 11 or less, each table entry requires one instruction.
+ If `|bits|` is 22 or less, each table entry requires two instructions.
+=1.1370: | ( x -- )
+ Compiles literal instruction(s) with the RET bit set. Sample syntax:
+
+ `: table  exec2: [ 123 | 456 | 789 | 321 ] literal ;`
+=1.1380: <a ( ccc> -- )
+ Add an anchor tag to the current or last header created.
+ The anchor tag consists of a reference name (suitable for a HTML hyperlink)
+ followed by one space and a stack picture.
+=1.1390: gendoc ( -- )
+ HTML documentation generator that compiles a master file
+ for the application.
+
+
+=1.2000: nop ( -- )
+ Do nothing.
+#
+_
+H<h2>Compiler tools</h2>
+_
+
+=1.2010: invert ( x -- ~x )
+ Bitwise invert `x`.
+=1.2020: 2* ( n -- n*2 )
+ Shift `n` left one place. The MSB carries out.
+=1.2030: 2/ ( n -- n/2 )
+ Shift signed `n` right one place. The LSB carries out.
+=1.2040: 2*c ( n -- n*2+c )
+ Shift `n` left one place, shifting the carry into LSB.
+ The MSB carries out.
+=1.2050: 2/c ( n -- c+n/2 )
+ Shift `n` right one place, shifting the carry into MSB.
+ The LSB carries out.
+=1.2060: xor ( n1 n2 -- n3 )
+ x3 is the bit-by-bit exclusive-or of x1 with x2.
+=1.2070: and ( n1 n2 -- n3 )
+ x3 is the bit-by-bit logical-and of x1 with x2.
+=1.2080: + ( n1 n2 -- n3 )
+ Add n2 to n1, giving the sum n3. The carry is modified.
+=1.2090: - ( n1 n2 -- n3 )
+ Subtract n2 from n1, giving the difference n3. The carry is modified.
+=1.2100: dup ( x -- x x )
+ Duplicate x.
+=1.2110: over ( x1 x2 -- x1 x2 x1 )
+ Place a copy of x1 on top of the stack.
+=1.2120: swap ( x1 x2 -- x2 x1 )
+ Exchange the top two stack items.
+=1.2130: drop ( x -- )
+ Remove x from the stack.
+=1.2140: nip ( x1 x2 -- x2 )
+ Drop the first item below the top of stack.
+=1.2150: 0= ( x -- flag )
+ `flag` is true if and only if `x` is equal to zero.
+=1.2160: 0< ( n -- flag )
+ `flag` is true if and only if `n` is less than zero.
+=1.2170: >r ( x --|-- x )
+ Move x to the return stack. "to-r"
+=1.2180: r> ( -- x|x -- )
+ Move x from the return stack to the data stack. "r-from".
+=1.2190: r@ ( -- x|x -- x )
+ Copy x from the return stack to the data stack. "r-fetch"
+=1.2200: rshift ( x1 u -- x2 )
+ Perform a logical right shift of u bit-places on x1, giving x2.
+ Put zeroes into the most significant bits vacated by the shift.
+ The LSBs of `u` control a barrel shifter.
+ If the cell size is not an exact power of two, the shift capability
+ is limited to the next smaller exact value.
+ For example, an 18-bit cell has a maximum shift count of 15.
+ An ambiguous condition exists if u is greater than or equal to
+ the number of bits in a cell or the next lower exact power of two
+ in the case of cells that are not a power of two wide.
+=1.2210: lshift ( x1 u -- x2 )
+ Perform a logical left shift of u bit-places on x1, giving x2.
+ Put zeroes into the least significant bits vacated by the shift.
+ An ambiguous condition exists if u is greater than or equal to
+ the number of bits in a cell or the next lower exact power of two
+ in the case of cells that are not a power of two wide.
+=1.2500: carry ( -- n )
+ Read the carry bit.
+#
+_
+H<h2>Forth primitives</h2>
+_
+
+=1.2510: w ( -- x )
+ Read the `w` register.
+=1.2520: >carry ( n -- )
+ Set the carry to the LSB of `n`. Also set the `w` register to `n`.
+=1.2530: _+ ( n1 n2 -- n3 )
+ Same as `+` but does not modify the carry.
+=1.2540: _@ ( addr -- addr )
+ Begins a memory read operation by creating a read-enable strobe.
+=1.2550: _@_ ( addr -- )
+ Ends a memory read operation. It can immediately follow a `_@`.
+=1.2560: _! ( x addr -- x )
+ Begins a memory write operation by creating a write-enable strobe.
+ It also drops the address from the stack.
+ An additional drop is needed to implement Forth's `!`.
+ A Forth equivalent of this instruction is "tuck !".
+=1.2570: _io! ( x addr -- x )
+ Begins an I/O write operation by creating a io_write strobe.
+ It also drops the address from the stack.
+=1.2580: _io@ ( addr -- addr )
+ Begins an I/O read operation by creating a io_read strobe.
+=1.2590: _io@_ ( addr -- )
+ Ends an I/O read operation. It can immediately follow a `_io@`.
+=1.2600: 2dupand ( u v -- u v u&v )
+ Same as `2dup and`.
+=1.2610: 2dupxor ( u v -- u v u^v )
+ Same as `2dup xor`.
+=1.2620: 2dup+ ( u v -- u v u+v )
+ Same as `2dup +`.
+=1.2630: 2dup- ( u v -- u v u-v )
+ Same as `2dup -`.
+=1.2640: mask ( addr -- cnt )
+ A helper for `c@`. Converts the address to a shift count and loads
+ FFh into the `w` register.
+=1.2650: wand ( x -- x&w )
+ Logical and `x` with the `w` register.
+=1.2660: overand ( u v -- u u&v )
+ Same as `over and`.
+=1.2670: overxor ( u v -- u u^v )
+ Same as `over xor`.
+=1.2680: over+ ( u v -- u u+v )
+ Same as `over +` but does not modify carry.
+=1.2690: over- ( u v -- u u-v )
+ Same as `over -` but does not modify carry.
+=1.2700: dup>r ( x -- x|-- x )
+ Same as `dup >r`.
+=1.2710: rdrop ( --|x -- )
+ Same as `r> drop`.
+=1.2720: +c ( u v -- u+v+c )
+ Add `u` to `v` with carry, giving the sum `u+v+c`. The carry is modified.
+=1.2730: dup@ ( addr -- addr x )
+ Ends a memory read operation while duplicating addr.
+ It can immediately follow a `_@`.
+=1.2740: spstat ( -- rp<<8|sp )
+ Get stack pointer status packed as `rp` | `sp`.
+ The return stack pointer field is left shifted by 8.
+ Both are unsigned.
+=1.2750: (R-1)@ ( -- x-1|x -- x )
+ Push R-1 onto the stack for use as a decrementing counter. See `next`.
+=1.2760: _next_ ( n -- flag|x -- n )
+ Write the counter back to the return stack and check its sign.
+ See `next`.
+=1.2900: begin ( -- )
+ Compilation: ( C: -- dest )
+ Put the next location for a transfer of control, dest, onto the control
+ flow stack, which is a separate stack dedicated to control only.
+ Append the run-time semantics given below to the current definition.
+
+ Run-time: ( -- ) Continue execution.
+
+ Examples: `begin again`, `begin until`, and `begin while repeat`.
+#
+_
+H<h2>Elided primitives</h2>
+_
+
+=1.2910: again ( -- )
+ Compilation: ( C: dest -- )
+ Append the run-time semantics given below to the current definition,
+ resolving the backward reference dest.
+
+ Run-time: ( -- )
+ Continue execution at the location specified by dest.
+ If no other control flow words are used,
+ any program code after `again` will not be executed.
+
+ Example: `begin again`.
+=1.2920: until ( -- )
+ Compilation: ( C: dest -- )
+ Append the run-time semantics given below to the current definition,
+ resolving the backward reference dest.
+
+ Run-time: ( x -- ) If all bits of x are zero, continue execution at
+ the location specified by dest.
+
+ Example: `begin until`.
+=1.2930: if ( -- )
+ Compilation: ( C: -- orig )
+ Put the location of a new unresolved forward reference orig onto the
+ control flow stack. Append the run-time semantics given below to the
+ current definition. The semantics are incomplete until orig is resolved,
+ e.g., by `then` or `else`.
+
+ Run-time: ( x -- )
+ If all bits of x are zero, continue execution at the location specified
+ by the resolution of orig.
+=1.2940: else ( -- )
+ Compilation: ( C: orig1 -- orig2 )
+ Put the location of a new unresolved forward reference orig2 onto the
+ control flow stack. Append the run-time semantics given below to the
+ current definition. The semantics will be incomplete until orig2 is
+ resolved (e.g., by `then`). Resolve the forward reference
+ orig1 using the location following the appended run-time semantics.
+
+ Run-time: ( -- )
+ Continue execution at the location given by the resolution of orig2.
+=1.2950: then ( -- )
+ Compilation: ( C: orig -- )
+ Append the run-time semantics given below to the current definition.
+ Resolve the forward reference orig using the location of the appended
+ run-time semantics.
+
+ Run-time: ( -- ) Continue execution.
+=1.2960: while ( -- )
+ Compilation: ( C: dest -- orig dest )
+ Put the location of a new unresolved forward reference orig onto the
+ control flow stack (internal to `chad.c`), under the existing dest.
+ Append the run-time semantics given below to the current definition.
+ The semantics are incomplete until orig and dest are resolved
+ (e.g., by `repeat`).
+
+ Run-time: ( x -- ) If all bits of x are zero,
+ continue execution at the location specified by the resolution of orig.
+=1.2970: repeat ( -- )
+ Compilation: ( C: orig dest -- )
+ Append the run-time semantics given below to the current definition,
+ resolving the backward reference dest.
+ Resolve the forward reference orig using the location following the
+ appended run-time semantics.
+
+ Run-time: ( -- ) Continue execution at the location given by dest.
+=1.2980: for ( -- )
+ Compilation: ( C: -- dest )
+ Compile `>r` and put the next location for a transfer of control, dest,
+ onto the control flow stack.
+ Append the run-time semantics given below to the current definition.
+
+ Run-time: ( -- ) Continue execution.
+
+ Example: `for next`.
+=1.2990: next ( -- )
+ Compilation: ( C: dest -- )
+ Append the run-time semantics given below to the current definition,
+ resolving the backward reference dest.
+
+ Run-time: ( -- ) ( R: x -- x-1 | )
+ Decrement and test R. If R is less than 0, drop it from the return stack.
+ Otherwise, continue execution at the location specified by dest.
+
+ Example: `for next`.
+=1.5000: asm ( -- wid )
+ The wordlist used by the assembler.
+#
+_
+H<h2>Flow Control</h2>
+_
+=

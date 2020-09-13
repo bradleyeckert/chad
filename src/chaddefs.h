@@ -69,11 +69,13 @@ struct Keyword {
     cell w;                             // optional data
     cell w2;
     cell target;                        // target address if used
-    uint16_t references;
+    uint16_t references;                // how many times it has been referenced
     uint16_t link;                      // enough for 64k headers
     cell *aux;                          // pointer to aux C data 
     uint8_t notail;                     // inhibit tail recursion
     uint8_t isALU;                      // is an ALU word
+    uint8_t srcFile;                    // source file ID
+    uint16_t srcLine;                   // source line number
 };
 
 int chadSpinFunction(void);             // external function waiting for keyboard input

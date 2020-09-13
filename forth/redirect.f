@@ -3,13 +3,13 @@
 there
 
 \ Equates take up no code space. Have as many as you want.
-0 equ 'TXbuf  							<a 1.6100 -- ioa> \ output register
-2 equ 'TXbusy 							<a 1.6110 -- ioa> \ tx busy flag
+0 equ 'TXbuf  							\ 2.2000 -- ioa \ output register
+2 equ 'TXbusy 							\ 2.2010 -- ioa \ tx busy flag
 
-variable ScreenProfile					<a 1.7000 -- addr>
+variable ScreenProfile					\ 2.2100 -- addr
 : ExecScreen  ( n -- ) ScreenProfile @ execute execute ;
-: emit  0 ExecScreen ;					<a 6.1.1320 x -->
-: cr    1 ExecScreen ;					<a 6.1.0990 -->
+: emit  0 ExecScreen ;					\ 2.2110 x --
+: cr    1 ExecScreen ;
 
 \ stdout is the screen:
 

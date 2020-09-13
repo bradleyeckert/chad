@@ -37,3 +37,11 @@ include ../frame.f
 
 .( Total instructions: ) there . cr
 \ 0 there dasm
+
+only forth
+gendoc ../wiki/wikiforth.txt html/forth.html
+previous
+gendoc ../wiki/wikiroot.txt html/root.html
+asm +order
+gendoc ../wiki/wikiasm.txt html/asm.html
+only forth

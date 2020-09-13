@@ -1,0 +1,48 @@
+<style>
+a:link {
+  color: green;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:visited {
+  color: blue;
+  background-color: transparent;
+  text-decoration: none;
+}
+
+a:hover {
+  color: red;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+a:active {
+  color: yellow;
+  background-color: transparent;
+  text-decoration: underline;
+}
+
+chad {
+color: #9900ff;
+}
+
+ref {
+color: #ff6600;
+}
+
+com {
+color: #339966;
+}
+
+tok {
+font-weight: bold;
+font-family: monospace;
+background-color: #dddddd;
+}
+
+p {  
+  text-indent: 1.0em;  
+}  
+
+</style>

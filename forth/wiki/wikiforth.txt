@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <title>Forth Reference</title>
+    <link rel="stylesheet" href="doc.css">
+    <!--[if IE]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+<body>
+<h1>Forth Reference</h1>
+<hr>
+<h2>Definitions in instruction memory</h2>
+<hr>
+\
+=2.0000: check_alignment
+ Compilation option: `1` to check address alignment and trigger an error
+ upon bad alignment, `0` for higher speed. Normally `0`.
+=2.0010: cold ( -- )
+ Boot vector forward reference.
+=2.0020: exception ( n -- )
+ Exception processing forward reference.
+=2.0100: noop ( -- )
+ A subroutine that does nothing. This is very useful in Forth.
+ For "lazy interrupts", it can be inserted where needed to improve
+ interrupt latency. 
+=2.0110: io@ ( addr -- n )
+ Fetch from an input device.
+=2.0120: io! ( n addr -- )
+ Store to an output device.
+=2.0130: = ( n1 n2 -- flag )
+ flag is true if and only if x1 is bit-for-bit the same as x2.
+=2.0140: < ( n1 n2 -- flag )
+ flag is true if and only if n1 is less than n2.
+=2.0150: > ( n1 n2 -- flag )
+ flag is true if and only if n1 is greater than n2.
+=2.0160: cell+ ( a-addr1 -- a-addr2 )
+ Add the size in address units of a cell to a-addr1, giving a-addr2.
+=2.0170: cells ( n -- n*2 )
+ n2 is the size in address units of n1 cells.
+=2.0210: @ ( addr -- x )
+ `x` is the value stored at a-addr.
+=2.0200: ! ( x addr -- )
+ Store `x` at a-addr.
+=2.0180: c! ( c addr -- )
+ Store `c` at addr.
+=2.0200: c@ ( addr -- c )
+ `c` is the byte stored at addr.
+=2.0190: w! ( w addr -- )
+ Store `w` at addr. Only applies to 32-bit machines.
+=2.0220: w@ ( addr -- w )
+ `w` is the 16-bit value stored at addr. Only applies to 32-bit machines.
+=2.0300: or ( n m -- n|m )
+ x3 is the bit-by-bit logical-or of x1 with x2.
+ In `chad`, `or` is made of `invert` and `and` instructions.
+ Most code can get by with `+` instead, if speed matters.
+=2.0310: rot ( x1 x2 x3 -- x2 x3 x1 )
+ Rotate the top three stack entries.
+=2.0320: execute ( xt -- )
+ Remove `xt` from the stack and perform the semantics identified by it.
+ Other stack effects are due to the word `execute`d
+=2.0330: 2dup ( d -- d d )
+ Duplicate cell pair x1 x2 (or `d`).
+=2.0340: 2drop ( d -- )
+ Drop cell pair x1 x2 (or `d`) from the stack.
+=2.0350: char+ ( a -- a+1 )
+ Add the size in address units of a character to c-addr1, giving c-addr2.
+ Same as `1+`.
+=2.0360: 1+ ( n -- n+1 )
+ Add 1 to `n`;
+=2.0370: 1- ( n -- n-1 )
+ Subtract 1 from `n`.
+=2.0380: negate ( n -- -n )
+ Negate `n`.
+=2.0390: tuck ( n1 n2 -- n2 n1 n2 )
+ Copy the first (top) stack item below the second stack item.
+=2.0400: +! ( n addr -- )
+ Add `n` to the single-cell number at a-addr.
+=2.0410: um* ( u1 u2 -- ud )
+ Multiply u1 by u2, giving the unsigned double-cell product ud.
+ All values and arithmetic are unsigned.
+=2.0420: um/mod ( ud u -- ur uq )
+ Divide `ud` by `u1`, giving the quotient `uq` and the remainder `ur`.
+ All values and arithmetic are unsigned.
+ An ambiguous condition exists if u1 is zero or if the quotient
+ lies outside the range of a single-cell unsigned integer.
+=2.0430: * ( n1 n2 -- n3 )
+ Multiply `n1` by `n2` giving the product `n3`.
+=2.0440: dnegate ( d -- -d )
+ Negate `d`.
+=2.0450: abs ( n -- u )
+ `u` is the absolute value of `n`.
+=2.0460: dabs ( d -- ud )
+ ud is the absolute value of d.
+=2.0470: /mod ( n1 n2 -- rem quot )
+ Divide `n1` by `n2`, giving the single-cell remainder `rem` and the
+ single-cell quotient `quot`. An ambiguous condition exists if `n2` is zero.
+=2.0480: mod ( n1 n2 -- rem )
+ Divide `n1` by `n2`, giving the single-cell remainder `rem`.
+ An ambiguous condition exists if `n2` is zero.
+=2.0490: / ( n1 n2 -- quot )
+ Divide `n1` by `n2`, giving the single-cell quotient `quot`.
+ An ambiguous condition exists if `n2` is zero.
+=2.0500: m* ( n1 n2 -- d )
+ `d` is the signed product of `n1` times `n2`.
+=2.0510: */mod ( n1 n2 n3 -- rem quot )
+ Multiply `n1` by `n2` producing the intermediate double-cell result d.
+ Divide d by `n3` producing the single-cell remainder `rem` and the
+ single-cell quotient `quot`.
+ An ambiguous condition exists if `n3` is zero, or if `quot` lies outside
+ the range of a single-cell signed integer.
+=2.0520: */ ( n1 n2 n3 -- n4 )
+ Multiply `n1` by `n2` producing the intermediate double-cell result d.
+ Divide d by `n3` giving the single-cell quotient `n4`.
+ An ambiguous condition exists if `n3` is zero or if `n4` lies
+ outside the range of a signed number.
+=2.0530: base ( -- a-addr )
+ `a-addr` is the address of a cell containing the current
+ number-conversion radix {2 ... 36}.
+=2.0540: state ( -- a-addr )
+ `a-addr` is the address of a cell containing the compilation-state flag.
+ `state` is true when in compilation state, false otherwise.
+
+ Note: A program shall not directly alter the contents of `state`.
+=2.0550: allot ( n -- )
+ If `n` is greater than zero, reserve n address units of data space.
+ If `n` is less than zero, release `n` address units of data space.
+ If `n` is zero, leave the data-space pointer unchanged.
+=2.0560: here ( -- addr )
+ `addr` is the data-space pointer. `: here dp @ ;`
+=2.0570: , ( x -- )
+ Reserve one aligned cell of data space and store `x` in the cell.
+=2.0580: c, ( c -- )
+ Reserve one byte of data space and store `c` in the byte.
+=2.0700: u< ( u1 u2 -- flag )
+ flag is true if and only if u1 is less than u2.
+=2.0710: min ( n1 n2 -- n3 )
+ n3 is the lesser of n1 and n2.
+=2.0720: max ( n1 n2 -- n3 )
+ n3 is the greater of n1 and n2.
+=2.0730: depth ( -- +n )
+ `+n` is the number of single-cell values contained in the
+ data stack before `+n` was placed on the stack.
+=2.0740: exec2: ( n -- )
+ Jump forward by `2*n` instructions in code.
+=2.0750: exec1: ( n -- )
+ Jump forward by `n` instructions in code.
+=2.1000: false ( -- false )
+ Return a `false` flag.
+=2.1010: true ( -- true )
+ Return a `true` flag.
+=2.1020: within ( u ulo uhi -- flag )
+ Perform a comparison of a test value n1 | u1 with a lower limit n2 | u2
+ and an upper limit n3 | u3,
+ returning true if either (n2 | u2 < n3 | u3 and (n2 | u2 <= n1 | u1 and n1 | u1 < n3 | u3))
+ or (n2 | u2 > n3 | u3 and (n2 | u2 <= n1 | u1 or n1 | u1 < n3 | u3)) is true, returning false otherwise. 
+ An ambiguous condition exists n1 | u1, n2 | u2, and n3 | u3
+ are not all the same type.
+=2.1030: <> ( n1 n2 -- flag )
+ flag is true if and only if `x1` is not bit-for-bit the same as `x2`.
+=2.1040: 0<> ( x y -- f )
+ flag is true if and only if `x` is not equal to zero.
+=2.1050: 0> ( n -- f )
+ flag is true if and only if `n` is greater than zero.
+=2.1060: u> ( u1 u2 -- flag )
+ flag is true if and only if `u1` is greater than `u2`.
+=2.1070: 2>r ( d -- | -- d )
+ Transfer cell pair x1 x2 to the return stack.
+ Semantically equivalent to `swap >r >r`.
+=2.1080: 2r> ( -- d | d -- )
+ Transfer cell pair x1 x2 from the return stack.
+ Semantically equivalent to `r> r> swap`.
+=2.1090: 2r@ ( -- d | d -- d )
+ Copy cell pair x1 x2 from the return stack.
+ Semantically equivalent to `r> r> 2dup >r >r swap`.
+=2.2000: 'TXbuf ( -- ioa )
+ 8-bit UART output buffer.
+=2.2010: 'TXbusy ( -- ioa )
+ UART busy flag.
+=2.2100: ScreenProfile ( -- addr )
+ Points to a table of `xt`s of terminal actions.
+ The actions in a table are:
+#
+H<ul>
+- `emit`
+- `cr`
+H</ul>
+=2.2110: emit ( x -- )
+ Send a character to the terminal.
+ The terminal is responsible for handling UTF-8 sequences.
+ `x` may be a wide character.
+=2.3000: hld ( -- c-addr )
+ A pointer variable for numeric conversion.
+=2.3010: bl ( -- ' ' )
+ `char` is the character value for a space.
+=2.3110: count ( a u -- a+1 u-1 )
+ Convert a counted string to an address and a length.
+ A counted string consists of a 1-byte length value (0 to 255)
+ along with that many byte-wide characters in data space.
+=2.3140: type ( c-addr u -- )
+ If `u` is greater than zero, display the character string specified by
+ c-addr and u. The output device should handle UTF-8 as a standard.
+=2.3150: s>d ( n -- d )
+ Convert the number n to the double-cell number d with the
+ same numerical value.
+=2.3160: space ( -- )
+ Display one space.
+=2.3170: spaces ( n -- )
+ If `n` is greater than zero, display `n` spaces.
+=2.3180: digit ( n -- char )
+ Convert `n` to an ASCII digit spanning '0' to '9' and 'A' to 'Z'.
+=2.3190: <# ( ud -- ud' )
+ Initialize the pictured numeric output conversion process.
+ In `chad`, numeric conversion is done at the top of data space:
+ `: <#  dm-size hld ! ;`.
+=2.3200: hold ( c -- )
+ Add `char` to the beginning of the pictured numeric output string.
+ An ambiguous condition exists if `hold` executes outside of a
+ `<# #>` delimited number conversion.
+=2.3210: # ( ud1 -- ud2 )
+ Divide `ud1` by the number in BASE giving the quotient `ud2` and the
+ remainder `n` where `n` is the least significant digit of `ud1`.
+ Convert `n` to external form and add the resulting character
+ to the beginning of the pictured numeric output string.
+ An ambiguous condition exists if `#` executes outside of
+ a `<# #>` delimited number conversion.
+=2.3220: #s ( ud -- 00 )
+ Convert one digit of `ud1` according to the rule for `#`.
+ Continue conversion until the quotient, `ud2`, is zero.
+ An ambiguous condition exists if `#s` executes outside of
+ a `<# #>` delimited number conversion.
+=2.3230: sign ( n -- )
+ If `n` is negative, add a minus sign to the beginning of the
+ pictured numeric output string.
+ An ambiguous condition exists if `sign` executes outside of
+ a `<# #>` delimited number conversion.
+=2.3240: #> ( ud -- c-addr u )
+ Drop `ud`.
+ Make the pictured numeric output string available as a character string.
+ `c-addr` and `u` specify the resulting character string.
+ A program may replace characters within the string.
+=2.3250: d.r ( d width -- )
+ Display `d` right aligned in a field `width` characters wide.
+ If the number of characters required to display `d` is greater than
+ `width`, all digits are displayed with no leading spaces in a field
+ as wide as necessary.
+=2.3260: u.r ( u width -- )
+ Display `u` right aligned in a field `width` characters wide.
+ If the number of characters required to display `width` is greater than
+ `width`, all digits are displayed with no leading spaces in a field as
+ wide as necessary.
+=2.3270: .r ( n width -- )
+ Display `n` right aligned in a field `width` characters wide.
+ If the number of characters required to display n1 is greater than
+ `width`, all digits are displayed with no leading spaces in a field
+ as wide as necessary.
+=2.3280: d. ( d -- )
+ Display d in free field format.
+=2.3290: u. ( u -- )
+ Display u in free field format.
+=2.3300: . ( n|u -- )
+ Display n in free field format.
+=2.3310: ? ( a -- )
+ Display the value stored at a-addr.
+=2.3320: h.x ( u n -- )
+ Display `u` in hex format using `n-1` digits.
+=2.2900: fpclear ( -- )
+ Clear the frame stack
+=2.2910: >mem ( n a -- a' )
+ Store `n` leaving `a` indexed to the next cell.
+=2.2920: mem> ( a -- a' n )
+ Pre-decrement `a` by 1 cell and fetch `a`.
+=2.2930: ds>mem ( ... n addr1 -- addr2 )
+ Move data stack to memory
+=2.2940: mem>ds ( addr1 -- ... addr2 )
+ Move memory to data stack
+=2.2950: f[ ( n -- )
+ Move the data stack to the frame stack, leaving `n` cells on top.
+ The return stack is emptied except for one cell to keep the sim running.
+=2.2960: ]f ( ? -- ? )
+ Restore the stacks saved by `f[`.
+=

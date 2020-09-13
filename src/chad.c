@@ -521,7 +521,7 @@ SV ListWords(int wid) {                 // in a given wordlist
     }
 }
 SV Words(void) {
-    ListWords(context());           // top of wordlist
+    ListWords(context());               // top of wordlist
     printf("\n");
 }
 
@@ -553,10 +553,13 @@ SV GetOrder(void) {
 }
 
 SV SetOrder(void) {
-    uint8_t len = Dpop();
+    int8_t len = Dpop();
     orders = 0;
-    for (int i = 0; i < len; i++)
-        OrderPush(Dpop());
+    if (len < 0) 
+        Only();
+    else
+        for (int i = 0; i < len; i++)
+            OrderPush(Dpop());
 }
 
 SI NotKeyword (char *key) {             // do a command, return 0 if found
@@ -571,6 +574,10 @@ SI NotKeyword (char *key) {             // do a command, return 0 if found
 }
 
 static uint32_t my (void) {return Header[me].w;}
+SI fileID = 0;                          // cumulative file ID
+struct FileRec FileStack[MaxFiles];
+SI filedepth = 0;                       // file stack
+
 SV doLITERAL  (void) { Literal(Dpop()); }
 SV Equ_Comp   (void) { Literal(my()); }
 SV Equ_Exec   (void) { Dpush(my()); }
@@ -598,6 +605,8 @@ SI AddHead (char* name, char* anchor) { // add a header to the list
         Header[hp].target = 0;
         Header[hp].notail = 0;
         Header[hp].isALU = 0;
+        Header[hp].srcFile = fileID;
+        Header[hp].srcLine = File.LineNumber;
         Header[hp].link = wordlist[current];
         Header[hp].references = 0;
         wordlist[current] = hp;
@@ -817,9 +826,7 @@ SV ddot (void) {                        // ( d -- )
 static char* buf;                       // line buffer
 SI maxlen;                              // maximum buffer length
 SI toin;                                // pointer to next character
-struct FileRec FileStack[MaxFiles];
-SI filedepth = 0;                       // file stack
-SI fileID = 0;                          // cumulative file ID
+static char FilePaths[MaxFilePaths*LineBufferSize];
 static char BOMmarker[4] = {0xEF, 0xBB, 0xBF, 0x00};
 
 SV SwallowBOM(FILE *fp) {               // swallow leading UTF8 BOM marker
@@ -830,14 +837,20 @@ SV SwallowBOM(FILE *fp) {               // swallow leading UTF8 BOM marker
     }
 }
 
+static FILE* fopenx(char* filename, char* fmt) {
+#ifdef MORESAFE
+    FILE* fp;
+    errno_t err = fopen_s(&fp, filename, fmt);
+    return fp;
+#else
+    return fopen(name, fmt);
+#endif
+}
+
 SV OpenNewFile(char *name) {            // Push a new file onto the file stack
     filedepth++;  fileID++;
     strmove (File.FilePath, name, LineBufferSize);
-#ifdef MORESAFE
-    errno_t err = fopen_s(&File.fp, name, "r");
-#else
-    File.fp = fopen(name, "r");
-#endif
+    File.fp = fopenx(name, "r");
     File.LineNumber = 0;
     File.Line[0] = 0;
     File.FID = fileID;
@@ -845,8 +858,12 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
         filedepth--;
         error = BAD_OPENFILE;
     } else {
-        if (filedepth >= MaxFiles) error = BAD_INCLUDING;
-        else SwallowBOM(File.fp);
+        if ((filedepth >= MaxFiles) || (fileID >= MaxFilePaths))
+            error = BAD_INCLUDING;
+        else {
+            SwallowBOM(File.fp);
+            strmove(&FilePaths[fileID * LineBufferSize], name, LineBufferSize);
+        }
     }
 }
 
@@ -948,15 +965,15 @@ SV NoTailRecursion (void) {
 }
 
 SV SaveMarker(cell* dest) {
-    dest[0] = hp;    dest[1] = cp;
+    dest[0] = hp;    dest[1] = cp;  dest[4] = fileID;
     dest[2] = wordlists;  dest[3] = Data[dp];
-    memcpy(&dest[4], wordlist, sizeof(cell) * MaxWordlists);
+    memcpy(&dest[5], wordlist, sizeof(cell) * MaxWordlists);
 }
 
 SV LoadMarker(cell* src) {
-    hp = src[0];     cp = src[1];
+    hp = src[0];     cp = src[1];   fileID = src[4];
     wordlists = src[2];  Data[dp] = src[3];
-    memcpy(wordlist, &src[4], sizeof(cell) * MaxWordlists);
+    memcpy(wordlist, &src[5], sizeof(cell) * MaxWordlists);
 }
 
 SV Marker_Exec(void) {                  // execution semantics of a marker
@@ -969,7 +986,7 @@ SV Marker (void) {
     parseword(' ');
     if (AddHead(tok, "")) {
         SetFns(cp, Marker_Exec, noCompile);
-        cell* pad = malloc(sizeof(cell) * (MaxWordlists + 4));
+        cell* pad = malloc(sizeof(cell) * (MaxWordlists + 8));
         Header[hp].aux = pad;
         SaveMarker(pad);
     }
@@ -1007,9 +1024,8 @@ SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
 SV EndCode   (void) { SaveLength();  OrderPop();  Dpop();  sane();}
 SV Bye       (void) { error = BYE; }
-SV SkipToEOL (void) { toin = (int)strlen(buf); }
 SV SkipToPar (void) { parseword(')'); }
-SV EchoToPar (void) { SkipToPar();  printf("%s", tok); }
+SV EchoToPar (void) { parseword(')');  printf("%s", tok); }
 SV Cr        (void) { printf("\n"); }
 SV Tick      (void) { Dpush(tick()); }
 SV BrackTick (void) { Literal(tick()); }
@@ -1021,8 +1037,39 @@ SV Semicolon (void) { SaveLength();  sane(); }
 SV Verbosity (void) { verbose = Dpop(); }
 SV Aligned   (void) { Dpush(aligned(Dpop())); }
 SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
-SV refAnchor (void) { parseword('>');  // HTMLish syntax
-                      strmove(Header[DefMarkID].help, tok, MaxAnchorSize); }
+
+SV SkipToEOL(void) {                // and look for x.xxxx format number
+    char* src = &buf[toin];
+    char* p = src;
+    char* dest = Header[DefMarkID].help;
+    int digits = 0;  int decimals = 0;
+    for (int i = 0; i < 6; i++) {
+        char c = *p++;
+        if (isdigit(c))
+            digits++;
+        else if (c == '.')
+            decimals++;
+    }
+    if ((dest[0] == '\0') && (digits == 5) && (decimals)) {
+        // valid reference string recognized
+        if ((p = strchr(src, '\\')) != NULL) *p = '\0';
+        strmove(dest, src, MaxAnchorSize);
+    }
+    toin = (int)strlen(buf); 
+}
+
+
+SV trimCR(char* buf) {              // clean up the buffer returned by fgets
+    char* p;                        // remove trailing newline
+    if ((p = strchr(buf, '\n')) != NULL) *p = '\0';
+    size_t len = strlen(buf);
+    for (size_t i = 0; i < len; i++) {
+        if (buf[i] == '\t')         // replace tabs with blanks
+            buf[i] = ' ';
+        if (buf[i] == '\r')         // trim CR if present
+            buf[i] = '\0';
+    }
+}
 
 SI refill(void) {
     int result = -1;
@@ -1049,18 +1096,8 @@ ask: toin = 0;
             goto ask;
         }
     }
-    else {
-        char* p;                        // remove trailing newline
-        if ((p = strchr(buf, '\n')) != NULL) *p = '\0';
-        size_t len = strlen(buf);
-        for (size_t i = 0; i < len; i++) {
-            if (buf[i] == '\t')         // replace tabs with blanks
-                buf[i] = ' ';
-            if (buf[i] == '\r')         // trim CR if present
-                buf[i] = '\0';
-        }
-    }
-    // save the line for error reporting
+    else
+        trimCR(buf);
     strmove(File.Line, buf, LineBufferSize);
     if (verbose & VERBOSE_SOURCE)
         printf("%d: %s\n", lineno, buf);
@@ -1136,44 +1173,161 @@ SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
     }
 };
 
-// List anchor field of all words as a HTML template
-// We want to add stack picture data to the header data
-// parse yy out of the a< xxx yy> string here. Allow a longer anchor string.
+// HTML document generator
 
-SV HTMLsafe(char* s) {
+SV htmlOut(char* s, FILE* fp) {         // text -> HTML
     char c;
+    int italic = 0;
     while ((c = *s++)) 
         switch (c) {
-        case '"': printf("&quot;");  break;
-        case '\'': printf("&apos;"); break;
-        case '<': printf("&lt;");    break;
-        case '>': printf("&gt;");    break;
-        case '&': printf("&amp;");   break;
-        default: printf("%c", c);
+        case '"':  fprintf(fp, "&quot;");  break;
+        case '\'': fprintf(fp, "&apos;");  break;
+        case '<':  fprintf(fp, "&lt;");    break;
+        case '>':  fprintf(fp, "&gt;");    break;
+        case '&':  fprintf(fp, "&amp;");   break;
+        case '`':
+            if (italic) 
+                fprintf(fp, "</tok>");
+            else
+                fprintf(fp, "<tok>");   
+            italic = (italic == 0);
+            break;
+        default:   fprintf(fp, "%c", c);
         }
 }
 
-SV listAnchors(void) {
-    printf("<body>\n<h1>Chad Reference</h1>\n");
-    for (int i = 1; i < hp; i++) {
+SV GenerateDoc(void) {
+    ParseFilename();
+    FILE* fpr = fopenx(tok, "r");
+    if (fpr == NULL) {
+        error = BAD_OPENFILE;  return;
+    }
+    ParseFilename();
+    FILE* fpw = fopenx(tok, "w");
+    if (fpw == NULL) {
+        error = BAD_CREATEFILE; 
+        fclose(fpr);   return;
+    }
+    static char wikiline[LineBufferSize];
+    long int org = 0;
+    if (fpr) { // pull in the header
+        while (1) {
+            if (fgets(wikiline, LineBufferSize, fpr) == NULL) break;
+            trimCR(wikiline);
+            int command = wikiline[0];
+            if (command == '\\') {      // end of header
+                org = ftell(fpr);       // origin of wiki
+                break;
+            }
+            if (command != '#')
+                fprintf(fpw, "%s\n", wikiline);
+        }
+    } else
+        fprintf(fpw, "<body>\n<h1>Chad Reference</h1>\n");
+    uint16_t i = wordlist[context()];
+    while (i) {
         char* hs = Header[i].help;
         char* na = Header[i].name;
+        uint8_t fileID = Header[i].srcFile;
+        static char ref[LineBufferSize];
         if (hs[0]) {
-            printf("<a name=\"%s\"></a>\n", hs);
-            printf("<h2>%s: ", hs);  HTMLsafe(na);
-            printf("</h2>\n");
+            strmove(ref, hs, LineBufferSize);
+            char* stackpic; // string remaining after first blank
+            if ((stackpic = strchr(ref, ' ')) != NULL) *stackpic++ = '\0';
+            fprintf(fpw, "<a name=\"%s\"></a>\n", ref);
+            fprintf(fpw, "<h3><ref>%s:</ref> ", ref);
+            if (fileID) {
+                fprintf(fpw, "<a href=\"%s\">",
+                    &FilePaths[fileID * LineBufferSize]);
+                htmlOut(na, fpw);
+                fprintf(fpw, "</a>");
+            }
+            else {
+                fprintf(fpw, "<chad>");
+                htmlOut(na, fpw);
+                fprintf(fpw, "</chad>");
+            }
+            if (stackpic) {
+                fprintf(fpw, " <com><i>( ");   htmlOut(stackpic, fpw);
+                fprintf(fpw, " )</i></com>");
+            }
+            fprintf(fpw, "</h3>\n");
+            if (fpr) {                  // -> wiki
+                fseek(fpr, org, SEEK_SET);
+                int found = 0;
+                int processing = 1;
+                do {
+                    if (fgets(wikiline, LineBufferSize, fpr) == NULL)
+                        processing = 0;
+                    trimCR(wikiline);
+                    int command = wikiline[0];
+                    char* txt = &wikiline[1];
+                    if (found) {
+                        switch (command) {
+                        case '=': processing = 0;
+                        case '#': goto endparagraph;
+                        case 'H': fprintf(fpw, "%s\n", txt);  break;
+                        case '_': fprintf(fpw, "<hr>");       break;
+                        case '-': 
+                            fprintf(fpw, "<li>");      
+                            htmlOut(txt, fpw);
+                            fprintf(fpw, "</li>");
+                            break;
+                        case ' ':
+                            if (found == 1)
+                                fprintf(fpw, "\n<p>");
+                            found = 2;
+                            htmlOut(txt, fpw);
+                            fprintf(fpw, "\n");
+                            break;
+                        default:
+endparagraph:               if (found > 1)
+                                fprintf(fpw, "</p>\n");
+                            found = 1;
+                        }
+                    }
+                    else {              // look for reference "ref:comment"
+                        if (command == '=') {
+                            char* p = txt;
+                            if ((p = strchr(txt, ':')) != NULL) *p++ = '\0';
+                            found = (strcmp(txt, ref) == 0);
+                        }
+                    }
+                } while (processing);
+            }
         }
         else {
-            printf("<-- No reference for %s -->\n", na);
+            fprintf(fpw, "<!-- No reference for %s -->\n", na);
         }
+        i = Header[i].link;             // traverse from oldest
     }
-    printf("</body>\n");
+    fprintf(fpw, "</body>\n</html>\n");
+    fclose(fpw);
+    if (fpr) fclose(fpr);
 }
 
 SV LoadCodeBin(void) { LoadMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
 SV SaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
 SV LoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
 SV SaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
+
+// char and [char] support utf-8:
+// bytes  from       to          1st        2nd         3rd         4th
+// 1	  U + 0000   U + 007F    0xxxxxxx
+// 2	  U + 0080   U + 07FF    110xxxxx	10xxxxxx
+// 3	  U + 0800   U + FFFF    1110xxxx	10xxxxxx	10xxxxxx
+// 4	  U + 10000  U + 10FFFF  11110xxx	10xxxxxx	10xxxxxx	10xxxxxx
+
+CELL getUTF8(void) {
+    char* p = tok;  cell c = *p++;
+    if ((c & 0x80) == 0x00) return c;                       // 1-char UTF-8
+    uint32_t d = *p++ & 0x3F;
+    if ((c & 0xE0) == 0xC0) return ((c & 0x1F) << 6) | d;   // 2-char UTF-8
+    d = (d << 6) | (*p++ & 0x3F);
+    if ((c & 0xF0) == 0xE0) return ((c & 0x0F) << 12) | d;  // 3-char UTF-8
+    d = (d << 6) | (*p++ & 0x3F);
+    return ((c & 7) << 18) | d;                             // 4-char UTF-8
+}
 
 // Data space compilation assigns `dp` to a fixed RAM address.
 // There's not much you can do without compiling on the chad CPU.
@@ -1186,8 +1340,8 @@ SV Cvariable(void) { buffer(1); }
 SV Align    (void) { Data[dp] = aligned(Data[dp]); }
 SV Variable (void) { Align();  buffer(CELLS); }
 SV Create   (void) { Align();  buffer(0); }
-SV Char     (void) { parseword(' ');  Dpush(tok[0]); }
-SV BrackChar(void) { parseword(' ');  Literal(tok[0]); }
+SV Char     (void) { parseword(' ');  Dpush(getUTF8()); }
+SV BrackChar(void) { parseword(' ');  Literal(getUTF8()); }
 
 // Initialize the dictionary at startup
 
@@ -1199,209 +1353,207 @@ SV LoadKeywords(void) {
     forth_wid = AddWordlist("forth");
     Only(); // order = root _forth
     current = root_wid;
-    AddEquate("root",         "16.3.0030 -- wid",     root_wid);
-    AddEquate("_forth",       "16.3.0040 -- wid",     forth_wid);
-    AddEquate("cm-writable",  "1.3000 -- addr",       BYTE_ADDR(CodeFence));
-    AddEquate("cm-size",      "1.3010 -- n",          BYTE_ADDR(CodeSize));
-    AddEquate("dm-size",      "1.3020 -- n",          BYTE_ADDR(DataSize));
-    AddEquate("cellbits",     "1.3030 -- n",          CELLBITS);
-    AddEquate("cell",         "1.3040 -- n",          CELLS);
-    AddEquate("dp",           "1.3050 -- addr",       BYTE_ADDR(dp));
-    AddKeyword("stats",       "1.3060 --",            Stats,         noCompile);
-    AddKeyword("verbosity",   "1.3070 flags --",      Verbosity,     noCompile);
-    AddKeyword("load-code",   "1.3080 <filename> --", LoadCodeBin,   noCompile);
-    AddKeyword("save-code",   "1.3090 <filename> --", SaveCodeBin,   noCompile);
-    AddKeyword("load-data",   "1.3100 <filename> --", LoadDataBin,   noCompile);
-    AddKeyword("save-data",   "1.3110 <filename> --", SaveDataBin,   noCompile);
-    AddKeyword("equ",         "1.3120 x <name> --",   Constant,      noCompile);
-    AddKeyword("assert",      "1.4000 n1 n2 --",      Assert,        noCompile);
-    AddKeyword(".s",          "15.1.0220 ? -- ?",     dotESS,        noCompile);
-    AddKeyword("see",         "15.1.2194 <name> --",  See,           noCompile);
-    AddKeyword("definitions", "16.1.1180 --",         Definitions,   noCompile);
-    AddKeyword("get-current", "16.1.1643 -- wid",     GetCurrent,    noCompile);
-    AddKeyword("set-current", "16.1.2195 wid --",     SetCurrent,    noCompile);
-    AddKeyword("get-order",   "16.1.1647 -- widN..wid1 N", GetOrder, noCompile);
-    AddKeyword("set-order",   "16.1.2197 widN..wid1 N --", SetOrder, noCompile);
-    AddKeyword("words",       "15.1.2465 --",         Words,         noCompile);
-    AddKeyword("bye",         "15.2.0830 --",         Bye,           noCompile);
-    AddKeyword("[if]",        "15.2.2532 flag --",    BrackIf,       noCompile);
-    AddKeyword("[then]",      "15.2.2533 --",         Nothing,       noCompile);
-    AddKeyword("[else]",      "15.2.2531 --",         BrackElse,     noCompile);
-    AddKeyword("[undefined]", "15.2.2534 <name> -- flag", BrackUndefined, noCompile);
-    AddKeyword("[defined]",   "15.2.2530 <name> -- flag", BrackDefined, noCompile);
-    AddKeyword("forth",       "16.2.1590 --",         ForthLex,      noCompile);
-    AddKeyword("assembler",   "15.2.0740 --",         AsmLex,        noCompile);
-    AddKeyword("only",        "16.2.1965 --",         Only,          noCompile);
-    AddKeyword("previous",    "16.2.2037 --",         Previous,      noCompile);
-    AddKeyword("also",        "16.2.0715 --",         Also,          noCompile);
-    AddKeyword("order",       "16.2.1985 --",         Order,         noCompile);
-    AddKeyword("+order",      "16.3.0010 wid --",     PlusOrder,     noCompile);
-    AddKeyword("lexicon",     "16.3.0020 <name> --",  Lexicon,       noCompile);
-    AddKeyword("d.",          "8.1.1060 d --",        ddot,          noCompile);
-    AddKeyword("include",     "11.2.1714 <filename> --", Include,    noCompile);
-    AddKeyword("(",           "1.0080 ccc<paren> --",    SkipToPar,  SkipToPar);
-    AddKeyword("constant",    "1.0950 x <name> --",   Constant,      noCompile);
-    AddKeyword("aligned",     "1.0706 addr1 -- addr2", Aligned,      noCompile);
-    AddKeyword("align",       "1.0705 --",            Align,         noCompile);
-    AddKeyword("char",        "1.0895 <c> -- n",      Char,          noCompile);
-    AddKeyword("chars",       "1.0898 n -- n",        Nothing,         Nothing);
-    AddKeyword("cr",          "1.0990 --",            Cr,            noCompile);
-    AddKeyword("create",      "1.1000 <name> --",     Create,        noCompile);
-    AddKeyword("decimal",     "1.1170 --",            Decimal,       noCompile);
-    AddKeyword("variable",    "1.2410 <name> --",     Variable,      noCompile);
-    AddKeyword("cvariable",   "1.2415 <name> --",     Cvariable,     noCompile);
-    AddKeyword("[char]",      "1.2520 <c> --",        noExecute,     BrackChar);
-    AddKeyword("[",           "1.2500 --",            toImmediate, toImmediate);
-    AddKeyword("]",           "1.2540 --",            toCompile,     toCompile);
-    AddKeyword("'",           "1.0070 <name> -- xt",  Tick,          noCompile);
-    AddKeyword("[']",         "1.2510 <name> --",     noExecute,     BrackTick);
-    AddKeyword(":",           "1.0450 <name> --",     Colon,         noCompile);
-    AddKeyword("exit",        "1.1380 --",            noExecute,     CompExit);
-    AddKeyword(";",           "1.0460 --",            Semicolon,     SemiComp);
-    AddKeyword("literal",     "1.1780 x --",          noExecute,     doLITERAL);
-    AddKeyword("immediate",   "1.1710 --",            Immediate,     noCompile);
-    AddKeyword(".",           "1.0180 n --",          dot,           noCompile);
-    AddKeyword("buffer:",     "2.0825 n <name> --",   Buffer,        noCompile);
-    AddKeyword("hex",         "2.1660 --",            Hex,           noCompile);
-    AddKeyword("\\",          "2.2535 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
-    AddKeyword(".(",          "2.0200 ccc) --",       EchoToPar,     noCompile);
-    AddKeyword(":noname",     "2.0455 -- xt",         NoName,        noCompile);
-    AddKeyword("marker",      "2.1850 <name> --",     Marker,        noCompile);
-    AddKeyword("dasm",        "15.3.0010 xt len --",  Dasm,          noCompile);
-    AddKeyword("sstep",       "15.3.0020 xt len --",  Steps,         noCompile);
-    AddKeyword("write-protect", "2.3000 --",          WrProtect,     noCompile);
-    AddKeyword("there",       "2.3020 -- taddr",      There,         noCompile);
-    AddKeyword("torg",        "2.3030 taddr --",      Torg,          noCompile);
-    AddKeyword("cvariable",   "1.2415 <name>",        Cvariable,     noCompile);
-    AddKeyword("later",       "2.3040 <name> --",     Later,         noCompile);
-    AddKeyword("resolves",    "2.3050 xt <name> --",  Resolves,      noCompile);
-    AddKeyword("CODE",        "3.0000 <name> -- 0",   BeginCode,     noCompile);
-    AddKeyword("macro",       "1.3160 --",            Macro,         noCompile);
-    AddKeyword("no-tail-recursion", "1.3170 --",    NoTailRecursion, noCompile);
-    AddKeyword("|bits|",      "1.3180 n --",       SetTableBitWidth, noCompile);
-    AddKeyword("|",           "1.3190 x --",          TableEntry,    noCompile);
-    AddKeyword("<a",          "1.3200 ccc> --",       refAnchor,     refAnchor);
-    AddKeyword("anchors",     "1.3210 --",            listAnchors,   noCompile);
+    AddEquate("root",         "1.0000 -- wid",        root_wid);
+    AddEquate("forth-wordlist", "1.0010 -- wid",      forth_wid);
+    AddEquate("cm-writable",  "1.0020 -- addr",       BYTE_ADDR(CodeFence));
+    AddEquate("cm-size",      "1.0030 -- n",          BYTE_ADDR(CodeSize));
+    AddEquate("dm-size",      "1.0040 -- n",          BYTE_ADDR(DataSize));
+    AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
+    AddEquate("cell",         "1.0060 -- n",          CELLS);
+    AddEquate("dp",           "1.0070 -- addr",       BYTE_ADDR(dp));
+    AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
+    AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
+    AddKeyword("load-code",   "1.0100 <filename> --", LoadCodeBin,   noCompile);
+    AddKeyword("save-code",   "1.0110 <filename> --", SaveCodeBin,   noCompile);
+    AddKeyword("load-data",   "1.0120 <filename> --", LoadDataBin,   noCompile);
+    AddKeyword("save-data",   "1.0130 <filename> --", SaveDataBin,   noCompile);
+    AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
+    AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
+    AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
+    AddKeyword("see",         "1.0210 <name> --",     See,           noCompile);
+    AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          noCompile);
+    AddKeyword("sstep",       "1.0230 xt len --",     Steps,         noCompile);
+    AddKeyword("words",       "1.0240 --",            Words,         noCompile);
+    AddKeyword("bye",         "1.0250 --",            Bye,           noCompile);
+    AddKeyword("[if]",        "1.0260 flag --",       BrackIf,       noCompile);
+    AddKeyword("[then]",      "1.0270 --",            Nothing,       noCompile);
+    AddKeyword("[else]",      "1.0280 --",            BrackElse,     noCompile);
+    AddKeyword("[undefined]", "1.0290 <name> -- flag", BrackUndefined, noCompile);
+    AddKeyword("[defined]",   "1.0300 <name> -- flag", BrackDefined, noCompile);
+    AddKeyword(".",           "1.0400 n --",          dot,           noCompile);
+    AddKeyword("d.",          "1.0410 d --",          ddot,          noCompile);
+    AddKeyword("forth",       "1.0420 --",            ForthLex,      noCompile);
+    AddKeyword("assembler",   "1.0430 --",            AsmLex,        noCompile);
+    AddKeyword("definitions", "1.0440 --",            Definitions,   noCompile);
+    AddKeyword("get-current", "1.0450 -- wid",        GetCurrent,    noCompile);
+    AddKeyword("set-current", "1.0460 wid --",        SetCurrent,    noCompile);
+    AddKeyword("get-order",   "1.0470 -- widN..wid1 N", GetOrder, noCompile);
+    AddKeyword("set-order",   "1.0480 widN..wid1 N --", SetOrder, noCompile);
+    AddKeyword("only",        "1.0490 --",            Only,          noCompile);
+    AddKeyword("previous",    "1.0500 --",            Previous,      noCompile);
+    AddKeyword("also",        "1.0510 --",            Also,          noCompile);
+    AddKeyword("order",       "1.0520 --",            Order,         noCompile);
+    AddKeyword("+order",      "1.0530 wid --",        PlusOrder,     noCompile);
+    AddKeyword("lexicon",     "1.0540 <name> --",     Lexicon,       noCompile);
+    AddKeyword("include",     "1.1000 <filename> --", Include,       noCompile);
+    AddKeyword("(",           "1.1010 ccc<paren> --",    SkipToPar,  SkipToPar);
+    AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
+    AddKeyword(".(",          "1.1030 ccc) --",       EchoToPar,     noCompile);
+    AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
+    AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
+    AddKeyword("align",       "1.1060 --",            Align,         noCompile);
+    AddKeyword("char",        "1.1070 <c> -- n",      Char,          noCompile);
+    AddKeyword("chars",       "1.1080 n1 -- n2",      Nothing,         Nothing);
+    AddKeyword("cr",          "1.1090 --",            Cr,            noCompile);
+    AddKeyword("create",      "1.1100 <name> --",     Create,        noCompile);
+    AddKeyword("decimal",     "1.1110 --",            Decimal,       noCompile);
+    AddKeyword("hex",         "1.1120 --",            Hex,           noCompile);
+    AddKeyword("variable",    "1.1130 <name> --",     Variable,      noCompile);
+    AddKeyword("cvariable",   "1.1140 <name> --",     Cvariable,     noCompile);
+    AddKeyword("buffer:",     "1.1150 n <name> --",   Buffer,        noCompile);
+    AddKeyword("[char]",      "1.1160 <c> --",        noExecute,     BrackChar);
+    AddKeyword("[",           "1.1170 --",            toImmediate, toImmediate);
+    AddKeyword("]",           "1.1180 --",            toCompile,     toCompile);
+    AddKeyword("'",           "1.1190 <name> -- xt",  Tick,          noCompile);
+    AddKeyword("[']",         "1.1200 <name> --",     noExecute,     BrackTick);
+    AddKeyword(":",           "1.1210 <name> --",     Colon,         noCompile);
+    AddKeyword(":noname",     "1.1220 -- xt",         NoName,        noCompile);
+    AddKeyword("exit",        "1.1230 --",            noExecute,     CompExit);
+    AddKeyword(";",           "1.1240 --",            Semicolon,     SemiComp);
+    AddKeyword("CODE",        "1.1250 <name> -- 0",   BeginCode,     noCompile);
+    AddKeyword("literal",     "1.1260 x --",          noExecute,     doLITERAL);
+    AddKeyword("immediate",   "1.1270 --",            Immediate,     noCompile);
+    AddKeyword("marker",      "1.1280 <name> --",     Marker,        noCompile);
+    AddKeyword("there",       "1.1290 -- taddr",      There,         noCompile);
+    AddKeyword("torg",        "1.1300 taddr --",      Torg,          noCompile);
+    AddKeyword("later",       "1.1310 <name> --",     Later,         noCompile);
+    AddKeyword("resolves",    "1.1320 xt <name> --",  Resolves,      noCompile);
+    AddKeyword("macro",       "1.1330 --",            Macro,         noCompile);
+    AddKeyword("write-protect", "1.1340 --",          WrProtect,     noCompile);
+    AddKeyword("no-tail-recursion", "1.1350 --",    NoTailRecursion, noCompile);
+    AddKeyword("|bits|",      "1.1360 n --",       SetTableBitWidth, noCompile);
+    AddKeyword("|",           "1.1370 x --",          TableEntry,    noCompile);
+    AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
     // primitives can compile and execute
-    AddALUinst("nop",     "1.3220 --",   0);
-    AddALUinst("invert",  "6.1.1720 x -- ~x",         com);
-    AddALUinst("2*",      "6.1.0320 n -- n*2",        shl1  | co);
-    AddALUinst("2/",      "6.1.0330 n -- n/2",        shr1  | co);
-    AddALUinst("2*c",     "1.3230 n -- n*2+c",        shlx  | co);
-    AddALUinst("2/c",     "1.3240 n -- c+n/2",        shrx  | co);
-    AddALUinst("xor",     "6.1.2490 n1 n2 -- n3",     eor   |        sdn);
-    AddALUinst("and",     "6.1.0720 n1 n2 -- n3",     Tand  |        sdn);
-    AddALUinst("_+",      "6.1.0120 n1 n2 -- n3",     add   | sdn);
-    AddALUinst("+",       "6.1.0120 n1 n2 -- n3",     add   | co   | sdn);
-    AddALUinst("-",       "6.1.0160 n1 n2 -- n3",     sub   | co   | sdn);
-    AddALUinst("dup",     "6.1.1290 x -- x x",        TtoN  |        sup);
-    AddALUinst("over",    "6.1.1990 x1 x2 -- x1 x2 x1", NtoT | TtoN | sup);
-    AddALUinst("swap",    "6.1.2260 x1 x2 -- x2 x1",  NtoT  | TtoN);
-    AddALUinst("drop",    "6.1.1260 x --",            NtoT  |        sdn);
-    AddALUinst("nip",     "6.2.1930 x1 x2 -- x2",                    sdn);
-    AddALUinst("0=",      "6.1.0270 x -- flag",       zeq   );
-    AddALUinst("0<",      "6.1.0250 x -- flag",       less0 );
-    AddALUinst(">r",      "6.1.0580 x --|-- x",       NtoT  | TtoR | sdn | rup);
-    AddALUinst("r>",      "6.1.2060 -- x|x --",       RtoT  | TtoN | sup | rdn);
-    AddALUinst("r@",      "6.1.2070 -- x|x -- x",     RtoT  | TtoN | sup);
-    AddALUinst("carry",   "1.3250 -- n",              carry | TtoN | sup);
-    AddALUinst("w",       "1.3260 -- x",              WtoT  | TtoN | sup);
-    AddALUinst(">carry",  "1.3270 n --",              NtoT  | co   | sdn);
-    AddALUinst("rshift",  "6.1.2162 n1 n2 -- n3",     shr          | sdn);
-    AddALUinst("lshift",  "6.1.1805 n1 n2 -- n3",     shl          | sdn);
-    AddALUinst("_@",      "1.3280 addr -- addr",              memrd);  // start
-    AddALUinst("_@_",     "1.3290 addr --",           read);        // end read
-    AddALUinst("_!",      "1.3300 x addr -- x",              write | sdn);
-    AddALUinst("_io!",    "1.3400 x addr -- x",               iow  | sdn);
-    AddALUinst("_io@",    "1.3410 addr -- addr",              ior);    // start
-    AddALUinst("_io@_",   "1.3420 addr --",           input);    // end io read
-    AddALUinst("2dupand", "1.3430 u v -- u v u&v",    Tand  | TtoN | sup);
-    AddALUinst("2dupxor", "1.3440 u v -- u v u^v",    eor   | TtoN | sup);
-    AddALUinst("2dup+",   "1.3450 u v -- u v u+v",    add   | TtoN | sup);
-    AddALUinst("2dup-",   "1.3460 u v -- u v u-v",    sub   | TtoN | sup);
-    AddALUinst("mask",    "1.3470 addr -- cnt",       bmask);
-    AddALUinst("wand",    "1.3480 x -- x&w",          TandW);
-    AddALUinst("overand", "1.3490 u v -- u u&v",      Tand);
-    AddALUinst("overxor", "1.3500 u v -- u u^v",      eor);
-    AddALUinst("over+",   "1.3510 u v -- u u+v",      add   | co);
-    AddALUinst("over-",   "1.3520 u v -- u u-v",      sub   | co);
-    AddALUinst("dup>r",   "1.3530 x -- x|-- x",       TtoR               | rup);
-    AddALUinst("rdrop",   "1.3540 --|x --",                                rdn);
-    AddALUinst("+c",      "1.3550 u v -- u+v+c",      addc  | co   | sdn);
-    AddALUinst("dup@",    "1.3560 addr -- addr x",    read  | TtoN | sup);
-    AddALUinst("spstat",  "1.3570 -- rp<<8|sp",       who   | TtoN | sup);
-    AddALUinst("(R-1)@",  "1.3580 -- x-1|x -- x",     RM1toT | TtoN | sup);
-    AddALUinst("_next_",  "1.3590 n -- flag|x -- n",  zeq   | TtoR);
+    AddALUinst("nop",     "1.2000 --",   0);
+    AddALUinst("invert",  "1.2010 x -- ~x",           com);
+    AddALUinst("2*",      "1.2020 n -- n*2",          shl1  | co);
+    AddALUinst("2/",      "1.2030 n -- n/2",          shr1  | co);
+    AddALUinst("2*c",     "1.2040 n -- n*2+c",        shlx  | co);
+    AddALUinst("2/c",     "1.2050 n -- c+n/2",        shrx  | co);
+    AddALUinst("xor",     "1.2060 n1 n2 -- n3",       eor   |        sdn);
+    AddALUinst("and",     "1.2070 n1 n2 -- n3",       Tand  |        sdn);
+    AddALUinst("+",       "1.2080 n1 n2 -- n3",       add   | co   | sdn);
+    AddALUinst("-",       "1.2090 n1 n2 -- n3",       sub   | co   | sdn);
+    AddALUinst("dup",     "1.2100 x -- x x",          TtoN  |        sup);
+    AddALUinst("over",    "1.2110 x1 x2 -- x1 x2 x1", NtoT  | TtoN | sup);
+    AddALUinst("swap",    "1.2120 x1 x2 -- x2 x1",    NtoT  | TtoN);
+    AddALUinst("drop",    "1.2130 x --",              NtoT  |        sdn);
+    AddALUinst("nip",     "1.2140 x1 x2 -- x2",                      sdn);
+    AddALUinst("0=",      "1.2150 x -- flag",         zeq   );
+    AddALUinst("0<",      "1.2160 n -- flag",         less0 );
+    AddALUinst(">r",      "1.2170 x -- | -- x",       NtoT  | TtoR | sdn | rup);
+    AddALUinst("r>",      "1.2180 -- x | x --",       RtoT  | TtoN | sup | rdn);
+    AddALUinst("r@",      "1.2190 -- x | x -- x",     RtoT  | TtoN | sup);
+    AddALUinst("rshift",  "1.2200 x1 u -- x2",        shr          | sdn);
+    AddALUinst("lshift",  "1.2210 x1 u -- x2",        shl          | sdn);
+    AddALUinst("carry",   "1.2500 -- n",              carry | TtoN | sup);
+    AddALUinst("w",       "1.2510 -- x",              WtoT  | TtoN | sup);
+    AddALUinst(">carry",  "1.2520 n --",              NtoT  | co   | sdn);
+    AddALUinst("_+",      "1.2530 n1 n2 -- n3",       add   |        sdn);
+    AddALUinst("_@",      "1.2540 addr -- addr",              memrd);  // start
+    AddALUinst("_@_",     "1.2550 addr -- x",         read);        // end read
+    AddALUinst("_!",      "1.2560 x addr -- x",              write | sdn);
+    AddALUinst("_io!",    "1.2570 x addr -- x",               iow  | sdn);
+    AddALUinst("_io@",    "1.2580 addr -- addr",              ior);    // start
+    AddALUinst("_io@_",   "1.2590 addr -- x",         input);    // end io read
+    AddALUinst("2dupand", "1.2600 u v -- u v u&v",    Tand  | TtoN | sup);
+    AddALUinst("2dupxor", "1.2610 u v -- u v u^v",    eor   | TtoN | sup);
+    AddALUinst("2dup+",   "1.2620 u v -- u v u+v",    add   | TtoN | sup);
+    AddALUinst("2dup-",   "1.2630 u v -- u v u-v",    sub   | TtoN | sup);
+    AddALUinst("mask",    "1.2640 addr -- cnt",       bmask);
+    AddALUinst("wand",    "1.2650 x -- x&w",          TandW);
+    AddALUinst("overand", "1.2660 u v -- u u&v",      Tand);
+    AddALUinst("overxor", "1.2670 u v -- u u^v",      eor);
+    AddALUinst("over+",   "1.2680 u v -- u u+v",      add   | co);
+    AddALUinst("over-",   "1.2690 u v -- u u-v",      sub   | co);
+    AddALUinst("dup>r",   "1.2700 x -- x | -- x",     TtoR               | rup);
+    AddALUinst("rdrop",   "1.2710 -- | x --",                              rdn);
+    AddALUinst("+c",      "1.2720 u v -- u+v+c",      addc  | co   | sdn);
+    AddALUinst("dup@",    "1.2730 addr -- addr x",    read  | TtoN | sup);
+    AddALUinst("spstat",  "1.2740 -- rp<<8|sp",       who   | TtoN | sup);
+    AddALUinst("(R-1)@",  "1.2750 -- x-1 | x -- x",  RM1toT | TtoN | sup);
+    AddALUinst("_next_",  "1.2760 n -- flag | x -- n", zeq  | TtoR);
     // compile-only control words, can't be postponed
-    AddKeyword("begin",   "6.1.0760 --",  noExecute, doBegin);
-    AddKeyword("again",   "6.2.0700 --",  noExecute, doAgain);
-    AddKeyword("until",   "6.1.2390 --",  noExecute, doUntil);
-    AddKeyword("if",      "6.1.1700 --",  noExecute, doIf);
-    AddKeyword("else",    "6.1.1310 --",  noExecute, doElse);
-    AddKeyword("then",    "6.1.2270 --",  noExecute, doThen);
-    AddKeyword("while",   "6.1.2430 --",  noExecute, doWhile);
-    AddKeyword("repeat",  "6.1.2140 --",  noExecute, doRepeat);
-    AddKeyword("for",     "1.5000 --",    noExecute, doFor);
-    AddKeyword("next",    "1.5010 --",    noExecute, doNext);
+    AddKeyword("begin",   "1.2900 --",  noExecute, doBegin);
+    AddKeyword("again",   "1.2910 --",  noExecute, doAgain);
+    AddKeyword("until",   "1.2920 --",  noExecute, doUntil);
+    AddKeyword("if",      "1.2930 --",  noExecute, doIf);
+    AddKeyword("else",    "1.2940 --",  noExecute, doElse);
+    AddKeyword("then",    "1.2950 --",  noExecute, doThen);
+    AddKeyword("while",   "1.2960 --",  noExecute, doWhile);
+    AddKeyword("repeat",  "1.2970 --",  noExecute, doRepeat);
+    AddKeyword("for",     "1.2980 --",  noExecute, doFor);
+    AddKeyword("next",    "1.2990 --",  noExecute, doNext);
     // assembler
     asm_wid = AddWordlist("asm");
-    AddEquate("asm",        "16.3.0050", asm_wid);
+    AddEquate("asm",        "1.5000 -- wid", asm_wid);
     current = asm_wid;
-    AddKeyword("END-CODE",  "3.0010 0 --",  EndCode,  noCompile);
-    AddModifier("T",        "3.1000 n1 -- n2",  alu  );  // Instruction fields
-    AddModifier("COP",      "3.1010 n1 -- n2",  cop  );
-    AddModifier("T0<",      "3.1020 n1 -- n2",  less0);
-    AddModifier("C",        "3.1030 n1 -- n2",  carry);
-    AddModifier("T2/",      "3.1040 n1 -- n2",  shr1 );
-    AddModifier("cT2/",     "3.1050 n1 -- n2",  shrx );
-    AddModifier("T2*",      "3.1060 n1 -- n2",  shl1 );
-    AddModifier("T2*c",     "3.1070 n1 -- n2",  shlx );
-    AddModifier("N",        "3.1080 n1 -- n2",  NtoT );
-    AddModifier("W",        "3.1090 n1 -- n2",  WtoT );
-    AddModifier("T^N",      "3.1000 n1 -- n2",  eor  );
-    AddModifier("~T",       "3.1110 n1 -- n2",  com  );
-    AddModifier("T&N",      "3.1120 n1 -- n2",  Tand );
-    AddModifier("T&W",      "3.1130 n1 -- n2",  TandW );
-    AddModifier("mask",     "3.1140 n1 -- n2",  bmask );
-    AddModifier("T+N",      "3.1150 n1 -- n2",  add  );
-    AddModifier("T+Nc",     "3.1160 n1 -- n2",  addc );
-    AddModifier("N-T",      "3.1170 n1 -- n2",  sub  );
-    AddModifier("N-Tc",     "3.1180 n1 -- n2",  subc );
-    AddModifier("T0=",      "3.1190 n1 -- n2",  zeq );
-    AddModifier("N>>T",     "3.1200 n1 -- n2",  shr  );
-    AddModifier("N<<T",     "3.1210 n1 -- n2",  shl  );
-    AddModifier("R",        "3.1220 n1 -- n2",  RtoT );
-    AddModifier("R-1",      "3.1230 n1 -- n2",  RM1toT );
-    AddModifier("[T]",      "3.1240 n1 -- n2",  read );
-    AddModifier("io[T]",    "3.1250 n1 -- n2",  input);
-    AddModifier("status",   "3.1260 n1 -- n2",  who);
-    AddModifier("RET",      "3.0020 n1 -- n2",  ret | rdn );  // return bit
-    AddModifier("T->N",     "3.2010 n1 -- n2",  TtoN );  // strobe field
-    AddModifier("T->R",     "3.2010 n1 -- n2",  TtoR );
-    AddModifier("N->[T]",   "3.2010 n1 -- n2",  write);
-    AddModifier("N->io[T]", "3.2010 n1 -- n2",  iow  );
-    AddModifier("_IORD_",   "3.2010 n1 -- n2",  ior);
-    AddModifier("_MEMRD_",  "3.2010 n1 -- n2",  memrd);
-    AddModifier("CO",       "3.2010 n1 -- n2",  co  );
-    AddModifier("r+1",      "3.3010 n1 -- n2",  rup  );  // stack pointer field
-    AddModifier("r-1",      "3.3020 n1 -- n2",  rdn  );
-    AddModifier("d+1",      "3.3030 n1 -- n2",  sup  );
-    AddModifier("d-1",      "3.3040 n1 -- n2",  sdn  );
-    AddLitOp("alu",         "3.4010 n -- 0",  alu );
-    AddLitOp("branch",      "3.4020 n -- 0",  jump );
-    AddLitOp("0branch",     "3.4030 n -- 0",  zjump);
-    AddLitOp("scall",       "3.4040 n -- 0",  call );
-    AddLitOp("litx",        "3.4050 n -- 0",  litx );
-    AddLitOp("cop",         "3.4060 n -- 0",  copop );
-    AddLitOp("imm",         "3.4070 n -- 0",  lit  );
-    AddKeyword("begin",     "3.0100 --",  doBegin,   noCompile);
-    AddKeyword("again",     "3.0110 --",  doAgain,   noCompile);
-    AddKeyword("until",     "3.0120 --",  doUntil,   noCompile);
-    AddKeyword("if",        "3.0130 --",  doIf,      noCompile);
-    AddKeyword("else",      "3.0140 --",  doElse,    noCompile);
-    AddKeyword("then",      "3.0150 --",  doThen,    noCompile);
-    AddKeyword("while",     "3.0160 --",  doWhile,   noCompile);
-    AddKeyword("repeat",    "3.0170 --",  doRepeat,  noCompile);
+    AddKeyword("begin",     "1.5100 --",  doBegin,   noCompile);
+    AddKeyword("again",     "1.5110 --",  doAgain,   noCompile);
+    AddKeyword("until",     "1.5120 --",  doUntil,   noCompile);
+    AddKeyword("if",        "1.5130 --",  doIf,      noCompile);
+    AddKeyword("else",      "1.5140 --",  doElse,    noCompile);
+    AddKeyword("then",      "1.5150 --",  doThen,    noCompile);
+    AddKeyword("while",     "1.5160 --",  doWhile,   noCompile);
+    AddKeyword("repeat",    "1.5170 --",  doRepeat,  noCompile);
+    AddKeyword(";CODE",     "1.5010 0 --",  EndCode,  noCompile);
+    AddModifier("RET",      "1.5020 n1 -- n2",  ret | rdn );  // return bit
+    AddModifier("T",        "1.6000 n1 -- n2",  alu  );  // Instruction fields
+    AddModifier("COP",      "1.6010 n1 -- n2",  cop  );
+    AddModifier("T0<",      "1.6020 n1 -- n2",  less0);
+    AddModifier("C",        "1.6030 n1 -- n2",  carry);
+    AddModifier("T2/",      "1.6040 n1 -- n2",  shr1 );
+    AddModifier("cT2/",     "1.6050 n1 -- n2",  shrx );
+    AddModifier("T2*",      "1.6060 n1 -- n2",  shl1 );
+    AddModifier("T2*c",     "1.6070 n1 -- n2",  shlx );
+    AddModifier("N",        "1.6080 n1 -- n2",  NtoT );
+    AddModifier("W",        "1.6090 n1 -- n2",  WtoT );
+    AddModifier("T^N",      "1.6100 n1 -- n2",  eor  );
+    AddModifier("~T",       "1.6110 n1 -- n2",  com  );
+    AddModifier("T&N",      "1.6120 n1 -- n2",  Tand );
+    AddModifier("T&W",      "1.6130 n1 -- n2",  TandW );
+    AddModifier("mask",     "1.6140 n1 -- n2",  bmask );
+    AddModifier("T+N",      "1.6150 n1 -- n2",  add  );
+    AddModifier("T+Nc",     "1.6160 n1 -- n2",  addc );
+    AddModifier("N-T",      "1.6170 n1 -- n2",  sub  );
+    AddModifier("N-Tc",     "1.6180 n1 -- n2",  subc );
+    AddModifier("T0=",      "1.6190 n1 -- n2",  zeq );
+    AddModifier("N>>T",     "1.6200 n1 -- n2",  shr  );
+    AddModifier("N<<T",     "1.6210 n1 -- n2",  shl  );
+    AddModifier("R",        "1.6220 n1 -- n2",  RtoT );
+    AddModifier("R-1",      "1.6230 n1 -- n2",  RM1toT );
+    AddModifier("[T]",      "1.6240 n1 -- n2",  read );
+    AddModifier("io[T]",    "1.6250 n1 -- n2",  input);
+    AddModifier("status",   "1.6260 n1 -- n2",  who);
+    AddModifier("T->N",     "1.7010 n1 -- n2",  TtoN );  // strobe field
+    AddModifier("T->R",     "1.7020 n1 -- n2",  TtoR );
+    AddModifier("N->[T]",   "1.7030 n1 -- n2",  write);
+    AddModifier("N->io[T]", "1.7040 n1 -- n2",  iow  );
+    AddModifier("_IORD_",   "1.7050 n1 -- n2",  ior);
+    AddModifier("_MEMRD_",  "1.7060 n1 -- n2",  memrd);
+    AddModifier("CO",       "1.7070 n1 -- n2",  co  );
+    AddModifier("r+1",      "1.8010 n1 -- n2",  rup  );  // stack pointer field
+    AddModifier("r-1",      "1.8020 n1 -- n2",  rdn  );
+    AddModifier("d+1",      "1.8030 n1 -- n2",  sup  );
+    AddModifier("d-1",      "1.8040 n1 -- n2",  sdn  );
+    AddLitOp("alu",         "1.9010 n -- 0",  alu );
+    AddLitOp("branch",      "1.9020 n -- 0",  jump );
+    AddLitOp("0branch",     "1.9030 n -- 0",  zjump);
+    AddLitOp("scall",       "1.9040 n -- 0",  call );
+    AddLitOp("litx",        "1.9050 n -- 0",  litx );
+    AddLitOp("cop",         "1.9060 n -- 0",  copop );
+    AddLitOp("imm",         "1.9070 n -- 0",  lit  );
     current = forth_wid;
 }
 
@@ -1414,10 +1566,11 @@ int chad(char * line, int maxlength) {
     buf = line;  maxlen = maxlength;    // assign a working buffer
     LoadKeywords();
     filedepth = 0;
+    fileID = 0;
     Decimal();
     while (1) {
         File.fp = stdin;                // keyboard input
-        fileID = error = 0;             // interpreter state
+        error = 0;                      // interpreter state
         toImmediate();
         cycles = spMax = rpMax = 0;     // CPU stats
         sp = rp = 0;                    // stacks

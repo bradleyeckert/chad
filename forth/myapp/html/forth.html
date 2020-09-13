@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <title>Forth Reference</title>
+    <link rel="stylesheet" href="doc.css">
+    <!--[if IE]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+<body>
+<h1>Forth Reference</h1>
+<hr>
+<h2>Definitions in instruction memory</h2>
+<hr>
+<!-- No reference for frtest1 -->
+<!-- No reference for fib -->
+<!-- No reference for frtest -->
+<a name="2.2960"></a>
+<h3><ref>2.2960:</ref> <a href="../frame.f">]f</a> <com><i>( ? -- ? )</i></com></h3>
+
+<p>Restore the stacks saved by <tok>f[</tok>.
+</p>
+<a name="2.2950"></a>
+<h3><ref>2.2950:</ref> <a href="../frame.f">f[</a> <com><i>( n -- )</i></com></h3>
+
+<p>Move the data stack to the frame stack, leaving <tok>n</tok> cells on top.
+The return stack is emptied except for one cell to keep the sim running.
+</p>
+<a name="2.2940"></a>
+<h3><ref>2.2940:</ref> <a href="../frame.f">mem&gt;ds</a> <com><i>( addr1 -- ... addr2 )</i></com></h3>
+
+<p>Move memory to data stack
+</p>
+<a name="2.2930"></a>
+<h3><ref>2.2930:</ref> <a href="../frame.f">ds&gt;mem</a> <com><i>( ... n addr1 -- addr2 )</i></com></h3>
+
+<p>Move data stack to memory
+</p>
+<a name="2.2920"></a>
+<h3><ref>2.2920:</ref> <a href="../frame.f">mem&gt;</a> <com><i>( a -- a&apos; n )</i></com></h3>
+
+<p>Pre-decrement <tok>a</tok> by 1 cell and fetch <tok>a</tok>.
+</p>
+<a name="2.2910"></a>
+<h3><ref>2.2910:</ref> <a href="../frame.f">&gt;mem</a> <com><i>( n a -- a&apos; )</i></com></h3>
+
+<p>Store <tok>n</tok> leaving <tok>a</tok> indexed to the next cell.
+</p>
+<a name="2.2900"></a>
+<h3><ref>2.2900:</ref> <a href="../frame.f">fpclear</a> <com><i>( --  )</i></com></h3>
+
+<p>Clear the frame stack
+</p>
+<!-- No reference for fp0 -->
+<!-- No reference for fpad -->
+<!-- No reference for fp1 -->
+<!-- No reference for fp -->
+<!-- No reference for |framestack| -->
+<a name="2.3320"></a>
+<h3><ref>2.3320:</ref> <a href="../numout.f">h.x</a> <com><i>( u n -- )</i></com></h3>
+
+<p>Display <tok>u</tok> in hex format using <tok>n-1</tok> digits.
+</p>
+<!-- No reference for <#> -->
+<a name="2.3310"></a>
+<h3><ref>2.3310:</ref> <a href="../numout.f">?</a> <com><i>( a -- )</i></com></h3>
+
+<p>Display the value stored at a-addr.
+</p>
+<a name="2.3300"></a>
+<h3><ref>2.3300:</ref> <a href="../numout.f">.</a> <com><i>( n|u -- )</i></com></h3>
+
+<p>Display n in free field format.
+</p>
+<a name="2.3290"></a>
+<h3><ref>2.3290:</ref> <a href="../numout.f">u.</a> <com><i>( u -- )</i></com></h3>
+
+<p>Display u in free field format.
+</p>
+<a name="2.3280"></a>
+<h3><ref>2.3280:</ref> <a href="../numout.f">d.</a> <com><i>( d -- )</i></com></h3>
+
+<p>Display d in free field format.
+</p>
+<a name="2.3270"></a>
+<h3><ref>2.3270:</ref> <a href="../numout.f">.r</a> <com><i>( n width -- )</i></com></h3>
+
+<p>Display <tok>n</tok> right aligned in a field <tok>width</tok> characters wide.
+If the number of characters required to display n1 is greater than
+<tok>width</tok>, all digits are displayed with no leading spaces in a field
+as wide as necessary.
+</p>
+<a name="2.3260"></a>
+<h3><ref>2.3260:</ref> <a href="../numout.f">u.r</a> <com><i>( u width -- )</i></com></h3>
+
+<p>Display <tok>u</tok> right aligned in a field <tok>width</tok> characters wide.
+If the number of characters required to display <tok>width</tok> is greater than
+<tok>width</tok>, all digits are displayed with no leading spaces in a field as
+wide as necessary.
+</p>
+<a name="2.3250"></a>
+<h3><ref>2.3250:</ref> <a href="../numout.f">d.r</a> <com><i>( d width -- )</i></com></h3>
+
+<p>Display <tok>d</tok> right aligned in a field <tok>width</tok> characters wide.
+If the number of characters required to display <tok>d</tok> is greater than
+<tok>width</tok>, all digits are displayed with no leading spaces in a field
+as wide as necessary.
+</p>
+<!-- No reference for s.r -->
+<a name="2.3240"></a>
+<h3><ref>2.3240:</ref> <a href="../numout.f">#&gt;</a> <com><i>( ud -- c-addr u )</i></com></h3>
+
+<p>Drop <tok>ud</tok>.
+Make the pictured numeric output string available as a character string.
+<tok>c-addr</tok> and <tok>u</tok> specify the resulting character string.
+A program may replace characters within the string.
+</p>
+<a name="2.3230"></a>
+<h3><ref>2.3230:</ref> <a href="../numout.f">sign</a> <com><i>( n -- )</i></com></h3>
+
+<p>If <tok>n</tok> is negative, add a minus sign to the beginning of the
+pictured numeric output string.
+An ambiguous condition exists if <tok>sign</tok> executes outside of
+a <tok>&lt;# #&gt;</tok> delimited number conversion.
+</p>
+<a name="2.3220"></a>
+<h3><ref>2.3220:</ref> <a href="../numout.f">#s</a> <com><i>( ud1 -- ud2 )</i></com></h3>
+
+<p>Convert one digit of <tok>ud1</tok> according to the rule for <tok>#</tok>.
+Continue conversion until the quotient, <tok>ud2</tok>, is zero.
+An ambiguous condition exists if <tok>#s</tok> executes outside of
+a <tok>&lt;# #&gt;</tok> delimited number conversion.
+</p>
+<a name="2.3210"></a>
+<h3><ref>2.3210:</ref> <a href="../numout.f">#</a> <com><i>( ud1 -- ud2 )</i></com></h3>
+
+<p>Divide <tok>ud1</tok> by the number in BASE giving the quotient <tok>ud2</tok> and the
+remainder <tok>n</tok> where <tok>n</tok> is the least significant digit of <tok>ud1</tok>.
+Convert <tok>n</tok> to external form and add the resulting character
+to the beginning of the pictured numeric output string.
+An ambiguous condition exists if <tok>#</tok> executes outside of
+a <tok>&lt;# #&gt;</tok> delimited number conversion.
+</p>
+<!-- No reference for _#_ -->
+<a name="2.3200"></a>
+<h3><ref>2.3200:</ref> <a href="../numout.f">hold</a> <com><i>( char -- )</i></com></h3>
+
+<p>Add <tok>char</tok> to the beginning of the pictured numeric output string.
+An ambiguous condition exists if <tok>hold</tok> executes outside of a
+<tok>&lt;# #&gt;</tok> delimited number conversion.
+</p>
+<a name="2.3190"></a>
+<h3><ref>2.3190:</ref> <a href="../numout.f">&lt;#</a> <com><i>( ud1 -- ud1 )</i></com></h3>
+
+<p>Initialize the pictured numeric output conversion process.
+In <tok>chad</tok>, numeric conversion is done at the top of data space:
+<tok>: &lt;#  dm-size hld ! ;</tok>.
+</p>
+<a name="2.3180"></a>
+<h3><ref>2.3180:</ref> <a href="../numout.f">digit</a> <com><i>( n -- char )</i></com></h3>
+
+<p>Convert <tok>n</tok> to an ASCII digit spanning &apos;0&apos; to &apos;9&apos; and &apos;A&apos; to &apos;Z&apos;.
+</p>
+<a name="2.3170"></a>
+<h3><ref>2.3170:</ref> <a href="../numout.f">spaces</a> <com><i>( n -- )</i></com></h3>
+
+<p>If <tok>n</tok> is greater than zero, display <tok>n</tok> spaces.
+</p>
+<a name="2.3160"></a>
+<h3><ref>2.3160:</ref> <a href="../numout.f">space</a> <com><i>( -- )</i></com></h3>
+
+<p>Display one space.
+</p>
+<a name="2.3150"></a>
+<h3><ref>2.3150:</ref> <a href="../numout.f">s&gt;d</a> <com><i>( n -- d )</i></com></h3>
+
+<p>Convert the number n to the double-cell number d with the
+same numerical value.
+</p>
+<a name="2.3140"></a>
+<h3><ref>2.3140:</ref> <a href="../numout.f">type</a> <com><i>( c-addr u -- )</i></com></h3>
+
+<p>If <tok>u</tok> is greater than zero, display the character string specified by
+c-addr and u. The output device should handle UTF-8 as a standard.
+</p>
+<!-- No reference for hex -->
+<!-- No reference for decimal -->
+<a name="2.3110"></a>
+<h3><ref>2.3110:</ref> <a href="../numout.f">count</a> <com><i>( a u -- a+1 u-1 )</i></com></h3>
+
+<p>Convert a counted string to an address and a length.
+A counted string consists of a 1-byte length value (0 to 255)
+along with that many byte-wide characters in data space.
+</p>
+<a name="2.3010"></a>
+<h3><ref>2.3010:</ref> <a href="../numout.f">bl</a> <com><i>( -- char )</i></com></h3>
+
+<p><tok>char</tok> is the character value for a space.
+</p>
+<a name="2.3000"></a>
+<h3><ref>2.3000:</ref> <a href="../numout.f">hld</a> <com><i>( -- c-addr  )</i></com></h3>
+
+<p>A pointer variable for numeric conversion.
+</p>
+<!-- No reference for stdout_table -->
+<!-- No reference for _cr -->
+<!-- No reference for _emit -->
+<!-- No reference for cr -->
+<a name="2.2110"></a>
+<h3><ref>2.2110:</ref> <a href="../redirect.f">emit</a> <com><i>( x -- )</i></com></h3>
+
+<p>Send a character to the terminal.
+The terminal is responsible for handling UTF-8 sequences.
+<tok>x</tok> may be a wide character.
+</p>
+<!-- No reference for ExecScreen -->
+<a name="2.2100"></a>
+<h3><ref>2.2100:</ref> <a href="../redirect.f">ScreenProfile</a> <com><i>( -- addr )</i></com></h3>
+
+<p>Points to a table of <tok>xt</tok>s of terminal actions.
+The actions in a table are:
+</p>
+<ul>
+<li> <tok>emit</tok></li><li> <tok>cr</tok></li></ul>
+<a name="2.2010"></a>
+<h3><ref>2.2010:</ref> <a href="../redirect.f">&apos;TXbusy</a> <com><i>( -- ioa  )</i></com></h3>
+
+<p>UART busy flag.
+</p>
+<a name="2.2000"></a>
+<h3><ref>2.2000:</ref> <a href="../redirect.f">&apos;TXbuf</a> <com><i>( -- ioa  )</i></com></h3>
+
+<p>8-bit UART output buffer.
+</p>
+<a name="2.1090"></a>
+<h3><ref>2.1090:</ref> <a href="../coreext.f">2r@</a> <com><i>( -- d | d -- d )</i></com></h3>
+
+<p>Copy cell pair x1 x2 from the return stack.
+Semantically equivalent to <tok>r&gt; r&gt; 2dup &gt;r &gt;r swap</tok>.
+</p>
+<a name="2.1080"></a>
+<h3><ref>2.1080:</ref> <a href="../coreext.f">2r&gt;</a> <com><i>( -- d | d -- )</i></com></h3>
+
+<p>Transfer cell pair x1 x2 from the return stack.
+Semantically equivalent to <tok>r&gt; r&gt; swap</tok>.
+</p>
+<a name="2.1070"></a>
+<h3><ref>2.1070:</ref> <a href="../coreext.f">2&gt;r</a> <com><i>( d -- | -- d )</i></com></h3>
+
+<p>Transfer cell pair x1 x2 to the return stack.
+Semantically equivalent to <tok>swap &gt;r &gt;r</tok>.
+</p>
+<a name="2.1060"></a>
+<h3><ref>2.1060:</ref> <a href="../coreext.f">u&gt;</a> <com><i>( u1 u2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if <tok>u1</tok> is greater than <tok>u2</tok>.
+</p>
+<a name="2.1050"></a>
+<h3><ref>2.1050:</ref> <a href="../coreext.f">0&gt;</a> <com><i>( n -- f )</i></com></h3>
+
+<p>flag is true if and only if <tok>n</tok> is greater than zero.
+</p>
+<a name="2.1040"></a>
+<h3><ref>2.1040:</ref> <a href="../coreext.f">0&lt;&gt;</a> <com><i>( x y -- f )</i></com></h3>
+
+<p>flag is true if and only if <tok>x</tok> is not equal to zero.
+</p>
+<a name="2.1030"></a>
+<h3><ref>2.1030:</ref> <a href="../coreext.f">&lt;&gt;</a> <com><i>( n1 n2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if <tok>x1</tok> is not bit-for-bit the same as <tok>x2</tok>.
+</p>
+<a name="2.1020"></a>
+<h3><ref>2.1020:</ref> <a href="../coreext.f">within</a> <com><i>( u ulo uhi -- flag )</i></com></h3>
+
+<p>Perform a comparison of a test value n1 | u1 with a lower limit n2 | u2
+and an upper limit n3 | u3,
+returning true if either (n2 | u2 &lt; n3 | u3 and (n2 | u2 &lt;= n1 | u1 and n1 | u1 &lt; n3 | u3))
+or (n2 | u2 &gt; n3 | u3 and (n2 | u2 &lt;= n1 | u1 or n1 | u1 &lt; n3 | u3)) is true, returning false otherwise. 
+An ambiguous condition exists n1 | u1, n2 | u2, and n3 | u3
+are not all the same type.
+</p>
+<a name="2.1010"></a>
+<h3><ref>2.1010:</ref> <a href="../coreext.f">true</a> <com><i>( -- true )</i></com></h3>
+
+<p>Return a <tok>true</tok> flag.
+</p>
+<a name="2.1000"></a>
+<h3><ref>2.1000:</ref> <a href="../coreext.f">false</a> <com><i>( -- false )</i></com></h3>
+
+<p>Return a <tok>false</tok> flag.
+</p>
+<a name="2.0750"></a>
+<h3><ref>2.0750:</ref> <a href="../core.f">exec1:</a> <com><i>( n --  )</i></com></h3>
+
+<p>Jump forward by <tok>n</tok> instructions in code.
+</p>
+<a name="2.0740"></a>
+<h3><ref>2.0740:</ref> <a href="../core.f">exec2:</a> <com><i>( n --  )</i></com></h3>
+
+<p>Jump forward by <tok>2*n</tok> instructions in code.
+</p>
+<a name="2.0730"></a>
+<h3><ref>2.0730:</ref> <a href="../core.f">depth</a> <com><i>( -- +n )</i></com></h3>
+
+<p><tok>+n</tok> is the number of single-cell values contained in the
+data stack before <tok>+n</tok> was placed on the stack.
+</p>
+<a name="2.0720"></a>
+<h3><ref>2.0720:</ref> <a href="../core.f">max</a> <com><i>( n1 n2 -- n3 )</i></com></h3>
+
+<p>n3 is the greater of n1 and n2.
+</p>
+<a name="2.0710"></a>
+<h3><ref>2.0710:</ref> <a href="../core.f">min</a> <com><i>( n1 n2 -- n3 )</i></com></h3>
+
+<p>n3 is the lesser of n1 and n2.
+</p>
+<a name="2.0700"></a>
+<h3><ref>2.0700:</ref> <a href="../core.f">u&lt;</a> <com><i>( u1 u2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if u1 is less than u2.
+</p>
+<a name="2.0580"></a>
+<h3><ref>2.0580:</ref> <a href="../core.f">c,</a> <com><i>( c -- )</i></com></h3>
+
+<p>Reserve one byte of data space and store <tok>c</tok> in the byte.
+</p>
+<a name="2.0570"></a>
+<h3><ref>2.0570:</ref> <a href="../core.f">,</a> <com><i>( x -- )</i></com></h3>
+
+<p>Reserve one aligned cell of data space and store <tok>x</tok> in the cell.
+</p>
+<a name="2.0560"></a>
+<h3><ref>2.0560:</ref> <a href="../core.f">here</a> <com><i>( -- addr )</i></com></h3>
+
+<p><tok>addr</tok> is the data-space pointer. <tok>: here dp @ ;</tok>
+</p>
+<a name="2.0550"></a>
+<h3><ref>2.0550:</ref> <a href="../core.f">allot</a> <com><i>( n -- )</i></com></h3>
+
+<p>If <tok>n</tok> is greater than zero, reserve n address units of data space.
+If <tok>n</tok> is less than zero, release <tok>n</tok> address units of data space.
+If <tok>n</tok> is zero, leave the data-space pointer unchanged.
+</p>
+<a name="1.1060"></a>
+<h3><ref>1.1060:</ref> <a href="../core.f">align</a> <com><i>( -- )</i></com></h3>
+<a name="1.1050"></a>
+<h3><ref>1.1050:</ref> <a href="../core.f">aligned</a> <com><i>( addr1 -- addr2 )</i></com></h3>
+<a name="2.0540"></a>
+<h3><ref>2.0540:</ref> <a href="../core.f">state</a> <com><i>( -- a-addr )</i></com></h3>
+
+<p><tok>a-addr</tok> is the address of a cell containing the compilation-state flag.
+<tok>state</tok> is true when in compilation state, false otherwise.
+</p>
+
+<p>Note: A program shall not directly alter the contents of <tok>state</tok>.
+</p>
+<a name="2.0530"></a>
+<h3><ref>2.0530:</ref> <a href="../core.f">base</a> <com><i>( -- a-addr )</i></com></h3>
+
+<p><tok>a-addr</tok> is the address of a cell containing the current
+number-conversion radix {2 ... 36}.
+</p>
+<a name="2.0520"></a>
+<h3><ref>2.0520:</ref> <a href="../core.f">*/</a> <com><i>( n1 n2 n3 -- n4 )</i></com></h3>
+
+<p>Multiply <tok>n1</tok> by <tok>n2</tok> producing the intermediate double-cell result d.
+Divide d by <tok>n3</tok> giving the single-cell quotient <tok>n4</tok>.
+An ambiguous condition exists if <tok>n3</tok> is zero or if <tok>n4</tok> lies
+outside the range of a signed number.
+</p>
+<a name="2.0510"></a>
+<h3><ref>2.0510:</ref> <a href="../core.f">*/mod</a> <com><i>( n1 n2 n3 -- rem quot )</i></com></h3>
+
+<p>Multiply <tok>n1</tok> by <tok>n2</tok> producing the intermediate double-cell result d.
+Divide d by <tok>n3</tok> producing the single-cell remainder <tok>rem</tok> and the
+single-cell quotient <tok>quot</tok>.
+An ambiguous condition exists if <tok>n3</tok> is zero, or if <tok>quot</tok> lies outside
+the range of a single-cell signed integer.
+</p>
+<a name="2.0500"></a>
+<h3><ref>2.0500:</ref> <a href="../core.f">m*</a> <com><i>( n1 n2 -- d )</i></com></h3>
+
+<p><tok>d</tok> is the signed product of <tok>n1</tok> times <tok>n2</tok>.
+</p>
+<a name="2.0490"></a>
+<h3><ref>2.0490:</ref> <a href="../core.f">/</a> <com><i>( n1 n2 -- quot )</i></com></h3>
+
+<p>Divide <tok>n1</tok> by <tok>n2</tok>, giving the single-cell quotient <tok>quot</tok>.
+An ambiguous condition exists if <tok>n2</tok> is zero.
+</p>
+<a name="2.0480"></a>
+<h3><ref>2.0480:</ref> <a href="../core.f">mod</a> <com><i>( n1 n2 -- rem )</i></com></h3>
+
+<p>Divide <tok>n1</tok> by <tok>n2</tok>, giving the single-cell remainder <tok>rem</tok>.
+An ambiguous condition exists if <tok>n2</tok> is zero.
+</p>
+<a name="2.0470"></a>
+<h3><ref>2.0470:</ref> <a href="../core.f">/mod</a> <com><i>( n1 n2 -- rem quot )</i></com></h3>
+
+<p>Divide <tok>n1</tok> by <tok>n2</tok>, giving the single-cell remainder <tok>rem</tok> and the
+single-cell quotient <tok>quot</tok>. An ambiguous condition exists if <tok>n2</tok> is zero.
+</p>
+<!-- No reference for m/mod -->
+<a name="2.0460"></a>
+<h3><ref>2.0460:</ref> <a href="../core.f">dabs</a> <com><i>( d -- ud )</i></com></h3>
+
+<p>ud is the absolute value of d.
+</p>
+<a name="2.0450"></a>
+<h3><ref>2.0450:</ref> <a href="../core.f">abs</a> <com><i>( n -- u )</i></com></h3>
+
+<p><tok>u</tok> is the absolute value of <tok>n</tok>.
+</p>
+<a name="2.0440"></a>
+<h3><ref>2.0440:</ref> <a href="../core.f">dnegate</a> <com><i>( d -- -d )</i></com></h3>
+
+<p>Negate <tok>d</tok>.
+</p>
+<a name="2.0430"></a>
+<h3><ref>2.0430:</ref> <a href="../core.f">*</a> <com><i>( n1 n2 -- n3 )</i></com></h3>
+
+<p>Multiply <tok>n1</tok> by <tok>n2</tok> giving the product <tok>n3</tok>.
+</p>
+<a name="2.0420"></a>
+<h3><ref>2.0420:</ref> <a href="../core.f">um/mod</a> <com><i>( ud u -- ur uq )</i></com></h3>
+
+<p>Divide <tok>ud</tok> by <tok>u1</tok>, giving the quotient <tok>uq</tok> and the remainder <tok>ur</tok>.
+All values and arithmetic are unsigned.
+An ambiguous condition exists if u1 is zero or if the quotient
+lies outside the range of a single-cell unsigned integer.
+</p>
+<!-- No reference for (um/mod) -->
+<a name="2.0410"></a>
+<h3><ref>2.0410:</ref> <a href="../core.f">um*</a> <com><i>( u1 u2 -- ud )</i></com></h3>
+
+<p>Multiply u1 by u2, giving the unsigned double-cell product ud.
+All values and arithmetic are unsigned.
+</p>
+<!-- No reference for (um*) -->
+<a name="2.0400"></a>
+<h3><ref>2.0400:</ref> <a href="../core.f">+!</a> <com><i>( n a-addr -- )</i></com></h3>
+
+<p>Add <tok>n</tok> to the single-cell number at a-addr.
+</p>
+<a name="2.0390"></a>
+<h3><ref>2.0390:</ref> <a href="../core.f">tuck</a> <com><i>( n1 n2 -- n2 n1 n2 )</i></com></h3>
+
+<p>Copy the first (top) stack item below the second stack item.
+</p>
+<a name="2.0380"></a>
+<h3><ref>2.0380:</ref> <a href="../core.f">negate</a> <com><i>( n -- -n )</i></com></h3>
+
+<p>Negate <tok>n</tok>.
+</p>
+<a name="2.0370"></a>
+<h3><ref>2.0370:</ref> <a href="../core.f">1-</a> <com><i>( n -- n-1 )</i></com></h3>
+
+<p>Subtract 1 from <tok>n</tok>.
+</p>
+<a name="2.0360"></a>
+<h3><ref>2.0360:</ref> <a href="../core.f">1+</a> <com><i>( n -- n+1 )</i></com></h3>
+
+<p>Add 1 to <tok>n</tok>;
+</p>
+<a name="2.0350"></a>
+<h3><ref>2.0350:</ref> <a href="../core.f">char+</a> <com><i>( c-addr1 -- c-addr2 )</i></com></h3>
+
+<p>Add the size in address units of a character to c-addr1, giving c-addr2.
+Same as <tok>1+</tok>.
+</p>
+<a name="2.0340"></a>
+<h3><ref>2.0340:</ref> <a href="../core.f">2drop</a> <com><i>( d -- )</i></com></h3>
+
+<p>Drop cell pair x1 x2 (or <tok>d</tok>) from the stack.
+</p>
+<a name="2.0330"></a>
+<h3><ref>2.0330:</ref> <a href="../core.f">2dup</a> <com><i>( d -- d d )</i></com></h3>
+
+<p>Duplicate cell pair x1 x2 (or <tok>d</tok>).
+</p>
+<a name="2.0320"></a>
+<h3><ref>2.0320:</ref> <a href="../core.f">execute</a> <com><i>( i*x xt -- j*x )</i></com></h3>
+
+<p>Remove <tok>xt</tok> from the stack and perform the semantics identified by it.
+Other stack effects are due to the word <tok>execute</tok>d
+</p>
+<a name="2.0310"></a>
+<h3><ref>2.0310:</ref> <a href="../core.f">rot</a> <com><i>( x1 x2 x3 -- x2 x3 x1 )</i></com></h3>
+
+<p>Rotate the top three stack entries.
+</p>
+<a name="2.0300"></a>
+<h3><ref>2.0300:</ref> <a href="../core.f">or</a> <com><i>( n m -- n|m )</i></com></h3>
+
+<p>x3 is the bit-by-bit logical-or of x1 with x2.
+In <tok>chad</tok>, <tok>or</tok> is made of <tok>invert</tok> and <tok>and</tok> instructions.
+Most code can get by with <tok>+</tok> instead, if speed matters.
+</p>
+<a name="2.0200"></a>
+<h3><ref>2.0200:</ref> <a href="../core.f">c@</a> <com><i>( c-addr -- c )</i></com></h3>
+
+<p>Store <tok>x</tok> at a-addr.
+</p>
+<a name="2.0180"></a>
+<h3><ref>2.0180:</ref> <a href="../core.f">c!</a> <com><i>( c c-addr -- )</i></com></h3>
+
+<p>Store <tok>c</tok> at addr.
+</p>
+<a name="2.0200"></a>
+<h3><ref>2.0200:</ref> <a href="../core.f">!</a> <com><i>( x a-addr -- )</i></com></h3>
+
+<p>Store <tok>x</tok> at a-addr.
+</p>
+<a name="2.0210"></a>
+<h3><ref>2.0210:</ref> <a href="../core.f">@</a> <com><i>( a-addr -- x )</i></com></h3>
+
+<p><tok>x</tok> is the value stored at a-addr.
+</p>
+<a name="2.0170"></a>
+<h3><ref>2.0170:</ref> <a href="../core.f">cells</a> <com><i>( n1 -- n2 )</i></com></h3>
+
+<p>n2 is the size in address units of n1 cells.
+</p>
+<a name="2.0160"></a>
+<h3><ref>2.0160:</ref> <a href="../core.f">cell+</a> <com><i>( a-addr1 -- a-addr2 )</i></com></h3>
+
+<p>Add the size in address units of a cell to a-addr1, giving a-addr2.
+</p>
+<a name="2.0150"></a>
+<h3><ref>2.0150:</ref> <a href="../core.f">&gt;</a> <com><i>( n1 n2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if n1 is greater than n2.
+</p>
+<a name="2.0140"></a>
+<h3><ref>2.0140:</ref> <a href="../core.f">&lt;</a> <com><i>( n1 n2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if n1 is less than n2.
+</p>
+<a name="2.0130"></a>
+<h3><ref>2.0130:</ref> <a href="../core.f">=</a> <com><i>( n1 n2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if x1 is bit-for-bit the same as x2.
+</p>
+<a name="2.0120"></a>
+<h3><ref>2.0120:</ref> <a href="../core.f">io!</a> <com><i>( n addr -- )</i></com></h3>
+
+<p>Store to an output device.
+</p>
+<a name="2.0110"></a>
+<h3><ref>2.0110:</ref> <a href="../core.f">io@</a> <com><i>( addr -- n )</i></com></h3>
+
+<p>Fetch from an input device.
+</p>
+<a name="2.0100"></a>
+<h3><ref>2.0100:</ref> <a href="../core.f">noop</a> <com><i>( -- )</i></com></h3>
+
+<p>A subroutine that does nothing. This is very useful in Forth.
+For &quot;lazy interrupts&quot;, it can be inserted where needed to improve
+interrupt latency. 
+</p>
+<a name="2.0020"></a>
+<h3><ref>2.0020:</ref> <a href="../core.f">exception</a> <com><i>( n --&gt;  )</i></com></h3>
+
+<p>Exception processing forward reference.
+</p>
+<a name="2.0010"></a>
+<h3><ref>2.0010:</ref> <a href="../core.f">cold</a> <com><i>( --&gt;         )</i></com></h3>
+
+<p>Boot vector forward reference.
+</p>
+<a name="2.0000"></a>
+<h3><ref>2.0000:</ref> <a href="../core.f">check_alignment</a> <com><i>( -- n )</i></com></h3>
+
+<p>Compilation option: <tok>1</tok> to check address alignment and trigger an error
+upon bad alignment, <tok>0</tok> for higher speed. Normally <tok>0</tok>.
+</p>
+</body>
+</html>

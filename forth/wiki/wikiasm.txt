@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="description" content="">
+    <meta name="keywords" content="">
+    <title>Assembler Reference</title>
+    <link rel="stylesheet" href="doc.css">
+    <!--[if IE]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+<body>
+<h1>Assembler Reference</h1>
+<hr>
+<p>Execution: The simulator executes one instruction.
+<br>Compilation: One instruction is appended to code space.
+</p>
+<hr>
+<h2>Instruction Compile</h2>
+<hr>
+\
+=1.5100: begin ( -- )
+ Assembler version of `begin`.
+=1.5110: again ( -- )
+ Assembler version of `again`.
+=1.5120: until ( -- )
+ Assembler version of `until`.
+=1.5130: if ( -- )
+ Assembler version of `if`.
+=1.5140: else ( -- )
+ Assembler version of `else`.
+=1.5150: then ( -- )
+ Assembler version of `then`.
+=1.5160: while ( -- )
+ Assembler version of `while`.
+=1.5170: repeat ( -- )
+ Assembler version of `repeat`.
+=1.5010: ;CODE ( 0 -- )
+ End a code definition.
+=1.5020: RET ( n1 -- n2 )
+ Set the ALU instruction `ret` bit.
+=1.6000: T ( n1 -- n2 )
+ No change in T.
+#
+_
+H<h2>Flow Control</h2>
+_
+=1.6010: COP ( n1 -- n2 )
+ T = 0, place holder for coprocessor result.
+=1.6020: T0< ( n1 -- n2 )
+ All bits in T = MSB(T).
+=1.6030: C ( n1 -- n2 )
+ T = carry flag.
+=1.6040: T2/ ( n1 -- n2 )
+ T = signed T / 2.
+=1.6050: cT2/ ( n1 -- n2 )
+ T = carry-in T / 2.
+=1.6060: T2* ( n1 -- n2 )
+ T = T * 2
+=1.6070: T2*c ( n1 -- n2 )
+ T = T * 2 + carry
+=1.6080: N ( n1 -- n2 )
+ T = N
+=1.6090: W ( n1 -- n2 )
+ T = W
+=1.6000: T^N ( n1 -- n2 )
+ T = N ^ T
+=1.6110: ~T ( n1 -- n2 )
+ T = ~T
+=1.6120: T&N ( n1 -- n2 )
+ T = N & T
+=1.6130: T&W ( n1 -- n2 )
+ T = W & T
+=1.6140: mask ( n1 -- n2 )
+ T = (T & 1) << 8 if cellbits < 32.
+ T = (T & 3) << 8 if cellbits = 32.
+ W = FFh.
+=1.6150: T+N ( n1 -- n2 )
+ T = N + T
+=1.6160: T+Nc ( n1 -- n2 )
+ T = N + T + carry
+=1.6170: N-T ( n1 -- n2 )
+ T = N - T
+=1.6180: N-Tc ( n1 -- n2 )
+ T = N - T - carry
+=1.6190: T0= ( n1 -- n2 )
+ T = all '1's if T=0 else all '0's 
+=1.6200: N>>T ( n1 -- n2 )
+ T = N >> T
+=1.6210: N<<T ( n1 -- n2 )
+ T = N << T
+=1.6220: R ( n1 -- n2 )
+ T = R
+=1.6230: R-1 ( n1 -- n2 )
+ T = R - 1
+=1.6240: [T] ( n1 -- n2 )
+ T = mem[RA] (see `_MEMRD_`)
+=1.6250: io[T] ( n1 -- n2 )
+ T = mem[RA] (see `_IORD_`)
+=1.6260: status ( n1 -- n2 )
+ T = (rp<<8) | sp
+=1.7010: T->N ( n1 -- n2 )
+ N = T
+#
+_
+H<h2>ALU operations</h2>
+_
+=1.7020: T->R ( n1 -- n2 )
+ R = T
+=1.7030: N->[T] ( n1 -- n2 )
+ Generate a memory write strobe.
+=1.7040: N->io[T] ( n1 -- n2 )
+ Generate an I/O write strobe.
+=1.7050: _IORD_ ( n1 -- n2 )
+ Generate an I/O read strobe.
+ RA = T.
+=1.7060: _MEMRD_ ( n1 -- n2 )
+ Generate a memory read strobe.
+ RA = T.
+=1.7070: CO ( n1 -- n2 )
+ carry = T[0]; W = T.
+=1.8010: r+1 ( n1 -- n2 )
+  Push to return stack.
+#
+_
+H<h2>ALU strobes</h2>
+_
+=1.8020: r-1 ( n1 -- n2 )
+  Pop from return stack.
+=1.8030: d+1 ( n1 -- n2 )
+  Push to data stack.
+=1.8040: d-1 ( n1 -- n2 )
+  Pop from data stack.
+=1.9010: alu ( n -- 0 )
+  Compile `ALU` instruction
+#
+_
+H<h2>Stack pointer fields</h2>
+_
+=1.9020: branch ( n -- 0 )
+  Compile `jump` instruction
+=1.9030: 0branch ( n -- 0 )
+  Compile `zjump` instruction
+=1.9040: scall ( n -- 0 )
+  Compile `call` instruction
+=1.9050: litx ( n -- 0 )
+  Compile `litx` instruction
+=1.9060: cop ( n -- 0 )
+  Compile coprocessor instruction. Not used.
+=1.9070: imm ( n -- 0 )
+  Compile ALU instruction
+=
