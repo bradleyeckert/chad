@@ -64,24 +64,26 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     case 3:
         nohostAPI = x;  break;
     case 4:
-        r = FlashMemSPI8 ((int)x);
+        r = FlashMemSPI8((int)x);
         SPIresult = (uint8_t)r;
         if (r < 0) {chadError(r / 256);}
         break;
     case 8:
         TFTLCDwrite(x);
     case 0x8000:                    // trigger get-source from interpreter.
-        y = chadGetSource ((char)x);
+        y = chadGetSource((char)x);
         source_addr = y >> 8;
         source_length = y & 0xFF;
         break;
     case 0x8001:                    // trigger a header data read 
-        header_data = chadGetHeader (x);  break;
+        header_data = chadGetHeader(x);  break;
     case 0x8002:                    // trigger an error
         chadError(x);  break;
+    case 0x8003:                    // trigger a host function
+        chadHostFunction(x);  break;
     default:
         if (addr >= 0x100) {        // write to code space
-            chadToCode (addr, x);
+            chadToCode(addr, x);
         } else {
             chadError(BAD_IOADDR);
         }
@@ -115,5 +117,9 @@ static int termKey(void) {              // Get the next byte in the input stream
         return buf[toin++];
     }
     return -1;                  // so this shouldn't happen unless bad gets
+}
+
+void killHostIO(void) {
+    nohostAPI = 1;
 }
 

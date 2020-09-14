@@ -917,17 +917,6 @@ SV dot (void) {                         // ( n -- )
     Cdot(Dpop());                       // .
 }
 
-SV ddot (void) {                        // ( d -- )
-    cell hi = Dpop();                   // d.
-    cell lo = Dpop();
-    uint64_t x = ((uint64_t)hi << CELLBITS) | lo;
-    #if (CELLBITS < 32) // sign extend
-    if (x & (1ull<<(CELLBITS*2-1)))
-        x -= 1ull<<(CELLBITS*2);
-    #endif
-    printf("%" PRId64 " ", x);
-}
-
 //##############################################################################
 // Forth interpreter
 // When a file is included, the rest of the TIB is discarded.
@@ -1184,7 +1173,7 @@ SV Tick      (void) { Dpush(tick()); }
 SV BrackTick (void) { Literal(tick()); }
 SV There     (void) { Dpush(cp); }
 SV Torg      (void) { cp = Dpop(); }
-SV WrProtect (void) { writeprotect = CodeFence; }
+SV WrProtect (void) { writeprotect = CodeFence;  killHostIO(); }
 SV SemiComp  (void) { CompExit();  SaveLength();  toImmediate();  sane();}
 SV Semicolon (void) { SaveLength();  sane(); }
 SV Verbosity (void) { verbose = Dpop(); }
@@ -1498,6 +1487,14 @@ SV Create   (void) { Align();  buffer(0); }
 SV Char     (void) { parseword(' ');  Dpush(getUTF8()); }
 SV BrackChar(void) { parseword(' ');  Literal(getUTF8()); }
 
+// Some words maybe should be compilable, but only if there's a good reason.
+
+SV hostComp(void) { 
+    // noCompile();
+    Literal(my());
+    toCode(call | 1);
+}
+
 // Initialize the dictionary at startup
 
 SV LoadKeywords(void) {
@@ -1522,11 +1519,11 @@ SV LoadKeywords(void) {
     AddKeyword("save-code",   "1.0110 <filename> --", SaveCodeBin,   noCompile);
     AddKeyword("load-data",   "1.0120 <filename> --", LoadDataBin,   noCompile);
     AddKeyword("save-data",   "1.0130 <filename> --", SaveDataBin,   noCompile);
-    AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
+    AddKeyword("equ",         "1.0140 x <name> --",   Constant,      hostComp);
     AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
-    AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
+    AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        hostComp);
     AddKeyword("see",         "1.0210 <name> --",     See,           noCompile);
-    AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          noCompile);
+    AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          hostComp);
     AddKeyword("sstep",       "1.0230 xt len --",     Steps,         noCompile);
     AddKeyword("words",       "1.0240 --",            Words,         noCompile);
     AddKeyword("bye",         "1.0250 --",            Bye,           noCompile);
@@ -1535,32 +1532,31 @@ SV LoadKeywords(void) {
     AddKeyword("[else]",      "1.0280 --",            BrackElse,     noCompile);
     AddKeyword("[undefined]", "1.0290 <name> -- flag", BrackUndefined, noCompile);
     AddKeyword("[defined]",   "1.0300 <name> -- flag", BrackDefined, noCompile);
-    AddKeyword(".",           "1.0400 n --",          dot,           noCompile);
-    AddKeyword("d.",          "1.0410 d --",          ddot,          noCompile);
+    AddKeyword(".",           "1.0400 n --",          dot,           hostComp);
     AddKeyword("forth",       "1.0420 --",            ForthLex,      noCompile);
     AddKeyword("assembler",   "1.0430 --",            AsmLex,        noCompile);
-    AddKeyword("definitions", "1.0440 --",            Definitions,   noCompile);
-    AddKeyword("get-current", "1.0450 -- wid",        GetCurrent,    noCompile);
-    AddKeyword("set-current", "1.0460 wid --",        SetCurrent,    noCompile);
-    AddKeyword("get-order",   "1.0470 -- widN..wid1 N", GetOrder, noCompile);
-    AddKeyword("set-order",   "1.0480 widN..wid1 N --", SetOrder, noCompile);
+    AddKeyword("definitions", "1.0440 --",            Definitions,   hostComp);
+    AddKeyword("get-current", "1.0450 -- wid",        GetCurrent,    hostComp);
+    AddKeyword("set-current", "1.0460 wid --",        SetCurrent,    hostComp);
+    AddKeyword("get-order",   "1.0470 -- widN..wid1 N", GetOrder,    hostComp);
+    AddKeyword("set-order",   "1.0480 widN..wid1 N --", SetOrder,    hostComp);
     AddKeyword("only",        "1.0490 --",            Only,          noCompile);
     AddKeyword("previous",    "1.0500 --",            Previous,      noCompile);
     AddKeyword("also",        "1.0510 --",            Also,          noCompile);
     AddKeyword("order",       "1.0520 --",            Order,         noCompile);
-    AddKeyword("+order",      "1.0530 wid --",        PlusOrder,     noCompile);
+    AddKeyword("+order",      "1.0530 wid --",        PlusOrder,     hostComp);
     AddKeyword("lexicon",     "1.0540 <name> --",     Lexicon,       noCompile);
     AddKeyword("include",     "1.1000 <filename> --", Include,       noCompile);
     AddKeyword("(",           "1.1010 ccc<paren> --",    SkipToPar,  SkipToPar);
     AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
     AddKeyword(".(",          "1.1030 ccc) --",       EchoToPar,     noCompile);
-    AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
+    AddKeyword("constant",    "1.1040 x <name> --",   Constant,      hostComp);
     AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
     AddKeyword("align",       "1.1060 --",            Align,         noCompile);
     AddKeyword("char",        "1.1070 <c> -- n",      Char,          noCompile);
     AddKeyword("chars",       "1.1080 n1 -- n2",      Nothing,         Nothing);
     AddKeyword("cr",          "1.1090 --",            Cr,            noCompile);
-    AddKeyword("create",      "1.1100 <name> --",     Create,        noCompile);
+    AddKeyword("create",      "1.1100 <name> --",     Create,        hostComp);
     AddKeyword("decimal",     "1.1110 --",            Decimal,       noCompile);
     AddKeyword("hex",         "1.1120 --",            Hex,           noCompile);
     AddKeyword("variable",    "1.1130 <name> --",     Variable,      noCompile);
@@ -1579,7 +1575,7 @@ SV LoadKeywords(void) {
     AddKeyword("literal",     "1.1260 x --",          noExecute,     doLITERAL);
     AddKeyword("immediate",   "1.1270 --",            Immediate,     noCompile);
     AddKeyword("marker",      "1.1280 <name> --",     Marker,        noCompile);
-    AddKeyword("there",       "1.1290 -- taddr",      There,         noCompile);
+    AddKeyword("there",       "1.1290 -- taddr",      There,         hostComp);
     AddKeyword("torg",        "1.1300 taddr --",      Torg,          noCompile);
     AddKeyword("later",       "1.1310 <name> --",     Later,         noCompile);
     AddKeyword("resolves",    "1.1320 xt <name> --",  Resolves,      noCompile);
@@ -1896,4 +1892,8 @@ void chadError (uint32_t errorcode) {
     int n = errorcode;
     if (n & MSB) n |= ~CELLMASK;        // sign extend errorcode
     error = n;
+}
+
+void chadHostFunction(uint32_t ID) {    // execute a host function
+    Header[ID].CompFn;
 }
