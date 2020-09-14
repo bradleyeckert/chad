@@ -19,6 +19,11 @@
 =2.0000: check_alignment
  Compilation option: `1` to check address alignment and trigger an error
  upon bad alignment, `0` for higher speed. Normally `0`.
+=2.0011: hostfunc ( ? -- ? )
+ When running in simulation, some host functions are available.
+ The compiler invokes them by compiling a function number and a call to
+ `hostfunc`. Use `write-protect` to flag an error when host functions
+ are invoked at run time to ensure they aren't called in the target system.
 =2.0010: cold ( -- )
  Boot vector forward reference.
 =2.0020: exception ( n -- )

@@ -1491,7 +1491,7 @@ SV BrackChar(void) { parseword(' ');  Literal(getUTF8()); }
 
 SV hostComp(void) { 
     // noCompile();
-    Literal(my());
+    Literal(me);
     toCode(call | 1);
 }
 
@@ -1895,5 +1895,5 @@ void chadError (uint32_t errorcode) {
 }
 
 void chadHostFunction(uint32_t ID) {    // execute a host function
-    Header[ID].CompFn;
+    Header[ID].ExecFn();
 }
