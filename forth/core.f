@@ -8,7 +8,6 @@
 
 0 torg
 later cold                              \ 2.0010 -- \ boots here
-later hostfunc                          \ 2.0011 ? -- ?
 later exception                         \ 2.0020 n --
 
 : noop  nop ;                           \ 2.0100 --
@@ -18,9 +17,6 @@ later exception                         \ 2.0020 n --
 : <     - 0< ; macro                    \ 2.0140 n1 n2 -- flag
 : >     swap < ;                        \ 2.0150 n1 n2 -- flag
 : cell+ cell + ; macro                  \ 2.0160 a-addr1 -- a-addr2
-
-\ When running on the host, allow access to some of its functions
-:noname  ( error -- )  $8003 io! ; resolves hostfunc
 
 cell 4 = [if]
     : cells 2* 2* ; macro               \ 2.0170 n1 -- n2

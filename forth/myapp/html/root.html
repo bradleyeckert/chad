@@ -14,7 +14,7 @@
 <h1>Root Reference</h1>
 <hr>
 <p>
-This wordlist is provided by <tok>chad</tok> to enable you to compile 
+This wordlist is provided by <tok>chad</tok> to enable you to compile
 and execute Forth code in a way that's binary compatible with the
 <tok>chad</tok> processor.
 <tok>chad</tok> is a simulation environment and development platform.
@@ -25,7 +25,7 @@ If you need to compile one, define its equivalent in Forth.
 It's possible to invent a mechanism by which <tok>chad</tok>
 would compile C functions into Forth definitions.
 Unfortunately, that opens a Pandora's box.
-So, we don't do it. 
+So, we don't do it.
 </p>
 <hr>
 <a name="1.5000"></a>
@@ -510,10 +510,16 @@ reference.
 
 <p>Set the code pointer.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.1290"></a>
 <h3><ref>1.1290:</ref> <chad>there</chad> <com><i>( -- taddr )</i></com></h3>
 
 <p>Push the code pointer onto the stack.
+</p>
+
+<p>This word can be used inside a definition that only runs on the host.
 </p>
 <a name="1.1280"></a>
 <h3><ref>1.1280:</ref> <chad>marker</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
@@ -685,18 +691,6 @@ Reserve one cell of data space at an aligned address.
 
 <p>Set the numeric conversion radix (<tok>base</tok>) to ten (decimal).
 </p>
-<a name="1.1100"></a>
-<h3><ref>1.1100:</ref> <chad>create</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
-
-<p>Parse name delimited by a space. Create a definition for name whose
-execution semantics return the current <tok>dp</tok>.
-If the data-space pointer is not aligned, reserve enough data space to
-align it. The new data-space pointer defines name’s data field.
-</p>
-
-<p>Since <tok>create</tok> can&apos;t be used in definitions, it can&apos;t be used with
-<tok>does&gt;</tok>.
-</p>
 <a name="1.1090"></a>
 <h3><ref>1.1090:</ref> <chad>cr</chad> <com><i>( -- )</i></com></h3>
 
@@ -728,6 +722,9 @@ character onto the stack.
 <h3><ref>1.1040:</ref> <chad>constant</chad> <com><i>( x &lt;name&gt; -- )</i></com></h3>
 
 <p>Create a word that pushes <tok>x</tok> onto the stack. Same as <tok>equ</tok>.
+</p>
+
+<p>This word can be used inside a definition that only runs on the host.
 </p>
 <a name="1.1030"></a>
 <h3><ref>1.1030:</ref> <chad>.(</chad> <com><i>( ccc) -- )</i></com></h3>
@@ -774,6 +771,9 @@ top of the search order with <tok>wid</tok>.
 
 <p>Append <tok>wid</tok> to the top of the search order.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.0520"></a>
 <h3><ref>1.0520:</ref> <chad>order</chad> <com><i>( -- )</i></com></h3>
 
@@ -813,6 +813,9 @@ If <tok>N</tok> is minus one, set the search order to the implementation-defined
 minimum search order. The minimum search order shall include the words
 <tok>forth-wordlist</tok> and <tok>set-order</tok>.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.0470"></a>
 <h3><ref>1.0470:</ref> <chad>get-order</chad> <com><i>( -- widN..wid1 N )</i></com></h3>
 
@@ -821,15 +824,24 @@ identifiers <tok>widN</tok> ... <tok>wid1</tok> identifying these word lists.
 <tok>wid1</tok> identifies the word list that is searched first, and
 <tok>widN</tok> the word list that is searched last. The search order is unaffected.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.0460"></a>
 <h3><ref>1.0460:</ref> <chad>set-current</chad> <com><i>( wid -- )</i></com></h3>
 
 <p>Set the compilation word list to the word list identified by <tok>wid</tok>.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.0450"></a>
 <h3><ref>1.0450:</ref> <chad>get-current</chad> <com><i>( -- wid )</i></com></h3>
 
 <p>Return <tok>wid</tok>, the identifier of the compilation word list.
+</p>
+
+<p>This word can be used inside a definition that only runs on the host.
 </p>
 <a name="1.0440"></a>
 <h3><ref>1.0440:</ref> <chad>definitions</chad> <com><i>( -- )</i></com></h3>
@@ -838,6 +850,9 @@ identifiers <tok>widN</tok> ... <tok>wid1</tok> identifying these word lists.
 search order. The names of subsequent definitions will be placed in the
 compilation word list. Subsequent changes in the search order will not
 affect the compilation word list.
+</p>
+
+<p>This word can be used inside a definition that only runs on the host.
 </p>
 <a name="1.0430"></a>
 <h3><ref>1.0430:</ref> <chad>assembler</chad> <com><i>( -- )</i></com></h3>
@@ -855,6 +870,9 @@ You can see the search order at any time by typing <tok>order</tok>.
 <h3><ref>1.0400:</ref> <chad>.</chad> <com><i>( n -- )</i></com></h3>
 
 <p>Display signed <tok>n</tok> using the current <tok>base</tok>. The range of <tok>n</tok> is:
+</p>
+
+<p>This word can be used inside a definition that only runs on the host.
 <ul>
 <li>-32768 to 32767 for 16-bit cells</li><li>-131072 to 131071 for 18-bit cells</li><li>-2147483648 to 2147483647 for 32-bit cells</li></ul>
 </p>
@@ -924,6 +942,9 @@ to trigger a lot more data than you want.
 
 <p>Disassemble <tok>len</tok> words of the code space starting at <tok>xt</tok>.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.0210"></a>
 <h3><ref>1.0210:</ref> <chad>see</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
 
@@ -936,6 +957,9 @@ to trigger a lot more data than you want.
 The interpreter does this for you if the stack is not empty:
 The stack is printed between <tok>\</tok> and <tok>ok&gt;</tok>.
 </p>
+
+<p>This word can be used inside a definition that only runs on the host.
+</p>
 <a name="1.0150"></a>
 <h3><ref>1.0150:</ref> <chad>assert</chad> <com><i>( n1 n2 -- )</i></com></h3>
 
@@ -946,6 +970,9 @@ The stack is printed between <tok>\</tok> and <tok>ok&gt;</tok>.
 
 <p>A synonym of constant that&apos;s guaranteed to not use any target resources
 for its definition. It creates a word that pushes x onto the stack.
+</p>
+
+<p>This word can be used inside a definition that only runs on the host.
 </p>
 <a name="1.0130"></a>
 <h3><ref>1.0130:</ref> <chad>save-data</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>

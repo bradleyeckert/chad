@@ -32,6 +32,4 @@ uint32_t chadGetHeader (uint32_t select);
 
 void chadError(int error); // Report an error
 
-void chadHostFunction(uint32_t ID);  // execxute a host fn (use carefully)
-
 #endif // __CHAD_H__

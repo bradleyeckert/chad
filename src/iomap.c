@@ -79,8 +79,6 @@ void writeIOmap (uint32_t addr, uint32_t x) {
         header_data = chadGetHeader(x);  break;
     case 0x8002:                    // trigger an error
         chadError(x);  break;
-    case 0x8003:                    // trigger a host function
-        chadHostFunction(x);  break;
     default:
         if (addr >= 0x100) {        // write to code space
             chadToCode(addr, x);
