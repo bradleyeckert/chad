@@ -17,6 +17,7 @@ An important feature of `\` is the optional reference field.
 If you want a word to have a reference number for documentation,
 use the format `\ x.xxxx yyyyyyyyyy` where `x.xxxx` is a reference number
 that you assign and `yyyyyyyyyy` is a stack picture.
+A second `\` after `yyyyyyyyyy` begins a comment to end-of-line.
 The `x.xxxx` identifier is also used in the wiki text file to mark
 the documentation text that will be used to populate the HTML reference.
 The order of the wiki document doesn't matter. 

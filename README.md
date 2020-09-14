@@ -138,3 +138,18 @@ ok>25 fib .
 2792024 cycles, MaxSP=27, MaxRP=26, 155 MHz
 ok>
 ```
+
+## While we're at it, a documentation standard.
+
+`chad` presents a documentation system for Forth systems.
+It doesn't need the ANS Forth standard, it generates a standard from source.
+
+Your project folder has a `html` folder that contains documentation.
+`chad` generates hyperlinked HTML versions of each source file
+so that you can click on any word to get an explanation of what it does
+and if necessary, a link to the source code of that word.
+That helps you navigate Forth source code even if you're new to Forth.
+The documentation is re-built each time you build your app.
+
+The 20th Century was great and all, with its books and PDF equivalents.
+We have web browsers now.
