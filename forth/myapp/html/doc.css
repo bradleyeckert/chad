@@ -23,16 +23,17 @@ a:active {
   text-decoration: underline;
 }
 
-chad {
+chad { <!-- internal chad word -->
 color: #9900ff;
 }
 
-ref {
+ref { <!-- reference number -->
 color: #ff6600;
 }
 
-com {
+com { <!-- comment -->
 color: #339966;
+font-style: italic;
 }
 
 tok {
@@ -46,3 +47,8 @@ p {
 }  
 
 </style>
+
+.forth {
+  font-weight: bold;
+  font-family: monospace;
+}

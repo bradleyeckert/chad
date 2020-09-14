@@ -2,10 +2,10 @@
 LCD module simulator
 
 TFT LCD modules with built-in RAM are controlled over a parallel bus by sending
-commands and data to a controller chip. 
+commands and data to a controller chip.
 A D/C (or RS) pin distinguishes between commands and data.
 There are many different kinds of controllers and LCD modules on the market.
-The smallest ones use serial or 8-bit data. 
+The smallest ones use serial or 8-bit data.
 The largest ones use 16-bit or 18-bit data.
 
 This simulator keeps its data in a 24-bit BMP image that can be displayed in any
@@ -93,7 +93,7 @@ int TFTLCDsetup(uint8_t* BMP, int format, int type, int width, int height) {
 static int cfgstate;
 static uint8_t red;						// incoming colors
 static uint8_t green;
-static uint8_t blue; 
+static uint8_t blue;
 
 static int bumpCol(void) {
 	colPtr++;
@@ -155,7 +155,7 @@ static void plotColor(void) {
 }
 
 static const uint32_t RSpos[] = {
-	(1 << 8), 
+	(1 << 8),
 	(1 << 16),
 	(1 << 9),
 	(1 << 18),
@@ -181,7 +181,6 @@ void TFTLCDwrite(uint32_t n) {
 		}
 	}
 	else {								// data
-		uint8_t sel = format;
 		switch (cfgstate++) {
 		case 1: colBegin  = n << 8;  break;
 		case 2: colBegin |= n & 0xFF;  break;
@@ -191,7 +190,7 @@ void TFTLCDwrite(uint32_t n) {
 		case 6: rowBegin |= n & 0xFF;  break;
 		case 7: rowEnd  = n << 8;  break;
 		case 8: rowEnd |= n & 0xFF;  cfgstate = 0;  break;
-		case 9: 
+		case 9:
 			switch (format) {
 			case PACKED16:				// RRRRRGGG
 				red = n & 0xF8;

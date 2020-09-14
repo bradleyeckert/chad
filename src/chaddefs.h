@@ -53,7 +53,8 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 struct FileRec {
     char Line[LineBufferSize];          // the current input line
     char FilePath[LineBufferSize];      // filename
-    FILE *fp;                           // file pointer
+    FILE* fp;                           // input file pointer
+    FILE* hfp;                          // html documentation file pointer
     uint32_t LineNumber;                // line number
     int FID;                            // file ID for LOCATE
 };
@@ -76,12 +77,24 @@ struct Keyword {
     uint8_t isALU;                      // is an ALU word
     uint8_t srcFile;                    // source file ID
     uint16_t srcLine;                   // source line number
+    uint32_t color;                     // HTML color
 };
 
 int chadSpinFunction(void);             // external function waiting for keyboard input
 
 #define NOTANEQU -3412
-#define MAGIC_DEFER 1000
+#define MAGIC_LATER 1000
+#define MAGIC_OPCODE 1001
+
+#define COLOR_NONE (0x000000)
+#define COLOR_NUM  (0xAA0000)
+#define COLOR_ROOT (0x00AAAA)
+#define COLOR_WORD (0x0000FF)
+#define COLOR_ALU  (0xFF00FF) // ALU predefined instruction
+#define COLOR_ASM  (0xCCCCCC) // Assembler sub-field
+#define COLOR_DEF  (0xFF0000)
+#define COLOR_EQU  (0xAA00AA)
+#define COLOR_COM  (0x008800)
 
 // Assembler primitives for the ALU instruction
 // Names are chosen to not conflict with Forth or C

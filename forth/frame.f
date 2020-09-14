@@ -1,4 +1,4 @@
-\ Frame stack													9/10/19 BNE
+\ Frame stack                                                   9/10/19 BNE
 
 \ Placed near the top of data space, grows upward.
 64 cells equ |framestack|
@@ -18,14 +18,14 @@ variable fp1                            \ frame pointer
 64 cells buffer: fpad                   \ frame pad
 dm-size |framestack| - equ fp0          \ empty frame stack
 
-: fpclear  fp0 fp ! ;       \ 2.2900 -- \ clear the frame stack
-: >mem     _! cell + ;      \ 2.2910 n a -- a'
-: mem>     cell - _@ dup@ ; \ 2.2920 a -- a' n
+: fpclear  fp0 fp ! ;                   \ 2.2900 --
+: >mem     _! cell + ;                  \ 2.2910 n a -- a'
+: mem>     cell - _@ dup@ ;             \ 2.2920 a -- a' n
 
 \ Move data stack to memory
 \ "4 buf ds>mem" --> mem = x3 x2 x1 x0 4   trivial case: 0
 \                 addr1----^    addr2----^      addr1----^ ^----addr2
-: ds>mem  ( ... n addr1 -- addr2 )		\ 2.2930 ... n addr1 -- addr2
+: ds>mem  ( ... n addr1 -- addr2 )      \ 2.2930 ... n addr1 -- addr2
     over >r  over if
         swap  for  >mem  next
     else  nip
@@ -35,7 +35,7 @@ dm-size |framestack| - equ fp0          \ empty frame stack
 \ Move memory to data stack
 \ "mem>ds" --> mem = x3 x2 x1 x0 4    trivial case: 0
 \           addr2----^    addr1----^       addr2----^ ^----addr1
-: mem>ds  ( addr1 -- ... addr2 )		\ 2.2940 addr1 -- ... addr2
+: mem>ds  ( addr1 -- ... addr2 )        \ 2.2940 addr1 -- ... addr2
     mem> dup if
         for  mem> swap  next  exit
     then drop
@@ -45,11 +45,11 @@ dm-size |framestack| - equ fp0          \ empty frame stack
 \ The return stack is emptied except for one cell to keep the sim running.
 \ "11 22 33 44 55  2 f[" --> FS = 33 22 11 3 0    stack = ( 44 55 )
 \                                           fp----^
-: f[  ( ... n -- x[n-1] ... x[0] )		\ 2.2950 n --
+: f[  ( ... n -- x[n-1] ... x[0] )      \ 2.2950 n --
     depth
     2dup- 0< if
         r> fp @  spstat 8 rshift 63 and ( RA fp rdepth )
-		1 - 0 max  						\ leave a little on the return stack
+        1 - 0 max                       \ leave a little on the return stack
         swap over                       ( RA rdepth fp cnt | ... )
         begin  dup  while 1 -
             swap r> swap  >mem  swap    \ push return stack to frame stack
@@ -64,9 +64,9 @@ dm-size |framestack| - equ fp0          \ empty frame stack
     then
 ;
 
-: ]f									\ 2.2960 ? -- ?
+: ]f                                    \ 2.2960 ? -- ?
     depth  fpad ds>mem  fp1 !           \ save whatever is on the stack
-	fp @   mem>ds                  		\ restore the old bottom
+    fp @   mem>ds                       \ restore the old bottom
     r>  swap  mem>                      ( RA fp cnt )
     begin  dup  while 1 -
         swap mem> >r swap               ( RA fp n | ... x )

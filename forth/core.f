@@ -3,23 +3,23 @@
 \ You can compile to either check address alignment or not.
 \ Set to 0 when everything looks stable. The difference is 25 instructions.
 
-0 equ check_alignment 					\ 2.0000 -- n
+0 equ check_alignment                   \ 2.0000 -- n
 \ enable @, !, w@, and w! to check address alignment
 
 0 torg
-later cold  	                        \ 2.0010 -->        \ boots here
+later cold                              \ 2.0010 -->        \ boots here
 later exception                         \ 2.0020 n --> \ error detected
 
-: noop  nop ;							\ 2.0100 --
-: io@   _io@ nop _io@_ ;				\ 2.0110 addr -- n
-: io!   _io! nop drop ;					\ 2.0120 n addr --
-: =     xor 0= ;						\ 2.0130 n1 n2 -- flag
-: <     - 0< ; macro					\ 2.0140 n1 n2 -- flag
-: >     swap < ;						\ 2.0150 n1 n2 -- flag
-: cell+ cell + ; macro					\ 2.0160 a-addr1 -- a-addr2
+: noop  nop ;                           \ 2.0100 --
+: io@   _io@ nop _io@_ ;                \ 2.0110 addr -- n
+: io!   _io! nop drop ;                 \ 2.0120 n addr --
+: =     xor 0= ;                        \ 2.0130 n1 n2 -- flag
+: <     - 0< ; macro                    \ 2.0140 n1 n2 -- flag
+: >     swap < ;                        \ 2.0150 n1 n2 -- flag
+: cell+ cell + ; macro                  \ 2.0160 a-addr1 -- a-addr2
 
 cell 4 = [if]
-    : cells 2* 2* ; macro				\ 2.0170 n1 -- n2
+    : cells 2* 2* ; macro               \ 2.0170 n1 -- n2
     : (x!)  ( u w-addr bitmask wordmask )
         >carry swap
         dup>r and 3 lshift dup>r lshift
@@ -30,30 +30,30 @@ cell 4 = [if]
   check_alignment [if]
     : (ta)  ( a mask -- a )
           over and if  22 invert exception  then ;
-    : @   3 (ta)  _@ _@_ ;				\ 2.0210 a-addr -- x
-    : !   3 (ta)  _! drop ;				\ 2.0200 x a-addr --
-    : w!  ( u w-addr -- )				\ 2.0190 w addr --
+    : @   3 (ta)  _@ _@_ ;              \ 2.0210 a-addr -- x
+    : !   3 (ta)  _! drop ;             \ 2.0200 x a-addr --
+    : w!  ( u w-addr -- )               \ 2.0190 w addr --
           1 (ta) 2 $FFFF (x!) ;
-    : w@  ( w-addr -- u )				\ 2.0220 addr -- w
+    : w@  ( w-addr -- u )               \ 2.0220 addr -- w
           1 (ta) _@ dup@ swap 2 and 3 lshift rshift $FFFF and ;
   [else]
-    : @   _@ _@_ ; macro			    \ 2.0210 a-addr -- x
-    : !   _! drop ; macro				\ 2.0200 x a-addr --
-    : w!  2 $FFFF (x!) ;			    \ 2.0190 w addr --
+    : @   _@ _@_ ; macro                \ 2.0210 a-addr -- x
+    : !   _! drop ; macro               \ 2.0200 x a-addr --
+    : w!  2 $FFFF (x!) ;                \ 2.0190 w addr --
     : w@  _@ dup@ swap 2 and 3 lshift   \ 2.0220 addr -- w
-	      rshift $FFFF and ;
+          rshift $FFFF and ;
   [then]
 [else] \ 16-bit or 18-bit cells
-    : cells 2* ; macro					\ 2.0170 n1 -- n2
+    : cells 2* ; macro                  \ 2.0170 n1 -- n2
   check_alignment [if]
     : (ta)  over and if  22 invert exception  then ;
-    : @   1 (ta)  _@ _@_ ;		    	\ 2.0210 a-addr -- x
-    : !   1 (ta)  _! drop ;				\ 2.0200 x a-addr --
+    : @   1 (ta)  _@ _@_ ;              \ 2.0210 a-addr -- x
+    : !   1 (ta)  _! drop ;             \ 2.0200 x a-addr --
   [else]
-    : @   _@ _@_ ; macro			    \ 2.0210 a-addr -- x
-    : !   _! drop ; macro				\ 2.0200 x a-addr --
+    : @   _@ _@_ ; macro                \ 2.0210 a-addr -- x
+    : !   _! drop ; macro               \ 2.0200 x a-addr --
   [then]
-    : c! ( u c-addr -- )				\ 2.0180 c c-addr --
+    : c! ( u c-addr -- )                \ 2.0180 c c-addr --
         dup>r 1 and if
             8 lshift  $00FF
         else
@@ -67,18 +67,18 @@ cell 4 = [if]
 
 \ Your code can usually use + instead of OR, but if it's needed:
 : or    invert swap invert and invert ; \ 2.0300 n m -- n|m
-: rot   >r swap r> swap ;				\ 2.0310 x1 x2 x3 -- x2 x3 x1
+: rot   >r swap r> swap ;               \ 2.0310 x1 x2 x3 -- x2 x3 x1
 
-: execute  2* >r ; no-tail-recursion 	\ 2.0320 i*x xt -- j*x
+: execute  2* >r ; no-tail-recursion    \ 2.0320 i*x xt -- j*x
 
 : 2dup   over over ; macro              \ 2.0330 d -- d d
 : 2drop  drop drop ;                    \ 2.0340 d --
-: char+ [ ;								\ 2.0350 c-addr1 -- c-addr2
-: 1+     1 + ; ( macro )				\ 2.0360 n -- n+1
-: 1-     1 - ; ( macro )				\ 2.0370 n -- n-1
-: negate invert 1+ ;					\ 2.0380 n -- -n
+: char+ [ ;                             \ 2.0350 c-addr1 -- c-addr2
+: 1+     1 + ; ( macro )                \ 2.0360 n -- n+1
+: 1-     1 - ; ( macro )                \ 2.0370 n -- n-1
+: negate invert 1+ ;                    \ 2.0380 n -- -n
 : tuck   swap over ; macro              \ 2.0390 n1 n2 -- n2 n1 n2
-: +!     tuck @ + swap ! ;				\ 2.0400 n a-addr --
+: +!     tuck @ + swap ! ;              \ 2.0400 n a-addr --
 
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
@@ -92,7 +92,7 @@ cell 4 = [if]
     if  over r> + >r carry +
     then  r>
 ;
-: um*  									\ 2.0410 u1 u2 -- ud
+: um*                                   \ 2.0410 u1 u2 -- ud
     0 [ cellbits 2/ ] literal           \ cell is an even number of bits
     for (um*) (um*) next
     >r nip r> swap
@@ -125,7 +125,7 @@ cell 4 = [if]
 : *     um* drop ;                      \ 2.0430 n1 n2 -- n3
 : dnegate                               \ 2.0440 d -- -d
         invert swap invert 1 + swap 0 +c ;
-: abs   dup 0< if negate then ;			\ 2.0450 n -- u
+: abs   dup 0< if negate then ;         \ 2.0450 n -- u
 : dabs  dup 0< if dnegate then ;        \ 2.0460 d -- ud
 
 : m/mod
@@ -153,16 +153,16 @@ cell 4 = [if]
 \ In order to use CREATE DOES>, we need ',' defined here.
 
 dp cell+ dp ! \ variables shared with chad's interpreter
-variable base							\ 2.0530 -- a-addr
-variable state							\ 2.0540 -- a-addr
+variable base                           \ 2.0530 -- a-addr
+variable state                          \ 2.0540 -- a-addr
 align
-: aligned  [ cell 1- ] literal +		\ 1.1050 addr1 -- addr2
+: aligned  [ cell 1- ] literal +        \ 1.1050 addr1 -- addr2
            [ cell negate ] literal and ;
-: align    dp @ aligned dp ! ;			\ 1.1060 --
-: allot    dp +! ;						\ 2.0550 n --
-: here     dp @ ;						\ 2.0560 -- addr
-: ,        align here !  cell allot ;	\ 2.0570 x --
-: c,       here c!  1 allot ;			\ 2.0580 c --
+: align    dp @ aligned dp ! ;          \ 1.1060 --
+: allot    dp +! ;                      \ 2.0550 n --
+: here     dp @ ;                       \ 2.0560 -- addr
+: ,        align here !  cell allot ;   \ 2.0570 x --
+: c,       here c!  1 allot ;           \ 2.0580 c --
 
 \ We're about at 300 instructions at this point.
 \ Paul Bennett's recommended minimum word set is mostly present.
@@ -170,13 +170,13 @@ align
 \ CATCH and THROW are not included. They use stack.
 \ DOES> needs a compilable CREATE.
 
-: u<     - drop carry 0= 0= ;			\ 2.0700 u1 u2 -- flag
-: min    over over- 0< if   			\ 2.0710 n1 n2 -- n3
+: u<     - drop carry 0= 0= ;           \ 2.0700 u1 u2 -- flag
+: min    over over- 0< if               \ 2.0710 n1 n2 -- n3
          swap drop exit then  drop ;
-: max    over over- 0< if  				\ 2.0720 n1 n2 -- n3
+: max    over over- 0< if               \ 2.0720 n1 n2 -- n3
          drop exit then  swap drop ;
 
-CODE depth								\ 2.0730 -- +n
+CODE depth                              \ 2.0730 -- +n
     status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu
 ;CODE
 

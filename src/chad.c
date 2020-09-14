@@ -50,24 +50,30 @@ SV toImmediate(void) { Data[state] = 0; }
 SV toCompile(void) { Data[state] = 1; }
 CELL DisassembleInsn(cell IR);
 
-static char* itos(uint32_t x, uint8_t radix) { // itoa replacement
-    char buf[32];
+static char* itos(uint32_t x, uint8_t radix, int8_t digits, int isUnsigned) {
+    static char buf[32];                 // itoa replacement
     uint32_t sign = (x & (1 << (CELLBITS - 1)));
-    if (sign) x = (~x) + 1;
-    x &= CELLMASK;
+    if (isUnsigned) {
+        sign = 0;
+    }
+    else {
+        if (sign) x = (~x) + 1;
+        x &= CELLMASK;
+    }
     int i = 32;  buf[--i] = 0;
     do {
         char c = x % radix;
         if (c > 9) c += 7;
         buf[--i] = c + '0';
         x /= radix;
-    } while (x && (i >= 0));
+        digits--;
+    } while ((x && (i >= 0)) || (digits > 0));
     if (sign) buf[--i] = '-';
     return &buf[i];
 }
 
 SV Cdot(cell x) {
-    printf("%s ", itos(x, Data[base]));
+    printf("%s ", itos(x, Data[base], 0, 0));
 }
 
 SV PrintDataStack(void) {
@@ -424,9 +430,80 @@ SV noCompile(void) { error = BAD_NOCOMPILE; }
 SV noExecute(void) { error = BAD_UNSUPPORTED; }
 
 SV doNext(void) {
-    toCode(alu | RM1toT | TtoN | sup);   /* (R-1)@ */
+    toCode(alu | RM1toT | TtoN | sup);  /* (R-1)@ */
     toCode(alu | zeq | TtoR);  ResolveRev(zjump);
-    toCode(alu | rdn);  fence = cp;      /* rdrop */
+    toCode(alu | rdn);  fence = cp;     /* rdrop */
+}
+
+// HTML output is a kind of log file of token handling. It's a browsable
+// version of the source text with links to reference documents.
+
+SI fileID = 0;                          // cumulative file ID
+struct FileRec FileStack[MaxFiles];
+SI filedepth = 0;                       // file stack
+static int logcolor = 0;
+static int leadingblanks = 0;
+
+SV LogR(char* s) {                      // raw text to HTML file
+    FILE* fp = File.hfp;
+    if (fp) fprintf(fp, "%s", s);
+}
+
+SV FlushBlanks(void) {
+    switch (leadingblanks) {
+    case 0: break;
+    case 1: LogR(" "); break;
+    default:
+        while (--leadingblanks)
+            LogR(" ");
+        LogR("&nbsp;");
+    }
+    leadingblanks = 0;
+}
+
+SV Log(char* s) {
+    FILE* fp = File.hfp;
+    if (fp) {
+        char c;
+        while ((c = *s++)) {
+            if (' ' != c)
+                FlushBlanks();
+            switch (c) {
+            case '"':  fprintf(fp, "&quot;");  break;
+            case '\'': fprintf(fp, "&apos;");  break;
+            case '<':  fprintf(fp, "&lt;");    break;
+            case '>':  fprintf(fp, "&gt;");    break;
+            case '&':  fprintf(fp, "&amp;");   break;
+            case ' ':  leadingblanks++;        break;
+            default:   fprintf(fp, "%c", c);
+            }
+        }
+    }
+}
+
+SV LogBegin(char* title) {
+    LogR("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n");
+    LogR("<meta charset=\"utf-8\">\n<title>");
+    LogR(title);
+    LogR("</title>\n<link rel=\"stylesheet\" href=\"doc.css\">\n");
+    LogR("</head>\n<body>\n<h1>");
+    LogR(title);
+    LogR("</h1>\n<pre class=\"forth\">\n<font color=black>\n");
+    LogR("<hr>\n");
+}
+
+SV LogEnd(void) {
+    LogR("\n</pre>\n</body>\n</html>\n");
+}
+
+// A strncpy that complies with C safety checks.
+
+void strmove(char* dest, char* src, int maxlen) {
+    for (int i = 0; i < maxlen; i++) {
+        char c = *src++;  *dest++ = c;
+        if (c == 0) return;             // up to and including the terminator
+    }
+    *--dest = 0;                        // max reached, add terminator
 }
 
 //##############################################################################
@@ -437,6 +514,46 @@ SV doNext(void) {
 SI hp;                                  // # of keywords in the Header list
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of found keyword
+static char* foundWidName;              // name of wid the word was found in
+static char ref[LineBufferSize];
+static char* ReferenceStackPic;         // string remaining after first blank
+
+static char* ReferenceString(int i) {   // extract reference string
+    char* hs = Header[i].help;
+    ReferenceStackPic = NULL;
+    if (hs[0]) {
+        strmove(ref, hs, LineBufferSize);
+        if ((ReferenceStackPic = strchr(ref, ' ')) != NULL)
+            *ReferenceStackPic++ = '\0';
+        return ref;
+    }
+    return NULL;
+}
+
+// HTML output of the token being evaluated, with hyperlink to reference.
+SV LogColor(uint32_t color, int ID, char* s) {
+    FlushBlanks();
+    if (logcolor != color) {
+        logcolor = color;
+        LogR("</font><font color=#");
+        Log(itos(color, 16, 6, 1));
+        LogR(">");
+    }
+    if (ID) {
+        LogR("<a href = \"");
+        LogR(foundWidName);
+        LogR(".html#");
+        LogR(ReferenceString(ID));
+        LogR("\" style=\"text-decoration: none; color: #");
+        Log(itos(color, 16, 6, 1));
+        LogR("\">");
+        LogR(s);
+        LogR("</a>");
+    }
+    else
+        LogR(s);
+    LogR(" ");
+}
 
 // The search order is a lists of contexts with order[orders] searched first
 // order:   wid3 wid2 wid1
@@ -490,20 +607,11 @@ SI FindWord(char* key) {                // find in context
         int id = findinWL(key, i);
         if (id >= 0) {
             Header[me].references += 1; // bump reference counter
+            foundWidName = &wordlistname[i][0];
             return id;
         }
     }
     return -1;
-}
-
-// A strncpy that complies with C safety checks.
-
-void strmove(char* dest, char* src, int maxlen) {
-    for (int i = 0; i < maxlen; i++) {
-        char c = *src++;  *dest++ = c;
-        if (c == 0) return;             // up to and including the terminator
-    }
-    *--dest = 0;                        // max reached, add terminator
 }
 
 SI AddWordlist(char *name) {
@@ -555,7 +663,7 @@ SV GetOrder(void) {
 SV SetOrder(void) {
     int8_t len = Dpop();
     orders = 0;
-    if (len < 0) 
+    if (len < 0)
         Only();
     else
         for (int i = 0; i < len; i++)
@@ -566,6 +674,7 @@ SI NotKeyword (char *key) {             // do a command, return 0 if found
     int i = FindWord(key);
     if (i < 0)
         return -1;                      // not found
+    LogColor(Header[i].color, i, key);
     if (Data[state])
         Header[i].CompFn();
     else
@@ -574,10 +683,6 @@ SI NotKeyword (char *key) {             // do a command, return 0 if found
 }
 
 static uint32_t my (void) {return Header[me].w;}
-SI fileID = 0;                          // cumulative file ID
-struct FileRec FileStack[MaxFiles];
-SI filedepth = 0;                       // file stack
-
 SV doLITERAL  (void) { Literal(Dpop()); }
 SV Equ_Comp   (void) { Literal(my()); }
 SV Equ_Exec   (void) { Dpush(my()); }
@@ -626,6 +731,7 @@ SV SetFns (cell value, void (*exec)(), void (*comp)()) {
 SV AddKeyword (char* name, char* help, void (*xte)(), void (*xtc)()) {
     if (AddHead(name, help)) {
         SetFns(NOTANEQU, xte, xtc);
+        Header[hp].color = COLOR_ROOT;
     }
 }
 
@@ -633,6 +739,7 @@ SV AddALUinst(char* name, char* help, cell value) {
     if (AddHead(name, help)) {
         SetFns(value, Prim_Exec, Prim_Comp);
         Header[hp].isALU = 1;
+        Header[hp].color = COLOR_ALU;
     }
 }
 
@@ -641,7 +748,8 @@ int DefMark, DefMarkID;
 SV AddEquate(char* name, char* help, cell value) {
     if (AddHead(name, help)) {
         SetFns(value, Equ_Exec, Equ_Comp);
-        DefMarkID = hp;
+        Header[hp].color = COLOR_EQU;
+        DefMarkID = hp; // was for DOES> but can't do it here
     }
 }
 
@@ -649,6 +757,7 @@ SV AddEquate(char* name, char* help, cell value) {
 SV AddModifier (char *name, char* help, cell value) {
     if (AddHead(name, help)) {
         SetFns(value, doInstMod, noCompile);
+        Header[hp].color = COLOR_ASM;
     }
 }
 
@@ -656,6 +765,8 @@ SV AddModifier (char *name, char* help, cell value) {
 SV AddLitOp (char *name, char* help, cell value) {
     if (AddHead(name, help)) {
         SetFns(value, doLitOp, noCompile);
+        Header[hp].w2 = MAGIC_OPCODE;
+        Header[hp].color = COLOR_ASM;
     }
 }
 
@@ -686,7 +797,7 @@ SV appendDA(char* s) {                  // append string to DA buffer
 }
 
 SV HexToDA(cell x) {                    // append hex number to DA buffer
-    appendDA(itos(x, 16));
+    appendDA(itos(x, 16, 2, 0));
 }
 
 SV diss (int id, char *str) {
@@ -829,6 +940,29 @@ SI toin;                                // pointer to next character
 static char FilePaths[MaxFilePaths*LineBufferSize];
 static char BOMmarker[4] = {0xEF, 0xBB, 0xBF, 0x00};
 
+static char* Title(char* filename) {    // strip down filename
+    char* p = &filename[strlen(filename)];
+    int running = 1;  int dot = 0;
+    do {
+        switch (*--p) {
+        case '\\':                      // trim leading file path
+        case '/': running = 0;  p++;  break;
+        case '.':                       // trim file extension
+            if (dot == 0) { dot = 1;  *p = '\0'; }
+        }
+    } while ((p > filename) && (running));
+    return p;
+}
+
+static char* RefPath(char* filename) {  // convert filename format
+    static char buf[LineBufferSize];
+    strmove(buf, "./html/", LineBufferSize);
+    strmove(&buf[strlen(buf)], Title(filename), LineBufferSize);
+    strmove(&buf[strlen(buf)], ".html", LineBufferSize);
+    buf[strlen(buf)] = '\0';
+    return buf;
+}
+
 SV SwallowBOM(FILE *fp) {               // swallow leading UTF8 BOM marker
     char BOM[4];                        // to support utf-8 files on Windows
     fgets(BOM, 4, fp);
@@ -843,7 +977,7 @@ static FILE* fopenx(char* filename, char* fmt) {
     errno_t err = fopen_s(&fp, filename, fmt);
     return fp;
 #else
-    return fopen(name, fmt);
+    return fopen(filename, fmt);
 #endif
 }
 
@@ -862,7 +996,10 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
             error = BAD_INCLUDING;
         else {
             SwallowBOM(File.fp);
-            strmove(&FilePaths[fileID * LineBufferSize], name, LineBufferSize);
+            char* infilename = &FilePaths[fileID * LineBufferSize];
+            strmove(infilename, name, LineBufferSize);
+            File.hfp = fopenx(RefPath(name), "w");
+            LogBegin(Title(name));
         }
     }
 }
@@ -870,10 +1007,13 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
 static char tok[LineBufferSize+1];      // blank-delimited token
 
 SI parseword(char delimiter) {
-    while (buf[toin] == delimiter) toin++;
+    while (buf[toin] == delimiter) {
+        Log(" ");
+        toin++;
+    }
     int length = 0;  char c;
     while ((c = buf[toin++]) != delimiter) {
-        if (!c) {                       // assume trailing 0 is there
+        if (!c) {                       // hit EOL
             toin--;  break;             // step back to terminator
         }
         tok[length++] = c;
@@ -894,14 +1034,17 @@ SV ParseFilename(void) {
 
 SV Include(void) {                      // Nest into a source file
     ParseFilename();
+    LogColor(COLOR_NONE, 0, tok);
     OpenNewFile(tok);
 }
 
 SV Colon(void) {
     parseword(' ');
     if (AddHead(tok, "")) {             // define a word that simulates
+        LogColor(COLOR_DEF, 0, tok);
         SetFns(cp, Def_Exec, Def_Comp);
         Header[hp].target = cp;
+        Header[hp].color = COLOR_WORD;
         DefMarkID = hp;                 // save for later reference
         DefMark = cp;  toCompile();
         fence = cp;                     // code starts here
@@ -919,11 +1062,13 @@ SV NoName(void) {
 SV Constant(void) {
     parseword(' ');
     AddEquate(tok, "", Dpop());
+    LogColor(COLOR_EQU, 0, tok);
 }
 
 SV Lexicon(void) {                    // named wordlist
     parseword(' ');
     AddEquate(tok, "", AddWordlist(tok));
+    LogColor(COLOR_DEF, 0, tok);
 }
 
 SV BrackDefined(void) {
@@ -931,7 +1076,10 @@ SV BrackDefined(void) {
     int r = (FindWord(tok) < 0) ? 0 : 1;
     if (r) {
         if (Header[me].target == 0) r = 0;
+        LogColor(COLOR_NONE, me, tok);
     }
+    else
+        LogColor(COLOR_WORD, me, tok);
     Dpush(r);
 }
 
@@ -986,9 +1134,11 @@ SV Marker (void) {
     parseword(' ');
     if (AddHead(tok, "")) {
         SetFns(cp, Marker_Exec, noCompile);
+        Header[hp].color = COLOR_ROOT;
         cell* pad = malloc(sizeof(cell) * (MaxWordlists + 8));
         Header[hp].aux = pad;
         SaveMarker(pad);
+        LogColor(COLOR_DEF, 0, tok);
     }
 }
 
@@ -998,6 +1148,7 @@ SI tick (void) {                        // get the w field of the word
         error = UNRECOGNIZED;
         return 0;
     }
+    LogColor(COLOR_WORD, me, tok);
     return Header[me].target;           // W field of found word
 }
 
@@ -1010,22 +1161,24 @@ SV See (void) {                         // ( <name> -- )
 
 SV Later(void) {
     Colon();  toImmediate();  toCode(jump);
-    Header[hp].w2 = MAGIC_DEFER;
+    Header[hp].w2 = MAGIC_LATER;
 }
 
 SV Resolves(void) {                     // ( xt <name> -- )
     int addr = tick();
-    if (Header[me].w2 != MAGIC_DEFER) error = BAD_IS;
+    if (Header[me].w2 != MAGIC_LATER) error = BAD_IS;
     cell insn = jump | (Dpop() & 0x1fff);
     chadToCode(addr, insn);
 }
 
+SV SkipToPar(void) {
+    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");  toin++;
+}
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
 SV EndCode   (void) { SaveLength();  OrderPop();  Dpop();  sane();}
 SV Bye       (void) { error = BYE; }
-SV SkipToPar (void) { parseword(')'); }
-SV EchoToPar (void) { parseword(')');  printf("%s", tok); }
+SV EchoToPar (void) { SkipToPar();  printf("%s", tok); }
 SV Cr        (void) { printf("\n"); }
 SV Tick      (void) { Dpush(tick()); }
 SV BrackTick (void) { Literal(tick()); }
@@ -1042,6 +1195,7 @@ SV SkipToEOL(void) {                // and look for x.xxxx format number
     char* src = &buf[toin];
     char* p = src;
     char* dest = Header[DefMarkID].help;
+    LogColor(COLOR_COM, 0, src);
     int digits = 0;  int decimals = 0;
     for (int i = 0; i < 6; i++) {
         char c = *p++;
@@ -1055,7 +1209,7 @@ SV SkipToEOL(void) {                // and look for x.xxxx format number
         if ((p = strchr(src, '\\')) != NULL) *p = '\0';
         strmove(dest, src, MaxAnchorSize);
     }
-    toin = (int)strlen(buf); 
+    toin = (int)strlen(buf);
 }
 
 
@@ -1092,6 +1246,8 @@ ask: toin = 0;
         result = 0;
         if (filedepth) {
             fclose(File.fp);
+            LogEnd();
+            fclose(File.hfp);
             filedepth--;
             goto ask;
         }
@@ -1099,6 +1255,8 @@ ask: toin = 0;
     else
         trimCR(buf);
     strmove(File.Line, buf, LineBufferSize);
+    logcolor = 0;
+    Log("\n");
     if (verbose & VERBOSE_SOURCE)
         printf("%d: %s\n", lineno, buf);
     return result;
@@ -1121,6 +1279,7 @@ static void BrackElse(void) {
             if (!strcmp(tok, "[else]") && (level == 1)) {
                 level--;
             }
+            LogColor(COLOR_NONE, 0, tok);
         }
         else {                        // EOL
             if (!refill()) {
@@ -1147,7 +1306,7 @@ SV SaveMem(uint8_t* mem, int length) { // save binary to a file
 #ifdef MORESAFE
     errno_t err = fopen_s(&fp, tok, "wb");
 #else
-    fp = fopen(filename, "wb");
+    fp = fopen(tok, "wb");
 #endif
     if (fp == NULL)
         error = BAD_CREATEFILE;
@@ -1163,7 +1322,7 @@ SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
 #ifdef MORESAFE
     errno_t err = fopen_s(&fp, tok, "rb");
 #else
-    fp = fopen(filename, "rb");
+    fp = fopen(tok, "rb");
 #endif
     if (fp == NULL)
         error = BAD_OPENFILE;
@@ -1173,12 +1332,13 @@ SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
     }
 };
 
-// HTML document generator
+//##############################################################################
+// HTML reference document generator
 
 SV htmlOut(char* s, FILE* fp) {         // text -> HTML
     char c;
     int italic = 0;
-    while ((c = *s++)) 
+    while ((c = *s++))
         switch (c) {
         case '"':  fprintf(fp, "&quot;");  break;
         case '\'': fprintf(fp, "&apos;");  break;
@@ -1186,10 +1346,10 @@ SV htmlOut(char* s, FILE* fp) {         // text -> HTML
         case '>':  fprintf(fp, "&gt;");    break;
         case '&':  fprintf(fp, "&amp;");   break;
         case '`':
-            if (italic) 
+            if (italic)
                 fprintf(fp, "</tok>");
             else
-                fprintf(fp, "<tok>");   
+                fprintf(fp, "<tok>");
             italic = (italic == 0);
             break;
         default:   fprintf(fp, "%c", c);
@@ -1205,7 +1365,7 @@ SV GenerateDoc(void) {
     ParseFilename();
     FILE* fpw = fopenx(tok, "w");
     if (fpw == NULL) {
-        error = BAD_CREATEFILE; 
+        error = BAD_CREATEFILE;
         fclose(fpr);   return;
     }
     static char wikiline[LineBufferSize];
@@ -1226,18 +1386,13 @@ SV GenerateDoc(void) {
         fprintf(fpw, "<body>\n<h1>Chad Reference</h1>\n");
     uint16_t i = wordlist[context()];
     while (i) {
-        char* hs = Header[i].help;
         char* na = Header[i].name;
         uint8_t fileID = Header[i].srcFile;
-        static char ref[LineBufferSize];
-        if (hs[0]) {
-            strmove(ref, hs, LineBufferSize);
-            char* stackpic; // string remaining after first blank
-            if ((stackpic = strchr(ref, ' ')) != NULL) *stackpic++ = '\0';
-            fprintf(fpw, "<a name=\"%s\"></a>\n", ref);
+        if (Header[i].help[0]) {
+            fprintf(fpw, "<a name=\"%s\"></a>\n", ReferenceString(i));
             fprintf(fpw, "<h3><ref>%s:</ref> ", ref);
             if (fileID) {
-                fprintf(fpw, "<a href=\"%s\">",
+                fprintf(fpw, "<a href=\"../%s\">",
                     &FilePaths[fileID * LineBufferSize]);
                 htmlOut(na, fpw);
                 fprintf(fpw, "</a>");
@@ -1247,8 +1402,8 @@ SV GenerateDoc(void) {
                 htmlOut(na, fpw);
                 fprintf(fpw, "</chad>");
             }
-            if (stackpic) {
-                fprintf(fpw, " <com><i>( ");   htmlOut(stackpic, fpw);
+            if (ReferenceStackPic) {
+                fprintf(fpw, " <com><i>( ");  htmlOut(ReferenceStackPic, fpw);
                 fprintf(fpw, " )</i></com>");
             }
             fprintf(fpw, "</h3>\n");
@@ -1268,8 +1423,8 @@ SV GenerateDoc(void) {
                         case '#': goto endparagraph;
                         case 'H': fprintf(fpw, "%s\n", txt);  break;
                         case '_': fprintf(fpw, "<hr>");       break;
-                        case '-': 
-                            fprintf(fpw, "<li>");      
+                        case '-':
+                            fprintf(fpw, "<li>");
                             htmlOut(txt, fpw);
                             fprintf(fpw, "</li>");
                             break;
@@ -1583,6 +1738,7 @@ int chad(char * line, int maxlength) {
                     printf("  %s", tok);
                 }
                 if (NotKeyword(tok)) {  // try to convert to number
+                    LogColor(COLOR_NUM, 0, tok);
                     int i = 0;   int radix = Data[base];   char c = 0;
                     if (radix == 0)
                         error = DIV_BY_ZERO;
@@ -1656,6 +1812,8 @@ bogus:                          error = UNRECOGNIZED;
                         printf("%s, Line %d: ", File.FilePath, File.LineNumber);
                         printf("%s\n", File.Line);
                         fclose(File.fp);
+                        LogEnd();
+                        fclose(File.hfp);
                         filedepth--;
                     }
                     rp = sp = 0;

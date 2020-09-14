@@ -3,12 +3,12 @@
 there
 
 \ Equates take up no code space. Have as many as you want.
-0 equ 'TXbuf  							\ 2.2000 -- ioa \ output register
-2 equ 'TXbusy 							\ 2.2010 -- ioa \ tx busy flag
+0 equ 'TXbuf                            \ 2.2000 -- ioa \ output register
+2 equ 'TXbusy                           \ 2.2010 -- ioa \ tx busy flag
 
-variable ScreenProfile					\ 2.2100 -- addr
+variable ScreenProfile                  \ 2.2100 -- addr
 : ExecScreen  ( n -- ) ScreenProfile @ execute execute ;
-: emit  0 ExecScreen ;					\ 2.2110 x --
+: emit  0 ExecScreen ;                  \ 2.2110 x --
 : cr    1 ExecScreen ;
 
 \ stdout is the screen:
@@ -17,10 +17,10 @@ variable ScreenProfile					\ 2.2100 -- addr
 : _cr    13 _emit 10 _emit ; \ --
 
 11 |bits|
-: stdout_table  exec1: [	\ The xts are less than 2048
+: stdout_table  exec1: [    \ The xts are less than 2048
     ' _emit | ' _cr
 ] literal ;
 
-' stdout_table ScreenProfile !	\ assign it
+' stdout_table ScreenProfile !  \ assign it
 
 there swap - . .( instructions used by I/O redirect) cr

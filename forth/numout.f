@@ -4,14 +4,14 @@
 
 there
 decimal
-variable hld 							\ 2.3000 -- c-addr \ numeric conversion pointer
-32 equ bl								\ 2.3010 -- char
+variable hld                            \ 2.3000 -- c-addr \ numeric conversion pointer
+32 equ bl                               \ 2.3010 -- char
 
-: count   dup 1+ swap c@ ; 				\ 2.3110 a u -- a+1 u-1
+: count   dup 1+ swap c@ ;              \ 2.3110 a u -- a+1 u-1
 : decimal 10 base ! ;
 : hex     16 base ! ;
 : type    dup if                        \ 2.3140 c-addr u --
-			for  count emit  next  drop
+            for  count emit  next  drop
           else  2drop
           then
 ;
@@ -22,7 +22,7 @@ variable hld 							\ 2.3000 -- c-addr \ numeric conversion pointer
 
 \ Numeric conversion, from eForth mostly.
 
-: digit   dup 10 - 0< 6 invert and		\ 2.3180 n -- char
+: digit   dup 10 - 0< 6 invert and      \ 2.3180 n -- char
           + [char] 7 + ;
 : <#      dm-size  hld ! ;              \ 2.3190 ud1 -- ud1
 : hold    hld dup >r @ 1- dup r> ! c! ; \ 2.3200 char --
@@ -36,7 +36,7 @@ variable hld 							\ 2.3000 -- c-addr \ numeric conversion pointer
 : sign    0< if [char] - hold then ;    \ 2.3230 n --
 : #>      2drop hld @ dm-size over - ;  \ 2.3240 ud -- c-addr u
 : s.r     over - spaces type ;          \ length width --
-: d.r     >r dup >r dabs         		\ 2.3250 d width --
+: d.r     >r dup >r dabs                \ 2.3250 d width --
           <# #s r> sign #> r> s.r ;
 : u.r     0 swap d.r ;                  \ 2.3260 u width --
 : .r      >r s>d r> d.r ;               \ 2.3270 n width --
