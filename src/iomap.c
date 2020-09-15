@@ -16,9 +16,7 @@
 // The `_IORD_` field in an ALU instruction strobes io_rd.
 // In the J1, input devices sit on (mem_addr,io_din)
 
-static uint32_t source_addr;        // host API return data
-static uint32_t source_length;
-static uint32_t header_data;
+static uint32_t header_data;        // host API return data
 static uint8_t SPIresult;
 static uint8_t nohostAPI;           // prohibit access to host API
 
@@ -37,9 +35,7 @@ uint32_t readIOmap (uint32_t addr) {
 #endif
     case 2: return 0;               // UART tx is never busy
     case 4: return SPIresult;       // return SPI result
-    case 0x8000: return source_addr;
-    case 0x8001: return source_length;
-    case 0x8002: return header_data;
+    case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }
     return 0;
@@ -50,7 +46,7 @@ uint32_t readIOmap (uint32_t addr) {
 
 // Code space is writable through this interface.
 void writeIOmap (uint32_t addr, uint32_t x) {
-    uint32_t y;  int r;
+    int r;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
@@ -70,12 +66,7 @@ void writeIOmap (uint32_t addr, uint32_t x) {
         break;
     case 8:
         TFTLCDwrite(x);
-    case 0x8000:                    // trigger get-source from interpreter.
-        y = chadGetSource((char)x);
-        source_addr = y >> 8;
-        source_length = y & 0xFF;
-        break;
-    case 0x8001:                    // trigger a header data read 
+    case 0x8000:                    // trigger a header data read 
         header_data = chadGetHeader(x);  break;
     case 0x8002:                    // trigger an error
         chadError(x);  break;

@@ -15,7 +15,8 @@
 
 #define MoreInstrumentation     /* Simulator has more instrumentation       */
 
-#define LineBufferSize 256      /* Size of line buffer                      */
+#define LineBufferSize 128      /* Size of line buffer                      */
+#define MaxLineLength  120      /* Max TIB size                             */
 #define MaxKeywords   2000      /* Number of headers                        */
 #define MaxNameSize     32      /* Number of chars in a name (less 1)       */
 #define MaxAnchorSize   32      /* Number of chars in an anchor string (-1) */

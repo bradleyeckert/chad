@@ -16,7 +16,7 @@ there
 variable fp                             \ frame stack pointer
 variable fp1                            \ frame pointer
 64 cells buffer: fpad                   \ frame pad
-dm-size |framestack| - equ fp0          \ empty frame stack
+tib |framestack| - equ fp0              \ empty frame stack
 
 : fpclear  fp0 fp ! ;                   \ 2.2900 --
 : >mem     _! cell + ;                  \ 2.2910 n a -- a'

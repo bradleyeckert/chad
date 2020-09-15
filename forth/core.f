@@ -155,6 +155,8 @@ cell 4 = [if]
 dp cell+ dp ! \ variables shared with chad's interpreter
 variable base                           \ 2.0530 -- a-addr
 variable state                          \ 2.0540 -- a-addr
+variable >in                          	\ 2.0541 -- a-addr
+variable tibs                         	\ 2.0542 -- a-addr
 align
 : aligned  [ cell 1- ] literal +        \ 1.1050 addr1 -- addr2
            [ cell negate ] literal and ;

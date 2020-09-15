@@ -130,6 +130,10 @@
  `state` is true when in compilation state, false otherwise.
 
  Note: A program shall not directly alter the contents of `state`.
+=2.0541: >in ( -- a-addr )
+ An index into the `tib` input buffer.
+=2.0542: tibs ( -- a-addr ) 
+ The number of characters in the input buffer.
 =2.0550: allot ( n -- )
  If `n` is greater than zero, reserve n address units of data space.
  If `n` is less than zero, release `n` address units of data space.

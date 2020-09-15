@@ -41,8 +41,10 @@ CELL Raddr;                             // data memory read address
 SI error;                               // simulator and interpreter error code
 
 #define dp 0                            // define shared variables
-#define base (dp + 1)                   // use cells not bytes for compatibility
+#define base  (dp + 1)                  // use cells not bytes for compatibility
 #define state (base + 1)                // define cell addresses
+#define toin  (state + 1)               // pointer to next character
+#define tibs  (toin + 1)                // chars in input buffer
 
 SV Hex(void) { Data[base] = 16; }
 SV Decimal(void) { Data[base] = 10; }
@@ -933,7 +935,6 @@ SV dot (void) {                         // ( n -- )
 
 static char* buf;                       // line buffer
 SI maxlen;                              // maximum buffer length
-SI toin;                                // pointer to next character
 static char FilePaths[MaxFilePaths*LineBufferSize];
 static char BOMmarker[4] = {0xEF, 0xBB, 0xBF, 0x00};
 
@@ -1004,14 +1005,14 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
 static char tok[LineBufferSize+1];      // blank-delimited token
 
 SI parseword(char delimiter) {
-    while (buf[toin] == delimiter) {
+    while (buf[Data[toin]] == delimiter) {
         Log(" ");
-        toin++;
+        Data[toin]++;
     }
     int length = 0;  char c;
-    while ((c = buf[toin++]) != delimiter) {
+    while ((c = buf[Data[toin]++]) != delimiter) {
         if (!c) {                       // hit EOL
-            toin--;  break;             // step back to terminator
+            Data[toin]--;  break;       // step back to terminator
         }
         tok[length++] = c;
     }
@@ -1020,9 +1021,9 @@ SI parseword(char delimiter) {
 }
 
 SV ParseFilename(void) {
-    while (buf[toin] == ' ') toin++;
-    if (buf[toin] == '"') {
-        toin++;  parseword('"');        // allow filename in quotes
+    while (buf[Data[toin]] == ' ') Data[toin]++;
+    if (buf[Data[toin]] == '"') {
+        Data[toin]++;  parseword('"');  // allow filename in quotes
     }
     else {
         parseword(' ');                 // or a filename with no spaces
@@ -1067,7 +1068,7 @@ SV Constant(void) {
     LogColor(COLOR_EQU, 0, tok);
 }
 
-SV Lexicon(void) {                    // named wordlist
+SV Lexicon(void) {                      // named wordlist
     parseword(' ');
     AddEquate(tok, "", AddWordlist(tok));
     LogColor(COLOR_DEF, 0, tok);
@@ -1174,7 +1175,7 @@ SV Resolves(void) {                     // ( xt <name> -- )
 }
 
 SV SkipToPar(void) {
-    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");  toin++;
+    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");  Data[toin]++;
 }
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
@@ -1193,8 +1194,8 @@ SV Verbosity (void) { verbose = Dpop(); }
 SV Aligned   (void) { Dpush(aligned(Dpop())); }
 SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
 
-SV SkipToEOL(void) {                // and look for x.xxxx format number
-    char* src = &buf[toin];
+SV SkipToEOL(void) {                    // and look for x.xxxx format number
+    char* src = &buf[Data[toin]];
     char* p = src;
     char* dest = Header[DefMarkID].help;
     LogColor(COLOR_COM, 0, src);
@@ -1211,25 +1212,25 @@ SV SkipToEOL(void) {                // and look for x.xxxx format number
         if ((p = strchr(src, '\\')) != NULL) *p = '\0';
         strmove(dest, src, MaxAnchorSize);
     }
-    toin = (int)strlen(buf);
+    Data[toin] = (int)strlen(buf);
 }
 
 
-SV trimCR(char* buf) {              // clean up the buffer returned by fgets
-    char* p;                        // remove trailing newline
+SV trimCR(char* buf) {                  // clean up the buffer returned by fgets
+    char* p;                            // remove trailing newline
     if ((p = strchr(buf, '\n')) != NULL) *p = '\0';
     size_t len = strlen(buf);
     for (size_t i = 0; i < len; i++) {
-        if (buf[i] == '\t')         // replace tabs with blanks
+        if (buf[i] == '\t')             // replace tabs with blanks
             buf[i] = ' ';
-        if (buf[i] == '\r')         // trim CR if present
+        if (buf[i] == '\r')             // trim CR if present
             buf[i] = '\0';
     }
 }
 
 SI refill(void) {
     int result = -1;
-ask: toin = 0;
+ask: Data[toin] = 0;
     int lineno = File.LineNumber++;
     if (File.fp == stdin) {
         printf("ok>");
@@ -1283,7 +1284,7 @@ static void BrackElse(void) {
             }
             LogColor(COLOR_NONE, 0, tok);
         }
-        else {                        // EOL
+        else {                          // EOL
             if (!refill()) {
                 error = BAD_EOF;
                 return;
@@ -1302,7 +1303,7 @@ static void BrackIf(void) {
 // They are not large, save the entire space.
 // The result differs between little-endian and big-endian machines.
 
-SV SaveMem(uint8_t* mem, int length) { // save binary to a file
+SV SaveMem(uint8_t* mem, int length) {  // save binary to a file
     ParseFilename();
     FILE* fp;
 #ifdef MORESAFE
@@ -1517,6 +1518,8 @@ SV LoadKeywords(void) {
     AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
     AddEquate("cell",         "1.0060 -- n",          CELLS);
     AddEquate("dp",           "1.0070 -- addr",       BYTE_ADDR(dp));
+    AddEquate("tib",     "1.0075 -- addr", BYTE_ADDR(DataSize) - MaxLineLength);
+    AddEquate("|tib|",        "1.0076 -- n",          MaxLineLength);
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
     AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
     AddKeyword("load-code",   "1.0100 <filename> --", LoadCodeBin,   noCompile);
@@ -1711,6 +1714,21 @@ SV LoadKeywords(void) {
     current = forth_wid;
 }
 
+SV CopyBuffer(void) {                   // copy buf to tib region in Data
+    char* src = buf;
+    cell bytes = Data[tibs];
+    cell words = (bytes + CELLS - 1) / CELLS;
+    cell addr = DataSize - CELL_ADDR(MaxLineLength);
+    cell* dest = &Data[addr];
+    for (cell i = 0; i < words; i++) {  // pack string into data memory
+        uint32_t w = 0;                 // little-endian packing
+        for (int j = 0; j < CELLS; j++) {
+            w |= (uint8_t)*src++ << (j * 8);
+        }
+        *dest++ = w;
+    }
+}
+
 
 //##############################################################################
 // Text Interpreter
@@ -1729,7 +1747,12 @@ int chad(char * line, int maxlength) {
         cycles = spMax = rpMax = 0;     // CPU stats
         sp = rp = 0;                    // stacks
         while (!error) {
-            toin = 0;
+            Data[toin] = 0;
+            Data[tibs] = strlen(buf);
+            if (Data[tibs] >= MaxLineLength)
+                error = BAD_INPUT_LINE;
+            else
+                CopyBuffer();
             uint64_t time0 = GetMicroseconds();
             uint64_t cycles0 = cycles;
             while (parseword(' ')) {
@@ -1798,7 +1821,7 @@ bogus:                          error = UNRECOGNIZED;
                     printf(")\n");
                 }
                 if (verbose & VERBOSE_SRC) {
-                    printf(") (%s", &buf[toin]);
+                    printf(") (%s", &buf[Data[toin]]);
                 }
                 if (sp == (StackSize - 1)) error = BAD_STACKUNDER;
                 if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER;
@@ -1839,33 +1862,6 @@ done:       elapsed_us = GetMicroseconds() - time0;
 // Executable Forth may exercise the SPI bus to compile it to SPI flash.
 // This is beyond the scope of the C side of Chad.
 // chadGetHeader would be used when building a header structure in flash.
-
-#define BYTES_PER_WORD  CELLS
-
-uint32_t chadGetSource (char delimiter) {
-    size_t bytes;
-    char *src;
-    if (delimiter) {
-        parseword(delimiter);
-        src = tok;
-        bytes = strlen(tok);
-    } else {
-        src = &buf[toin];               // use the rest of the line
-        bytes = strlen(buf) - toin;
-        SkipToEOL();
-    }
-    size_t words = (bytes + BYTES_PER_WORD - 1) / BYTES_PER_WORD;
-    size_t addr = DataSize - words;
-    cell* dest = &Data[addr];
-    for (size_t i = 0; i < words; i++) {// pack string into data memory
-        uint32_t w = 0;                 // little-endian packing
-        for (int j = 0; j < BYTES_PER_WORD; j++) {
-            w |= (uint8_t)*src++ << (j * 8);
-        }
-        *dest++ = w;
-    }
-    return (uint32_t)((addr << 8) + words);
-}
 
 uint32_t chadGetHeader (uint32_t select) {
     int ID = select >> 6;

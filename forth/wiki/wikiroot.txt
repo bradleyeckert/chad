@@ -48,6 +48,11 @@ So, we don't do it.
  Used for addressing cells when address units are in bytes.
 =1.0070: dp ( -- addr )
  A variable pointing to the next free byte in data space.
+=1.0075: tib ( -- addr )
+ The text input buffer, populated by `chad` before evaluating it.
+ `tib` is placed at the very top of data memory.
+=1.0076: |tib| ( -- addr )
+ Size in bytes of the text input buffer.
 =1.0080: stats ( -- )
  Prints simulator statistics.
 =1.0090: verbosity ( flags -- )

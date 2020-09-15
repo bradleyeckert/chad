@@ -195,6 +195,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_ORDER_OVER  -49 // Search-order overflow
 #define BAD_ORDER_UNDER -50 // Search-order underflow
 #define BAD_EOF         -58 // unexpected EOF in [IF]
+#define BAD_INPUT_LINE  -62 // Input buffer overflow, line too long
 #define BAD_DATA_WRITE  -64 // Write to non-existent data memory
 #define BAD_DATA_READ   -65 // Read from non-existent data memory
 #define BAD_PC          -66 // PC is in non-existent code memory
