@@ -87,22 +87,16 @@ H</ul>
 =1.0140: equ ( x <name> -- )
  A synonym of constant that's guaranteed to not use any target resources
  for its definition. It creates a word that pushes x onto the stack.
-
- This word can be used inside a definition that only runs on the host.
 =1.0150: assert ( n1 n2 -- )
  Displays an error message if n1 <> n2. n1 is actual, n2 is expected.
 =1.0200: .s ( ? -- ? )
  Copy and display the values currently on the data stack.
  The interpreter does this for you if the stack is not empty:
  The stack is printed between `\` and `ok>`.
-
- This word can be used inside a definition that only runs on the host.
 =1.0210: see ( <name> -- )
  Display the named word’s definition.
 =1.0220: dasm ( xt len -- )
  Disassemble `len` words of the code space starting at `xt`.
-
- This word can be used inside a definition that only runs on the host.
 =1.0230: sstep ( xt len -- )
  Runs the simulator one step at a time for the number of steps
  or until the return stack underflows, whichever comes first.
@@ -142,8 +136,6 @@ H</ul>
  `[defined]` is an immediate word.
 =1.0400: . ( n -- )
  Display signed `n` using the current `base`. The range of `n` is:
-
- This word can be used inside a definition that only runs on the host.
 H<ul>
 --32768 to 32767 for 16-bit cells
 --131072 to 131071 for 18-bit cells
@@ -167,23 +159,15 @@ H</ul>
  search order. The names of subsequent definitions will be placed in the
  compilation word list. Subsequent changes in the search order will not
  affect the compilation word list.
-
- This word can be used inside a definition that only runs on the host.
 =1.0450: get-current ( -- wid )
  Return `wid`, the identifier of the compilation word list.
-
- This word can be used inside a definition that only runs on the host.
 =1.0460: set-current ( wid -- )
  Set the compilation word list to the word list identified by `wid`.
-
- This word can be used inside a definition that only runs on the host.
 =1.0470: get-order ( -- widN..wid1 N )
  Returns the number of word lists `N` in the search order and the word list
  identifiers `widN` ... `wid1` identifying these word lists.
  `wid1` identifies the word list that is searched first, and
  `widN` the word list that is searched last. The search order is unaffected.
-
- This word can be used inside a definition that only runs on the host.
 =1.0480: set-order ( widN..wid1 N -- )
  Set the search order to the word lists identified by `widN` ... `wid1`.
  Subsequently, word list `wid1` will be searched first, and word list
@@ -192,8 +176,6 @@ H</ul>
  If `N` is minus one, set the search order to the implementation-defined
  minimum search order. The minimum search order shall include the words
  `forth-wordlist` and `set-order`.
-
- This word can be used inside a definition that only runs on the host.
 =1.0490: only ( -- )
  Set the search order to the implementation-defined minimum search order.
  In this case, `root` `forth-wordlist`.
@@ -212,8 +194,6 @@ H</ul>
  Also display the word list into which new definitions will be placed.
 =1.0530: +order ( wid -- )
  Append `wid` to the top of the search order.
-
- This word can be used inside a definition that only runs on the host.
 =1.0540: lexicon ( <name> -- )
  Create a new wordlist `name` whose `wid` has `name` associated with
  such that `order` will display it. When executed, `name` overwrites the
@@ -240,8 +220,6 @@ H</ul>
  If there is no `)`, print the remainder of the line.
 =1.1040: constant ( x <name> -- )
  Create a word that pushes `x` onto the stack. Same as `equ`.
-
- This word can be used inside a definition that only runs on the host.
 =1.1050: aligned ( addr -- a-addr )
  `a-addr` is the first aligned address greater than or equal to `addr`.
 =1.1060: align ( -- )
@@ -254,18 +232,6 @@ H</ul>
  In byte-addressed machines like `chad`, it has no effect.
 =1.1090: cr ( -- )
  Cause subsequent output to appear at the beginning of the next line.
-=1.1100: create ( <name> -- )
- Create a definition for `name` whose execution semantics return the
- current aligned `dp`.
- `chad` implements this by compiling a literal with its `ret` bit set.
-
- This word can be used inside a definition that only runs on the host.
-=1.1105 does> ( -- )
- Patches the "returning literal" compiled by `create` so that it falls
- through to the next code. It does this by clearing the `ret` bit.
- This works because data is kept in data space.
-
- This word can be used inside a definition that only runs on the host.
 =1.1110: decimal ( -- )
  Set the numeric conversion radix (`base`) to ten (decimal).
 =1.1120: hex ( -- )
@@ -371,12 +337,8 @@ H</ul>
  Typical usage: `[defined] -foo [if] -foo [else] marker -foo [then]`
 =1.1290: there ( -- taddr )
  Push the code pointer onto the stack.
-
- This word can be used inside a definition that only runs on the host.
 =1.1300: torg ( taddr -- )
  Set the code pointer.
-
- This word can be used inside a definition that only runs on the host.
 =1.1310: later ( <name> -- )
  Define a forward reference. Compile a jump instruction whose address
  will be resolved later by `resolves`. For example:

@@ -1,4 +1,4 @@
-\ Application example
+﻿\ Application example
 
 \ To load: With your working directory here, type:
 \ ..\chad include myapp.f  (in Windows), or
@@ -7,15 +7,17 @@
 include ../core.f
 include ../coreext.f
 include ../redirect.f
-include ../numout.f
 include ../frame.f
+include ../numout.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
 
 :noname  ( error -- )  $8002 io! ; resolves exception
 
+: hi [char] 你 ;
 
+.( 你好，世界 ) cr
 
 \ Examples
 

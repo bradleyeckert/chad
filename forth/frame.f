@@ -78,6 +78,3 @@ dm-size |framestack| - equ fp0          \ empty frame stack
 there swap - . .( instructions used by f[ and ]f framing) cr
 
 fpclear
-
-: frtest 2 >r 1 >r  6 5 4 3  2 f[
-          ]f r> r> 2drop 2drop 2drop ;

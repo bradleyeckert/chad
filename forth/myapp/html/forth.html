@@ -17,63 +17,22 @@
 <hr>
 <!-- No reference for frtest1 -->
 <!-- No reference for fib -->
-<!-- No reference for frtest -->
-<a name="2.2960"></a>
-<h3><ref>2.2960:</ref> <a href="../../frame.f">]f</a> <com><i>( ? -- ? )</i></com></h3>
-
-<p>Restore the stacks saved by <tok>f[</tok>.
-</p>
-<a name="2.2950"></a>
-<h3><ref>2.2950:</ref> <a href="../../frame.f">f[</a> <com><i>( n -- )</i></com></h3>
-
-<p>Move the data stack to the frame stack, leaving <tok>n</tok> cells on top.
-The return stack is emptied except for one cell to keep the sim running.
-</p>
-<a name="2.2940"></a>
-<h3><ref>2.2940:</ref> <a href="../../frame.f">mem&gt;ds</a> <com><i>( addr1 -- ... addr2 )</i></com></h3>
-
-<p>Move memory to data stack
-</p>
-<a name="2.2930"></a>
-<h3><ref>2.2930:</ref> <a href="../../frame.f">ds&gt;mem</a> <com><i>( ... n addr1 -- addr2 )</i></com></h3>
-
-<p>Move data stack to memory
-</p>
-<a name="2.2920"></a>
-<h3><ref>2.2920:</ref> <a href="../../frame.f">mem&gt;</a> <com><i>( a -- a&apos; n )</i></com></h3>
-
-<p>Pre-decrement <tok>a</tok> by 1 cell and fetch <tok>a</tok>.
-</p>
-<a name="2.2910"></a>
-<h3><ref>2.2910:</ref> <a href="../../frame.f">&gt;mem</a> <com><i>( n a -- a&apos; )</i></com></h3>
-
-<p>Store <tok>n</tok> leaving <tok>a</tok> indexed to the next cell.
-</p>
-<a name="2.2900"></a>
-<h3><ref>2.2900:</ref> <a href="../../frame.f">fpclear</a> <com><i>( -- )</i></com></h3>
-
-<p>Clear the frame stack
-</p>
-<!-- No reference for fp0 -->
-<!-- No reference for fpad -->
-<!-- No reference for fp1 -->
-<!-- No reference for fp -->
-<!-- No reference for |framestack| -->
+<!-- No reference for hi -->
 <a name="2.3320"></a>
 <h3><ref>2.3320:</ref> <a href="../../numout.f">h.x</a> <com><i>( u n -- )</i></com></h3>
 
 <p>Display <tok>u</tok> in hex format using <tok>n-1</tok> digits.
 </p>
 <!-- No reference for <#> -->
+<a name="2.3300"></a>
+<h3><ref>2.3300:</ref> <a href="../../numout.f">.</a> <com><i>( n -- )</i></com></h3>
+
+<p>Display n in free field format.
+</p>
 <a name="2.3310"></a>
 <h3><ref>2.3310:</ref> <a href="../../numout.f">?</a> <com><i>( a -- )</i></com></h3>
 
 <p>Display the value stored at a-addr.
-</p>
-<a name="2.3300"></a>
-<h3><ref>2.3300:</ref> <a href="../../numout.f">.</a> <com><i>( n|u -- )</i></com></h3>
-
-<p>Display n in free field format.
 </p>
 <a name="2.3290"></a>
 <h3><ref>2.3290:</ref> <a href="../../numout.f">u.</a> <com><i>( u -- )</i></com></h3>
@@ -201,14 +160,66 @@ along with that many byte-wide characters in data space.
 <p><tok>char</tok> is the character value for a space.
 </p>
 <a name="2.3000"></a>
-<h3><ref>2.3000:</ref> <a href="../../numout.f">hld</a> <com><i>( -- c-addr  )</i></com></h3>
+<h3><ref>2.3000:</ref> <a href="../../numout.f">hld</a> <com><i>( -- c-addr )</i></com></h3>
 
 <p>A pointer variable for numeric conversion.
 </p>
+<a name="2.2960"></a>
+<h3><ref>2.2960:</ref> <a href="../../frame.f">]f</a> <com><i>( ? -- ? )</i></com></h3>
+
+<p>Restore the stacks saved by <tok>f[</tok>.
+</p>
+<a name="2.2950"></a>
+<h3><ref>2.2950:</ref> <a href="../../frame.f">f[</a> <com><i>( n -- )</i></com></h3>
+
+<p>Move the data stack to the frame stack, leaving <tok>n</tok> cells on top.
+The return stack is emptied except for one cell to keep the sim running.
+</p>
+<a name="2.2940"></a>
+<h3><ref>2.2940:</ref> <a href="../../frame.f">mem&gt;ds</a> <com><i>( addr1 -- ... addr2 )</i></com></h3>
+
+<p>Move memory to data stack
+</p>
+<a name="2.2930"></a>
+<h3><ref>2.2930:</ref> <a href="../../frame.f">ds&gt;mem</a> <com><i>( ... n addr1 -- addr2 )</i></com></h3>
+
+<p>Move data stack to memory
+</p>
+<a name="2.2920"></a>
+<h3><ref>2.2920:</ref> <a href="../../frame.f">mem&gt;</a> <com><i>( a -- a&apos; n )</i></com></h3>
+
+<p>Pre-decrement <tok>a</tok> by 1 cell and fetch <tok>a</tok>.
+</p>
+<a name="2.2910"></a>
+<h3><ref>2.2910:</ref> <a href="../../frame.f">&gt;mem</a> <com><i>( n a -- a&apos; )</i></com></h3>
+
+<p>Store <tok>n</tok> leaving <tok>a</tok> indexed to the next cell.
+</p>
+<a name="2.2900"></a>
+<h3><ref>2.2900:</ref> <a href="../../frame.f">fpclear</a> <com><i>( -- )</i></com></h3>
+
+<p>Clear the frame stack
+</p>
+<!-- No reference for fp0 -->
+<!-- No reference for fpad -->
+<!-- No reference for fp1 -->
+<!-- No reference for fp -->
+<!-- No reference for |framestack| -->
 <!-- No reference for stdout_table -->
+<!-- No reference for _page -->
+<!-- No reference for esc[x -->
 <!-- No reference for _cr -->
 <!-- No reference for _emit -->
-<!-- No reference for cr -->
+<a name="2.2112"></a>
+<h3><ref>2.2112:</ref> <a href="../../redirect.f">page</a> <com><i>( x -- )</i></com></h3>
+
+<p>Clear the screen and reset the cursor position to the upper left corner.
+</p>
+<a name="2.2111"></a>
+<h3><ref>2.2111:</ref> <a href="../../redirect.f">cr</a> <com><i>( x -- )</i></com></h3>
+
+<p>Cause subsequent output to appear at the beginning of the next line.
+</p>
 <a name="2.2110"></a>
 <h3><ref>2.2110:</ref> <a href="../../redirect.f">emit</a> <com><i>( x -- )</i></com></h3>
 
@@ -224,7 +235,7 @@ The terminal is responsible for handling UTF-8 sequences.
 The actions in a table are:
 </p>
 <ul>
-<li> <tok>emit</tok></li><li> <tok>cr</tok></li></ul>
+<li> <tok>emit</tok></li><li> <tok>cr</tok></li><li> <tok>page</tok></li></ul>
 <a name="2.2010"></a>
 <h3><ref>2.2010:</ref> <a href="../../redirect.f">&apos;TXbusy</a> <com><i>( -- ioa  )</i></com></h3>
 

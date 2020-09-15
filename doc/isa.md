@@ -196,6 +196,19 @@ is busy. Once finished, you can read result registers into `COP`.
 - 0xE808 = Trigger multiplication of T and N
 - 0xE809 = Trigger division of T:N by W
 
+### SDRAM (TBD)
+
+Coprocessor instructions could be used to page data between SDRAM and
+data RAM. 
+It seems you get a choice between high pin count and high cost when
+choosing a SDRAM. For example, the Infineon/Cypress HyperRam has a reduced
+pin count (5x5 BGA with 1mm ball pitch) but cost $3 to $4 for 64Mb.
+64Mb is 8M bytes.
+
+SDRAMs usually need an occasional `refresh` instruction, which could be
+supplied by a periodic ISR. 
+The ISR would also maintain a counter to keep track of time.
+
 ## Shift register stacks
 
 It took me a while to come around to shift register stacks.
@@ -217,7 +230,7 @@ stack (in data memory) to prevent possible stack overflow.
 A complex chunk of code would be preceded by `f[` *( depth -- )* to minimize
 stacks and `]f` would restore the stacks.
 For example, `2 f[` would leave nothing but two items on the data stack and
-an empty return stack.
+an empty return stack. `d.r` uses `f[`, for example.
 The simulator word `stats` tells you how deep your code is
 actually stacking.
 
@@ -241,7 +254,7 @@ MISC is great if you can simulate it, but there's the rub.
 Commercial chip design tools just aren't up to doing
 that kind of simulation. If you can't simulate it, you can't build it.
 GreenArrays built their own simulation tools.
-They can't build an entire chip industry.
+Okay, but...
 
 Any synthesis tool,
 which you can get for free if you are targeting an FPGA,
@@ -253,3 +266,14 @@ What Chuck Moore demonstrated with MISC was the utility of small stacks.
 His Novix architecture from the 1980s had stacks made of 256-cell
 memories. It turns out smaller is better.
 James Bowman's use of shift register stacks in the J1 was a great idea.
+
+If you look at commercial ASIC processes, ON Semi's 180nm process offers
+RAM with a cycle time of 3.3 to 5 ns. That's slow compared to GreenArrays
+1 ns instructions. In an actual standard cell chip, the processor may
+have to wait on memory. Adding a `hold` signal to the port list would let
+the memories hold off execution to insert wait states. With code memory,
+that wouldn't impact performance much.
+If you use a wider data bus (such as 64-bit) on the ROM and mux it down to
+16-bit, most of the time you would only have the mux delay because the
+64-bit word is already settled. So, a `chad` processor could be very fast
+even in legacy (cheaper) fab processes.

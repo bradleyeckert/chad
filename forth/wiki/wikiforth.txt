@@ -192,11 +192,16 @@
 H<ul>
 - `emit`
 - `cr`
+- `page`
 H</ul>
 =2.2110: emit ( x -- )
  Send a character to the terminal.
  The terminal is responsible for handling UTF-8 sequences.
  `x` may be a wide character.
+=2.2111: cr ( -- )
+ Cause subsequent output to appear at the beginning of the next line.
+=2.2112: page ( -- )
+ Clear the screen and reset the cursor position to the upper left corner.
 =2.3000: hld ( -- c-addr )
  A pointer variable for numeric conversion.
 =2.3010: bl ( -- ' ' )

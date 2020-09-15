@@ -4,7 +4,7 @@
 
 there
 decimal
-variable hld                            \ 2.3000 -- c-addr \ numeric conversion pointer
+variable hld                            \ 2.3000 -- c-addr
 32 equ bl                               \ 2.3010 -- char
 
 : count   dup 1+ swap c@ ;              \ 2.3110 a u -- a+1 u-1
@@ -20,7 +20,9 @@ variable hld                            \ 2.3000 -- c-addr \ numeric conversion 
 : spaces  dup 1- 0< if  drop exit  then \ 2.3170 n --
           for space next ;
 
-\ Numeric conversion, from eForth mostly.
+\ Numeric conversion. `d.r` uses frame stack protection to prevent overflow
+\ when the stacks have significant content. Since `d.r` ia typically at the
+\ end of a definition, its tail call doesn't increase the stack.
 
 : digit   dup 10 - 0< 6 invert and      \ 2.3180 n -- char
           + [char] 7 + ;
@@ -36,21 +38,16 @@ variable hld                            \ 2.3000 -- c-addr \ numeric conversion 
 : sign    0< if [char] - hold then ;    \ 2.3230 n --
 : #>      2drop hld @ dm-size over - ;  \ 2.3240 ud -- c-addr u
 : s.r     over - spaces type ;          \ length width --
-: d.r     >r dup >r dabs                \ 2.3250 d width --
-          <# #s r> sign #> r> s.r ;
+: d.r     3 f[ >r dup >r dabs           \ 2.3250 d width --
+          <# #s r> sign #> r> s.r ]f ;  \ prevent stack overflow
 : u.r     0 swap d.r ;                  \ 2.3260 u width --
 : .r      >r s>d r> d.r ;               \ 2.3270 n width --
 : d.      0 d.r space ;                 \ 2.3280 d --
 : u.      0 d. ;                        \ 2.3290 u --
-: .       base @ 10 xor if              \ 2.3300 n|u --
-             u. exit                    \           unsigned if hex
-          then  s>d d. ;                \           signed if decimal
-: ?       @ . ;                         \ 2.3310 a --
+: ?       @ [ ;                         \ 2.3310 a --
+: .       s>d d. ;                      \ 2.3300 n --
 : <#>     >r  <# begin # next #s #> ;   \ ud digits-1
 : h.x     base @ >r hex  0 swap <#> r>  \ 2.3320 u n --
           base !  type space ;
 
 there swap - . .( instructions used by numeric output) cr
-
-\ stats for "123456789 d." are: 5824 cycles, MaxSP=7, MaxRP=12, latency=31
-\ at cell size of 18 bits. At 100 MIPS, 58 usec.
