@@ -67,6 +67,8 @@
 =2.0320: execute ( xt -- )
  Remove `xt` from the stack and perform the semantics identified by it.
  Other stack effects are due to the word `execute`d
+=2.0325 ?dup ( x -- 0 | x x )
+ Duplicate x if it is non-zero.
 =2.0330: 2dup ( d -- d d )
  Duplicate cell pair x1 x2 (or `d`).
 =2.0340: 2drop ( d -- )
@@ -168,7 +170,7 @@
  or (n2 | u2 > n3 | u3 and (n2 | u2 <= n1 | u1 or n1 | u1 < n3 | u3)) is true, returning false otherwise. 
  An ambiguous condition exists n1 | u1, n2 | u2, and n3 | u3
  are not all the same type.
-=2.1030: <> ( n1 n2 -- flag )
+=2.0135: <> ( n1 n2 -- flag )
  flag is true if and only if `x1` is not bit-for-bit the same as `x2`.
 =2.1040: 0<> ( x y -- f )
  flag is true if and only if `x` is not equal to zero.
@@ -198,10 +200,9 @@ H<ul>
 - `cr`
 - `page`
 H</ul>
-=2.2110: emit ( x -- )
+=2.2110: emit ( c -- )
  Send a character to the terminal.
  The terminal is responsible for handling UTF-8 sequences.
- `x` may be a wide character.
 =2.2111: cr ( -- )
  Cause subsequent output to appear at the beginning of the next line.
 =2.2112: page ( -- )
@@ -291,9 +292,30 @@ H</ul>
  Move data stack to memory
 =2.2940: mem>ds ( addr1 -- ... addr2 )
  Move memory to data stack
-=2.2950: f[ ( n -- )
+=2.2950: stack[ ( n -- )
  Move the data stack to the frame stack, leaving `n` cells on top.
  The return stack is emptied except for one cell to keep the sim running.
-=2.2960: ]f ( ? -- ? )
+=2.2960: ]stack ( ? -- ? )
  Restore the stacks saved by `f[`.
+=2.4000 sector ( -- a-addr )
+ Variable for the current flash sector number.
+=2.4010 fp ( -- a-addr )
+ Variable for a 16-bit index into the 64 KB sector.
+=2.4020 fwall ( sector key -- )
+ Set the first writable 64KB flash sector.
+ Ignored if `key` doesn't match fwallen.
+=2.4030 write[ ( fa -- )
+ Set `fp` = `fa`.
+ If `addr` is at a 4KB boundary, erase the sector.
+ Start a page write at address `sector<<16+addr`. 
+=2.4040 >f ( c -- )
+ Append a byte to flash and bump `fp`.
+=2.4050 ]write ( -- )
+ End the page program command.
+=2.4060 read[ ( fa -- )
+ Start reading flash at address `sector<<16+addr`.
+=2.4070 f> ( -- c )
+ Read the next byte from flash.
+=2.4080 ]read ( -- )
+ End the read command.
 =

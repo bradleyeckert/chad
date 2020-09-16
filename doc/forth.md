@@ -124,3 +124,26 @@ and load it into data space at boot.
 The word data types of code and data are simply cast to `char*` so the binary
 is not endian-agnostic. This only matters if your desktop is big-endian.
 The rest of the world is little-endian.
+
+## Data space usage
+
+Data memory is an exact power of 2 in size.
+The number of cells is set in `config.h`.
+The corresponding number of bytes is the constant `dm-size`.
+
+| Field             | Name  | Size     | Address    |
+| ----------------- | ----- | --------:| ----------:|
+| Text input buffer | tib   | 80 bytes | Top of RAM |
+| Frame stack       | fpad  | 64 cells |            |
+| ...               | ...   |  ...     | ...        |
+| Bytes in `tib`    | tibs  |  1 cells | 4 cells    |
+| Index into `tib`  | >in   |  1 cells | 3 cells    |
+| Compile state     | state |  1 cells | 2 cells    |
+| Number radix      | base  |  1 cells | 1 cells    |
+| Data pointer      | dp    |  1 cells | 0 cells    |
+
+The lowest 5 cells of memory are fixed because they are shared with the
+host interpreter.
+
+The frame stack grows upward. 
+The top of `fpad` is also used for numeric conversion, which grows downward.

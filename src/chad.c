@@ -517,7 +517,7 @@ SI hp;                                  // # of keywords in the Header list
 static struct Keyword Header[MaxKeywords];
 CELL me;                                // index of found keyword
 static char* foundWidName;              // name of wid the word was found in
-static char ref[LineBufferSize];
+static char ref[LineBufferSize];        // ReferenceString result buffer
 static char* ReferenceStackPic;         // string remaining after first blank
 
 static char* ReferenceString(int i) {   // extract reference string
@@ -562,8 +562,6 @@ SV LogColor(uint32_t color, int ID, char* s) {
 // context------------^ ^-----orders
 // A wid points to a linked list of headers.
 // The head pointer of the list is created by WORDLIST.
-// In Forth, it would just be a cell in the dictionary placed by comma.
-// The paradigm here expects names for everything.
 
 SI order[32];                           // search order list
 SI orders;                              // items in the search order list
@@ -1858,14 +1856,14 @@ done:       elapsed_us = GetMicroseconds() - time0;
 //##############################################################################
 // Other exported functions
 // These are called by iomap.c so that Forth code can access host data.
-// For example, chadGetSource packs a string into data memory.
-// Executable Forth may exercise the SPI bus to compile it to SPI flash.
+// Executable Forth may exercise the SPI bus to compile to SPI flash.
 // This is beyond the scope of the C side of Chad.
 // chadGetHeader would be used when building a header structure in flash.
 
 uint32_t chadGetHeader (uint32_t select) {
-    int ID = select >> 6;
-    select &= 0x3F;
+    int ID = select >> 7;
+    select &= 0x7F;
+    int field = select >> 5; // 0 to 3
     if (ID > hp) return -1;
     switch (select) {
     case 0: return (Header[ID].ExecFn == Def_Exec); // it's executable code
@@ -1876,13 +1874,25 @@ uint32_t chadGetHeader (uint32_t select) {
     case 5: return Header[ID].w2;
     case 6: return Header[ID].notail;
     case 7: return Header[ID].link;
-    case 8: return Header[ID].references;
+    case 8: return Header[ID].isALU;
+    case 9: return Header[ID].srcFile;
+    case 10: return Header[ID].srcLine;
+    case 11: return Header[ID].color;
     case 16: return cp;
     case 17: return hp;
+    case 18: return wordlists;
+    case 19: return wordlist[ID];
+    case 20: return wordlistname[ID / 16][ID % 16];
+    case 21: return fileID;
+    case 22: return LineBufferSize;
+    case 23: return FilePaths[ID];
     default:
-        if ((select < 0x20) || (select >= (0x20 + MaxNameSize)))
-            return 0;
-        return Header[ID].name[select - 0x20];
+        select = ID & 0x1F;
+        switch (field) {
+        case 1:  return Header[ID].name[select];
+        case 2:  return Header[ID].help[select];
+        default: return 0;
+        }
     }
     return 0;
 }
@@ -1892,3 +1902,8 @@ void chadError (uint32_t errorcode) {
     if (n & MSB) n |= ~CELLMASK;        // sign extend errorcode
     error = n;
 }
+
+uint64_t chadCycles(void) {
+    return cycles;
+}
+

@@ -9,11 +9,13 @@ include ../coreext.f
 include ../redirect.f
 include ../frame.f
 include ../numout.f
+include ../flash.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
 
-:noname  ( error -- )  $8002 io! ; resolves exception
+:noname  ( error -- )  ?dup if $8002 io! then
+; resolves exception
 
 : hi [char] 你 ;
 
@@ -33,9 +35,6 @@ include ../numout.f
 \ Try 25 fib, then stats
 
 ' fib resolves cold
-
-: frtest1  2 >r 1 >r  6 5 4 3  2 f[  spstat . cr
-          ]f r> . r> .  . . . . ;
 
 .( Total instructions: ) there . cr
 \ 0 there dasm

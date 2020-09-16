@@ -17,7 +17,7 @@
 // In the J1, input devices sit on (mem_addr,io_din)
 
 static uint32_t header_data;        // host API return data
-static uint8_t SPIresult;
+static uint16_t SPIresult;
 static uint8_t nohostAPI;           // prohibit access to host API
 
 static int termKey(void);
@@ -34,7 +34,8 @@ uint32_t readIOmap (uint32_t addr) {
         return 0;
 #endif
     case 2: return 0;               // UART tx is never busy
-    case 4: return SPIresult;       // return SPI result
+    case 4: return FlashMemSPIbusy();
+    case 5: return SPIresult;       // return SPI result
     case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }
@@ -60,9 +61,11 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     case 3:
         nohostAPI = x;  break;
     case 4:
-        r = FlashMemSPI8((int)x);
-        SPIresult = (uint8_t)r;
-        if (r < 0) {chadError(r / 256);}
+        FlashMemSPIformat(x);  break;
+    case 5:
+        r = FlashMemSPI((int)x);
+        SPIresult = (uint16_t)r;
+        if (r < 0) {chadError(r);}
         break;
     case 8:
         TFTLCDwrite(x);

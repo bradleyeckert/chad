@@ -40,29 +40,36 @@ who didn't want to be one either. I only wrote `chad`.
 
 If this is all just too much, stick with C.
 You know, the language for writing operating systems.
-Because computing had to pay the bills.
-Because of that, libraries.
-Because of that, it's not your code.
-That's not a spiritual practice then, is it? It's business.
+Because computers were expensive and had to pay for themselves.
+And, computer languages evolved out of the military.
+An Admiral in the US Navy started this whole language business.
+Let me guess. Your embedded app doesn't look much like an OS
+and isn't designed to make things go *kaboom*.
 
-Which is fine, but why does everyone on the planet have an ARM processor
-in their hands?
-Because arms are offensive weapons.
+It comes back to intent.
+The whole way that industry uses computers.
+That zeitgeist led to everyone on the planet having an ARM processor
+in their hands.
+How about that? The entire world is ARMed. 
+It's Admiral Grace's intent writ large.
+That's how intent works. The ripples keep on going.
 How's everyone at each other's throats working for you?
 
 How about waging peace?
 How about we forget about ARM and its wannabes like RISC V?
 They are all part of the same dying world.
-It's rather poetic that Corona-virus could bring an empire built on C to its knees.
+It's rather ironic that Corona-virus could bring an empire built on C
+to its knees.
 Sorry, C is not the language of peace.
-It's the language of Commerce, which makes `C` such a fitting name.
-If there's a mathematical function relating lines of code to body count,
-the C language and its libraries wouldn't exactly come out clean.
-Don't stop me, I'm on a roll.
-An Admiral in the US Navy starting off this whole business had its time.
+It's the language of commerce, or war without bullets as it's practiced.
 But here's the thing about planetary consciousness shifts.
 You have to roll with the tide.
 Stop coding for war machines.
+
+Tiny cores scale up. Need more power? Put in more cores.
+Create a pool usage model like GPUs use.
+A modern CPU could have thousands of `chad` cores,
+each running at multi-GHz speeds.
 
 If your code is so great, why shouldn't everyone on the planet be 
 able to run it without it being hosted by
@@ -72,3 +79,14 @@ Building the silicon is a formality, the CPU can be simulated.
 Which is fine. Did you build your code so sucky the time would matter?
 
 No, let's get real. Let's get simple. Let's just build code.
+
+The world is the way it is because we became disconnected from spirit.
+We are spiritual beings. That's just how biology works,
+with its integration with infinite timelessness.
+Spiritual practices are sorely lacking in today's world.
+Those practices don't have to be boring.
+They are all about the flow mental state.
+The flow state is a practice.
+Programming is a very good practice.
+Why not use a language that's built for it? 
+Like Forth?

@@ -14,6 +14,7 @@ later exception                         \ 2.0020 n --
 : io@   _io@ nop _io@_ ;                \ 2.0110 addr -- n
 : io!   _io! nop drop ;                 \ 2.0120 n addr --
 : =     xor 0= ;                        \ 2.0130 n1 n2 -- flag
+: <>     xor 0= 0= ;                    \ 2.0135 n1 n2 -- flag
 : <     - 0< ; macro                    \ 2.0140 n1 n2 -- flag
 : >     swap < ;                        \ 2.0150 n1 n2 -- flag
 : cell+ cell + ; macro                  \ 2.0160 a-addr1 -- a-addr2
@@ -70,7 +71,7 @@ cell 4 = [if]
 : rot   >r swap r> swap ;               \ 2.0310 x1 x2 x3 -- x2 x3 x1
 
 : execute  2* >r ; no-tail-recursion    \ 2.0320 i*x xt -- j*x
-
+: ?dup   dup if dup then ;              \ 2.0325 x -- 0 | x x
 : 2dup   over over ; macro              \ 2.0330 d -- d d
 : 2drop  drop drop ;                    \ 2.0340 d --
 : char+ [ ;                             \ 2.0350 c-addr1 -- c-addr2

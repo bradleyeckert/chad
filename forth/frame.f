@@ -13,12 +13,12 @@
 \ ]f  ( -- )  Restores the stack data saved by frame.
 
 there
-variable fp                             \ frame stack pointer
-variable fp1                            \ frame pointer
+variable frp                            \ frame stack pointer
+variable frp1                           \ frame pointer
 64 cells buffer: fpad                   \ frame pad
-tib |framestack| - equ fp0              \ empty frame stack
+tib |framestack| - equ frp0             \ bottom of frame stack
 
-: fpclear  fp0 fp ! ;                   \ 2.2900 --
+: fpclear  frp0 frp ! ;                 \ 2.2900 --
 : >mem     _! cell + ;                  \ 2.2910 n a -- a'
 : mem>     cell - _@ dup@ ;             \ 2.2920 a -- a' n
 
@@ -45,34 +45,34 @@ tib |framestack| - equ fp0              \ empty frame stack
 \ The return stack is emptied except for one cell to keep the sim running.
 \ "11 22 33 44 55  2 f[" --> FS = 33 22 11 3 0    stack = ( 44 55 )
 \                                           fp----^
-: f[  ( ... n -- x[n-1] ... x[0] )      \ 2.2950 n --
+: stack[  ( ... n -- x[n-1] ... x[0] )  \ 2.2950 n --
     depth
     2dup- 0< if
-        r> fp @  spstat 8 rshift 63 and ( RA fp rdepth )
+        r> frp @  spstat 8 rshift 63 and ( RA fp rdepth )
         1 - 0 max                       \ leave a little on the return stack
         swap over                       ( RA rdepth fp cnt | ... )
         begin  dup  while 1 -
             swap r> swap  >mem  swap    \ push return stack to frame stack
         repeat
-        drop  >mem  fp !  >r            \ restore return address
+        drop  >mem  frp !  >r           \ restore return address
         over - 1 -  >r                  ( ... top | bottom )
-        fpad ds>mem   fp1 !             \ save top of stack
-        r> fp @ ds>mem  fp !            \ move bottom of data stack to frame
-        fp1 @  mem>ds  drop             \ restore top of stack
+        fpad ds>mem   frp1 !            \ save top of stack
+        r> frp @ ds>mem  frp !          \ move bottom of data stack to frame
+        frp1 @  mem>ds  drop            \ restore top of stack
     else
         -4 exception                    \ not enough data on the stack
     then
 ;
 
-: ]f                                    \ 2.2960 ? -- ?
-    depth  fpad ds>mem  fp1 !           \ save whatever is on the stack
-    fp @   mem>ds                       \ restore the old bottom
+: ]stack                                \ 2.2960 ? -- ?
+    depth  fpad ds>mem  frp1 !          \ save whatever is on the stack
+    frp @   mem>ds                      \ restore the old bottom
     r>  swap  mem>                      ( RA fp cnt )
     begin  dup  while 1 -
         swap mem> >r swap               ( RA fp n | ... x )
     repeat
-    drop  fp ! >r                       \ restore return address
-    fp1 @  mem>ds  drop                 \ restore top
+    drop  frp ! >r                      \ restore return address
+    frp1 @  mem>ds  drop                \ restore top
 ; no-tail-recursion
 
 there swap - . .( instructions used by f[ and ]f framing) cr

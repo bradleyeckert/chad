@@ -15,9 +15,40 @@
 <hr>
 <h2>Definitions in instruction memory</h2>
 <hr>
-<!-- No reference for frtest1 -->
 <!-- No reference for fib -->
 <!-- No reference for hi -->
+<a name="2.4070"></a>
+<h3><ref>2.4070:</ref> <a href="../../flash.f">f&gt;</a> <com><i>( c -- )</i></com></h3>
+<a name="2.4060"></a>
+<h3><ref>2.4060:</ref> <a href="../../flash.f">read[</a> <com><i>( fa -- )</i></com></h3>
+<a name="2.4040"></a>
+<h3><ref>2.4040:</ref> <a href="../../flash.f">&gt;f</a> <com><i>( c -- )</i></com></h3>
+<a name="2.4030"></a>
+<h3><ref>2.4030:</ref> <a href="../../flash.f">write[</a> <com><i>( fa -- )</i></com></h3>
+<a name="2.4050"></a>
+<h3><ref>2.4050:</ref> <a href="../../flash.f">]write</a> <com><i>( -- )</i></com></h3>
+<a name="2.4080"></a>
+<h3><ref>2.4080:</ref> <a href="../../flash.f">]read</a> <com><i>( -- )</i></com></h3>
+<!-- No reference for sendaddr24 -->
+<!-- No reference for fl_wrdi -->
+<!-- No reference for fl_wren -->
+<!-- No reference for waitflash -->
+<!-- No reference for SPIend -->
+<!-- No reference for SPIcommand -->
+<!-- No reference for readSPI -->
+<!-- No reference for sendSPI -->
+<!-- No reference for waitSPI -->
+<a name="2.4020"></a>
+<h3><ref>2.4020:</ref> <a href="../../flash.f">flash-wp</a> <com><i>( sector key -- )</i></com></h3>
+<a name="2.4010"></a>
+<h3><ref>2.4010:</ref> <a href="../../flash.f">fp</a> <com><i>( -- a-addr )</i></com></h3>
+<a name="2.4000"></a>
+<h3><ref>2.4000:</ref> <a href="../../flash.f">sector</a> <com><i>( -- a-addr )</i></com></h3>
+<!-- No reference for fwren1 -->
+<!-- No reference for fwren0 -->
+<!-- No reference for flwp_en -->
+<!-- No reference for flashcon1 -->
+<!-- No reference for flashcon0 -->
 <a name="2.3320"></a>
 <h3><ref>2.3320:</ref> <a href="../../numout.f">h.x</a> <com><i>( u n -- )</i></com></h3>
 
@@ -165,12 +196,12 @@ along with that many byte-wide characters in data space.
 <p>A pointer variable for numeric conversion.
 </p>
 <a name="2.2960"></a>
-<h3><ref>2.2960:</ref> <a href="../../frame.f">]f</a> <com><i>( ? -- ? )</i></com></h3>
+<h3><ref>2.2960:</ref> <a href="../../frame.f">]stack</a> <com><i>( ? -- ? )</i></com></h3>
 
 <p>Restore the stacks saved by <tok>f[</tok>.
 </p>
 <a name="2.2950"></a>
-<h3><ref>2.2950:</ref> <a href="../../frame.f">f[</a> <com><i>( n -- )</i></com></h3>
+<h3><ref>2.2950:</ref> <a href="../../frame.f">stack[</a> <com><i>( n -- )</i></com></h3>
 
 <p>Move the data stack to the frame stack, leaving <tok>n</tok> cells on top.
 The return stack is emptied except for one cell to keep the sim running.
@@ -200,10 +231,10 @@ The return stack is emptied except for one cell to keep the sim running.
 
 <p>Clear the frame stack
 </p>
-<!-- No reference for fp0 -->
+<!-- No reference for frp0 -->
 <!-- No reference for fpad -->
-<!-- No reference for fp1 -->
-<!-- No reference for fp -->
+<!-- No reference for frp1 -->
+<!-- No reference for frp -->
 <!-- No reference for |framestack| -->
 <!-- No reference for stdout_table -->
 <!-- No reference for _page -->
@@ -225,7 +256,6 @@ The return stack is emptied except for one cell to keep the sim running.
 
 <p>Send a character to the terminal.
 The terminal is responsible for handling UTF-8 sequences.
-<tok>x</tok> may be a wide character.
 </p>
 <!-- No reference for ExecScreen -->
 <a name="2.2100"></a>
@@ -278,11 +308,6 @@ Semantically equivalent to <tok>swap &gt;r &gt;r</tok>.
 <h3><ref>2.1040:</ref> <a href="../../coreext.f">0&lt;&gt;</a> <com><i>( x y -- f )</i></com></h3>
 
 <p>flag is true if and only if <tok>x</tok> is not equal to zero.
-</p>
-<a name="2.1030"></a>
-<h3><ref>2.1030:</ref> <a href="../../coreext.f">&lt;&gt;</a> <com><i>( n1 n2 -- flag )</i></com></h3>
-
-<p>flag is true if and only if <tok>x1</tok> is not bit-for-bit the same as <tok>x2</tok>.
 </p>
 <a name="2.1020"></a>
 <h3><ref>2.1020:</ref> <a href="../../coreext.f">within</a> <com><i>( u ulo uhi -- flag )</i></com></h3>
@@ -504,6 +529,8 @@ Same as <tok>1+</tok>.
 
 <p>Duplicate cell pair x1 x2 (or <tok>d</tok>).
 </p>
+<a name="2.0325"></a>
+<h3><ref>2.0325:</ref> <a href="../../core.f">?dup</a> <com><i>( x -- 0 | x x )</i></com></h3>
 <a name="2.0320"></a>
 <h3><ref>2.0320:</ref> <a href="../../core.f">execute</a> <com><i>( i*x xt -- j*x )</i></com></h3>
 
@@ -561,6 +588,11 @@ Most code can get by with <tok>+</tok> instead, if speed matters.
 <h3><ref>2.0140:</ref> <a href="../../core.f">&lt;</a> <com><i>( n1 n2 -- flag )</i></com></h3>
 
 <p>flag is true if and only if n1 is less than n2.
+</p>
+<a name="2.0135"></a>
+<h3><ref>2.0135:</ref> <a href="../../core.f">&lt;&gt;</a> <com><i>( n1 n2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if <tok>x1</tok> is not bit-for-bit the same as <tok>x2</tok>.
 </p>
 <a name="2.0130"></a>
 <h3><ref>2.0130:</ref> <a href="../../core.f">=</a> <com><i>( n1 n2 -- flag )</i></com></h3>

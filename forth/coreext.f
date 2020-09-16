@@ -6,7 +6,6 @@ there
 -1 equ true                             \ 2.1010 -- true
 
 : within over - >r - r> u< ;            \ 2.1020 u ulo uhi -- flag
-: <>     xor 0= 0= ;                    \ 2.1030 n1 n2 -- flag
 : 0<>    0= 0= ; macro                  \ 2.1040 x y -- f
 : 0>     negate 0< ;                    \ 2.1050 n -- f
 : u>     swap u< ;                      \ 2.1060 u1 u2 -- flag

@@ -23,4 +23,6 @@ uint32_t chadGetHeader (uint32_t select);
 
 void chadError(int error); // Report an error
 
+uint64_t chadCycles(void); // total number of processor cycles
+
 #endif // __CHAD_H__
