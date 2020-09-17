@@ -7,15 +7,15 @@
 \ The frame stack is for freeing up stack space for library code to run
 \ without overflowing the hardware stack.
 
-\ f[  ( n -- ) Pushes the return stack and most of the data stack
+\ stack[  ( n -- ) Pushes the return stack and most of the data stack
 \ except for the top n cells to the frame stack.
 
-\ ]f  ( -- )  Restores the stack data saved by frame.
+\ ]stack  ( -- )  Restores the stack data saved by frame.
 
 there
 variable frp                            \ frame stack pointer
 variable frp1                           \ frame pointer
-64 cells buffer: fpad                   \ frame pad
+20 cells buffer: fpad                   \ frame pad
 tib |framestack| - equ frp0             \ bottom of frame stack
 
 : fpclear  frp0 frp ! ;                 \ 2.2900 --
@@ -75,6 +75,20 @@ tib |framestack| - equ frp0             \ bottom of frame stack
     frp1 @  mem>ds  drop                \ restore top
 ; no-tail-recursion
 
-there swap - . .( instructions used by f[ and ]f framing) cr
+: pick                                  \ 2.2970 xu...x0 u -- xu...x0 xu
+    frp @ ds>mem  over >r  mem>ds drop r>
+;
+
+: roll                                  \ 2.2980 xu..x0 u -- xu-1..x0 xu
+    ?dup if
+        1+  frp @  ds>mem  mem>
+        1-  over cell -                 ( a u' 'xu )
+        dup @ >r  !
+        mem>ds drop  r>
+    then
+;
+
+
+there swap - . .( instructions used by stack framing) cr
 
 fpclear

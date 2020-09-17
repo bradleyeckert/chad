@@ -15,6 +15,8 @@ Read and write invert the data so that blank means 0xFF.
 Chad can call LoadFlashMem to initialize it from a file.
 */
 
+//#define VERBOSE
+
 static uint8_t mem[FlashMemorySize];
 
 int LoadFlashMem(char* filename) {     // load binary image
@@ -60,7 +62,7 @@ int SaveFlashMem(char* filename) { // save binary image
 */
 
 enum states {
-	idle, wait, rdsr, wrsra, wrsrb, jid1, jid2, jid3, \
+	idle, wait, rdsr, wrsra, wrsrb, jid1, jid2, jid3,
 	addr2, addr1, addr0, cmd, fastread, read, write
 };
 
@@ -73,6 +75,12 @@ void FlashMemSPIformat(int n) {
 	format = 3 & (n >> 1);
 	if (n & 1)
 		state = idle;                   // CS line high = inactive
+#ifdef VERBOSE
+	if (n & 1)
+		printf("]\n");
+	else
+		printf("[");
+#endif
 }
 
 // Formats are:
@@ -107,12 +115,21 @@ int FlashMemSPI(int n) {
 	case 3: beats = 4;  break;
 	}
 	mark = chadCycles() + (uint64_t)beats * clockDivisor;
+#ifdef VERBOSE
+	if (state != idle)
+	printf("{%X}", cin);
+#endif
 	switch (state) {
 	case idle:
 		command = cin;
+#ifdef VERBOSE
+		printf("#%02X ", cin);
+#endif
 		switch (command) {
 		case 0x01: /* WRSR   opcd n -- */
-			if (wen) { state = wrsra; }  break;
+			if (wen) { 
+				state = wrsra;
+			}  break;
 		case 0x05: /* RDSR   opcd -- n1 */
 			state = rdsr;                break;
 		case 0xEB:
@@ -120,11 +137,11 @@ int FlashMemSPI(int n) {
 		case 0x0B: /* FR     opcd A2 A1 A0 xx -- data... */
 		case 0x02: /* PP     opcd A2 A1 A0 d0 d1 d2 ... */
 		case 0x20: /* SER4K  opcd A2 A1 A0 */
-			state = cmd;                 break;
+			state = addr2;               break;
 		case 0x06: /* WREN   opcd */
-			state = idle;  wen = 2;      break;
+			state = wait;  wen = 2;      break;
 		case 0x04: /* WRDI   opcd */
-			state = idle;  wen = 0;      break;
+			state = wait;  wen = 0;      break;
 		case 0x9F: /* RDJDID opcd -- n1 n2 n3 */
 			state = jid1;                break;
 		} break;
@@ -136,12 +153,16 @@ int FlashMemSPI(int n) {
 	case jid2: cout = 0xFF & (FlashMemorySize >> 24);
 		state = jid3;  break;
 	case jid3: cout = 0xFF & (FlashMemorySize >> 16);
-		state = idle;  break;
+		state = wait;  break;
 	case addr2: addr = cin << 16;
 		state = addr1;  break;
 	case addr1: addr += cin << 8;
 		state = addr0;  break;
 	case addr0: addr += cin;
+#ifdef VERBOSE
+		printf("%02X[%06X] ", command, addr);
+#endif
+		state = wait;
 		if (addr < FlashMemorySize) {
 			switch (command) {
 			case 0x20:				// 4K erase
@@ -149,13 +170,11 @@ int FlashMemSPI(int n) {
 					wen = 0;
 					memset(&mem[addr & (~0xFFF)], 0, 4096);
 					fmark = chadCycles() + (uint64_t)ERASE_DELAY;
-				}
-				state = idle;  break;
+				} break;
 			case 0x03:
 				state = read;  break;
-			case 0x0B:
-				state = fastread;  break;
 			case 0xEB:  dummy = 2;
+			case 0x0B:
 				state = fastread;  break;
 			case 0x32:
 				if (qe == 0) { goto notenabled; }
@@ -165,32 +184,27 @@ int FlashMemSPI(int n) {
 					state = write;  break; 
 				}
 			notenabled:  wen = 0;
-				state = idle;  return BAD_NOTENABLED;
-			default:
-				state = idle;
+				return BAD_NOTENABLED;
 			} break;
-		}
-		else {						// invalid address, ignore
-			state = idle;
 		}
 	case fastread: 
 		if (dummy) dummy--; else { state = read; }
 		break;
 	case read:						// read as long as you want
-		cout = ~mem[addr++];
+		cout = 0xFF & ~mem[addr++];
 		if (format == 3) {			// big-endian, unfortunately
-			cout = (cout << 8) | (~mem[addr++]);
+			cout = (cout << 8) | (0xFF & ~mem[addr++]);
 		}
 		break;
 	case write:						// write byte to flash
 		if (mem[addr]) {			// 0 = blank
-			wen = 0;  state = idle;
+			wen = 0;  state = wait;
 			return BAD_NOTBLANK;
 		}
 		mem[addr++] = ~cin;
 		fmark += (uint64_t)BYTE_DELAY;
 		if ((addr & 0xFF) == 0) {	// reached end of write page
-			wen = 0;  state = idle;
+			wen = 0;  state = wait;
 		}
 		break;
 	case wrsra:
@@ -198,7 +212,7 @@ int FlashMemSPI(int n) {
 	case wrsrb:
 		qe = cin & 2;				// bit 9 of status write
 		fmark = chadCycles() + (uint64_t)WRSR_DELAY;
-		state = wait;  break;
+		state = idle;  break;
 	default:
 		state = idle;
 	}

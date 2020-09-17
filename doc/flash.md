@@ -18,7 +18,7 @@ SPI flash is a simple enough abstraction.
 On-chip flash could be adapted to it.
 The basic primitives for writing to and reading from flash are:
 
-- `fwall` *( sector magic -- )* Set the first writable 4K flash sector.
+- `flash-wp` *( sector magic -- )* Set the first writable 4K flash sector.
 *magic* works like a PIN number.
 - `sector` *( -- a-addr )* Variable for the current flash sector number.
 - `fp` *( -- a-addr )* Variable for a 16-bit index into the 64 KB sector.
@@ -39,22 +39,21 @@ The `>f` sequence is:
 - if `fp[15:0]` is 0, clear `fp` and bump `sector`.
 
 Flash write issues a WREN when starting and a WRDI when finished.
-If `sector<<16+addr` is less than `fwall<<12`, WREN is not issued.
+If `sector<<16+addr` is less than `flash-wp<<12`, WREN is not issued.
 
 ## Notes on primitives
 
-\[1] `fwall` *( sector magic -- )* is a write-protect feature. 
+\[1] `flash-wp` *( sector magic -- )* is a write-protect feature. 
 You don't want to inadvertently change it,
 so it needs a *magic* parameter to enable it.
-Some page numbers are unavailable. 
+Some sector numbers are unavailable. 
 If *sector* is out of range or *magic* is wrong, nothing changes.
 The proposed value for *magic* is 27182.
-Flash pages below the wall are write protected.
+Flash pages below flash-wp are write protected.
 
-Write protected RAM for the wall would be a "nice-to-have". 
-This should be in I/O space, protected by enable and disable registers.
-The wall should use such a register.
-That would also make it accessible to an external flash controller.
+Two variables are used for flash-wp.
+One is the inverse of the other so if they get stomped it will be
+detected.
 
 \[2] `write[` *( addr -- )* Can trigger a -81 error if the sector
 is not writable, or just do nothing so the flash chip ignores the data.

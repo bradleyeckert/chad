@@ -554,6 +554,8 @@ Append the run-time semantics given below to the current definition.
 search order and leaves a 0 on the stack. Instruction modifiers &quot;or&quot; data
 to the stack to build the instruction(s).
 </p>
+<a name="1.1245"></a>
+<h3><ref>1.1245:</ref> <chad>recurse</chad> <com><i>( -- )</i></com></h3>
 <a name="1.1240"></a>
 <h3><ref>1.1240:</ref> <chad>;</chad> <com><i>( -- )</i></com></h3>
 
@@ -587,10 +589,11 @@ Append the initiation semantics given below to the current definition.
 </p>
 
 <p>The execution semantics of name will be determined by the words compiled
-into the body of the definition. The current definition is findable in the dictionary, unlike ANS Forth.
+into the body of the definition. The current definition shall not be
+findable in the dictionary until it is ended.
 </p>
 
-<p><tok>:</tok> does not change the stack, another entitlement not given by ANS.
+<p><tok>:</tok> does not change the stack, an entitlement not given by ANS.
 You can feed in literal data from the outside, such as:
 </p>
 
@@ -980,6 +983,12 @@ Maybe you should re-factor or try something different.
 Stackrobatics usually means you need to re-think your approach.
 But it does look cool and it&apos;s an easy way to see what your code is doing
 in each instruction.
+</p>
+<a name="1.0085"></a>
+<h3><ref>1.0085:</ref> <chad>locate</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
+
+<p>Display the source file path and source code of a word.
+If the file can&apos;t be opened, display the line number.
 </p>
 <a name="1.0080"></a>
 <h3><ref>1.0080:</ref> <chad>stats</chad> <com><i>( -- )</i></com></h3>

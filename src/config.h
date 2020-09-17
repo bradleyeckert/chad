@@ -12,6 +12,7 @@
 #define DataSize      1024      /* Data memory cells                        */
 #define StackAwidth      5      /* log2(Stack cells)                        */
 #define CodeFence     1024      /* Beginning of RAM-based Code space        */
+#define CodeAlignment    1      /* Alignment for new definitions            */
 
 #define MoreInstrumentation     /* Simulator has more instrumentation       */
 
@@ -19,9 +20,8 @@
 #define MaxLineLength   80      /* Max TIB size                             */
 #define MaxKeywords   2000      /* Number of headers                        */
 #define MaxNameSize     32      /* Number of chars in a name (less 1)       */
-#define MaxAnchorSize   32      /* Number of chars in an anchor string (-1) */
-#define MaxFiles        20      /* Max depth of file nesting                */
-#define MaxFilePaths    32      /* Max number of filenames                  */
+#define MaxAnchorSize   40      /* Number of chars in an anchor string (-1) */
+#define MaxFiles        32      /* Max unique files                         */
 #define MaxWordlists    20      /* Max number of wordlists                  */
 
 #ifdef _MSC_VER                 /* Visual Studio wants "safe" functions.    */

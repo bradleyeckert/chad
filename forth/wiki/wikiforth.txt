@@ -163,13 +163,19 @@
  Return a `false` flag.
 =2.1010: true ( -- true )
  Return a `true` flag.
-=2.1020: within ( u ulo uhi -- flag )
- Perform a comparison of a test value n1 | u1 with a lower limit n2 | u2
- and an upper limit n3 | u3,
- returning true if either (n2 | u2 < n3 | u3 and (n2 | u2 <= n1 | u1 and n1 | u1 < n3 | u3))
- or (n2 | u2 > n3 | u3 and (n2 | u2 <= n1 | u1 or n1 | u1 < n3 | u3)) is true, returning false otherwise. 
- An ambiguous condition exists n1 | u1, n2 | u2, and n3 | u3
- are not all the same type.
+=2.1020: within ( x xlo xhi -- flag )
+ Perform a comparison of a test value `u` with a lower limit `xlo`
+ and an upper limit `xhi`, returning true if:
+#
+H<ul>
+-(`xlo` < `xhi`) and (`xlo` <= `x` and `x` < `uhi`), or
+-(`xlo` > `xhi`) and (`xlo` <= `x` or `x` < `xhi`)
+H</ul>
+ `x`, `xlo`, and `xhi` may be either signed or unsigned, but not mixed.
+=2.1030: /string ( addr1 u1 n -- addr2 u2 )
+ Adjust the character string at `addr1` by `n` characters.
+ The resulting character string, specified by `addr2 u2`,
+ begins at `addr1` plus `n` characters and is `u1 - n` characters long.
 =2.0135: <> ( n1 n2 -- flag )
  flag is true if and only if `x1` is not bit-for-bit the same as `x2`.
 =2.1040: 0<> ( x y -- f )
@@ -187,6 +193,8 @@
 =2.1090: 2r@ ( -- d | d -- d )
  Copy cell pair x1 x2 from the return stack.
  Semantically equivalent to `r> r> 2dup >r >r swap`.
+=2.1100: third ( x1 x2 x3 -- x1 x2 x3 x1 )
+ Equivalent to `2 pick`.
 =2.2000: 'TXbuf ( -- ioa )
  8-bit UART output buffer.
 =2.2010: 'TXbusy ( -- ioa )
@@ -297,25 +305,35 @@ H</ul>
  The return stack is emptied except for one cell to keep the sim running.
 =2.2960: ]stack ( ? -- ? )
  Restore the stacks saved by `f[`.
-=2.4000 sector ( -- a-addr )
+=2.2970: pick ( xu...x0 u -- xu...x0 xu )
+ Remove `u`. Copy the `xu` to the top of the stack.
+ An ambiguous condition exists if there are less than u+2
+ items on the stack before `pick` is executed.
+=2.2980: roll
+ Remove `u`. Rotate `u+1` items on the top of the stack.
+ An ambiguous condition exists if there are less than u+2 items
+ on the stack before `roll` is executed.
+=2.4000: sector ( -- a-addr )
  Variable for the current flash sector number.
-=2.4010 fp ( -- a-addr )
+=2.4010: fp ( -- a-addr )
  Variable for a 16-bit index into the 64 KB sector.
-=2.4020 fwall ( sector key -- )
+=2.4020: flash-wp ( sector key -- )
  Set the first writable 64KB flash sector.
- Ignored if `key` doesn't match fwallen.
-=2.4030 write[ ( fa -- )
+ Ignored if `key` doesn't match flwp_en.
+=2.4021: flwp_en ( -- n )
+ The `key` to enable flash-wp. Usage is `flwp_en flash-wp`.
+=2.4030: write[ ( fa -- )
  Set `fp` = `fa`.
  If `addr` is at a 4KB boundary, erase the sector.
  Start a page write at address `sector<<16+addr`. 
-=2.4040 >f ( c -- )
+=2.4040: >f ( c -- )
  Append a byte to flash and bump `fp`.
-=2.4050 ]write ( -- )
+=2.4050: ]write ( -- )
  End the page program command.
-=2.4060 read[ ( fa -- )
+=2.4060: read[ ( fa -- )
  Start reading flash at address `sector<<16+addr`.
-=2.4070 f> ( -- c )
+=2.4070: f> ( -- c )
  Read the next byte from flash.
-=2.4080 ]read ( -- )
+=2.4080: ]read ( -- )
  End the read command.
 =

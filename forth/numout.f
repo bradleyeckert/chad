@@ -38,7 +38,7 @@ variable hld                            \ 2.3000 -- c-addr
 : sign    0< if [char] - hold then ;    \ 2.3230 n --
 : #>      2drop hld @ tib over - ;      \ 2.3240 ud -- c-addr u
 : s.r     over - spaces type ;          \ length width --
-: d.r     3 stack[ >r dup >r dabs       \ 2.3250 d width --
+: d.r     3 stack[  >r dup >r dabs      \ 2.3250 d width --
           <# #s r> sign #> r> s.r ]stack ;
 : u.r     0 swap d.r ;                  \ 2.3260 u width --
 : .r      >r s>d r> d.r ;               \ 2.3270 n width --

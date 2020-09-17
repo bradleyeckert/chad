@@ -323,14 +323,14 @@ SV Simulate(cell xt) {
 // Compiler
 
 CELL cp = 0;                            // dictionary pointer for code space
-CELL fence = 0;                         // latest writable code word
+CELL latest = 0;                        // latest writable code word
 SI notail = 0;                          // tail recursion inhibited for call
 
 SV toCode (cell x) {                    // compile to code space
     chadToCode(cp++, x);
 }
 SV CompExit (void) {                    // compile an exit
-    if (fence == cp) {                  // code run is empty
+    if (latest == cp) {                 // code run is empty
         goto plain;                     // nothing to optimize
     }
     int a = (cp-1) & (CodeSize-1);
@@ -416,8 +416,8 @@ SV sane(void) {
 
 // Addressing beyond 1FFFh is not supported yet.
 
-SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= cp; fence = cp; }
-SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst); fence = cp; }
+SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= cp;  latest = cp; }
+SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = cp; }
 SV MarkFwd(void) { CtrlStack[++ConSP] = cp; }
 SV doBegin(void) { MarkFwd(); }
 SV doAgain(void) { ResolveRev(jump); }
@@ -429,12 +429,12 @@ SV doWhile(void) { doIf();  ControlSwap(); }
 SV doRepeat(void) { doAgain();  doThen(); }
 SV doFor(void) { toCode(alu | NtoT | TtoR | sdn | rup);  MarkFwd(); }
 SV noCompile(void) { error = BAD_NOCOMPILE; }
-SV noExecute(void) { error = BAD_UNSUPPORTED; }
+SV noExecute(void) { error = BAD_NOEXECUTE; }
 
 SV doNext(void) {
     toCode(alu | RM1toT | TtoN | sup);  /* (R-1)@ */
     toCode(alu | zeq | TtoR);  ResolveRev(zjump);
-    toCode(alu | rdn);  fence = cp;     /* rdrop */
+    toCode(alu | rdn);  latest = cp;    /* rdrop */
 }
 
 // HTML output is a kind of log file of token handling. It's a browsable
@@ -442,6 +442,7 @@ SV doNext(void) {
 
 SI fileID = 0;                          // cumulative file ID
 struct FileRec FileStack[MaxFiles];
+struct FilePath FilePaths[MaxFiles];
 SI filedepth = 0;                       // file stack
 static int logcolor = 0;
 static int leadingblanks = 0;
@@ -593,8 +594,10 @@ SI findinWL(char* key, int wid) {       // find in wordlist
     if (strlen(key) < MaxNameSize) {
         while (i) {
             if (strcmp(key, Header[i].name) == 0) {
-                me = i;
-                return i;
+                if (Header[i].smudge == 0) {
+                    me = i;
+                    return i;
+                }
             }
             i = Header[i].link;
         }
@@ -709,8 +712,9 @@ SI AddHead (char* name, char* anchor) { // add a header to the list
         Header[hp].notail = 0;
         Header[hp].target = 0;
         Header[hp].notail = 0;
+        Header[hp].smudge = 0;
         Header[hp].isALU = 0;
-        Header[hp].srcFile = fileID;
+        Header[hp].srcFile = File.FID;
         Header[hp].srcLine = File.LineNumber;
         Header[hp].link = wordlist[current];
         Header[hp].references = 0;
@@ -933,7 +937,6 @@ SV dot (void) {                         // ( n -- )
 
 static char* buf;                       // line buffer
 SI maxlen;                              // maximum buffer length
-static char FilePaths[MaxFilePaths*LineBufferSize];
 static char BOMmarker[4] = {0xEF, 0xBB, 0xBF, 0x00};
 
 static char* Title(char* filename) {    // strip down filename
@@ -979,7 +982,6 @@ static FILE* fopenx(char* filename, char* fmt) {
 
 SV OpenNewFile(char *name) {            // Push a new file onto the file stack
     filedepth++;  fileID++;
-    strmove (File.FilePath, name, LineBufferSize);
     File.fp = fopenx(name, "r");
     File.LineNumber = 0;
     File.Line[0] = 0;
@@ -988,12 +990,11 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
         filedepth--;
         error = BAD_OPENFILE;
     } else {
-        if ((filedepth >= MaxFiles) || (fileID >= MaxFilePaths))
+        if ((filedepth >= MaxFiles) || (fileID >= MaxFiles))
             error = BAD_INCLUDING;
         else {
             SwallowBOM(File.fp);
-            char* infilename = &FilePaths[fileID * LineBufferSize];
-            strmove(infilename, name, LineBufferSize);
+            strmove(FilePaths[fileID].filepath, name, LineBufferSize);
             File.hfp = fopenx(RefPath(name), "w");
             LogBegin(Title(name));
         }
@@ -1034,21 +1035,24 @@ SV Include(void) {                      // Nest into a source file
     OpenNewFile(tok);
 }
 
-SV _Colon(void) {
-    LogColor(COLOR_DEF, 0, tok);
-    SetFns(cp, Def_Exec, Def_Comp);
-    Header[hp].target = cp;
-    Header[hp].color = COLOR_WORD;
-    DefMarkID = hp;                     // save for later reference
-    DefMark = cp;
-    fence = cp;                         // code starts here
-    ConSP = 0;
-}
+// Start a new definition at the code boundary specified by CodeAlignment.
+// Use CodeAlignment > 1 for Code memory (ROM) that's slow.
+// For example, a ROM with a 64-bit prefetch buffer would have
+// CodeAlignment = 4 and use a 4:1 mux to fetch the instruction.
 
 SV Colon(void) {
     parseword(' ');
     if (AddHead(tok, "")) {             // define a word that simulates
-        _Colon();
+        cp = (cp + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
+        LogColor(COLOR_DEF, 0, tok);
+        SetFns(cp, Def_Exec, Def_Comp);
+        Header[hp].target = cp;
+        Header[hp].color = COLOR_WORD;
+        Header[hp].smudge = 1;
+        DefMarkID = hp;                 // save for later reference
+        DefMark = cp;
+        latest = cp;                     // code starts here
+        ConSP = 0;
         toCompile();
     }
 }
@@ -1056,7 +1060,7 @@ SV Colon(void) {
 SV NoName(void) {
     Dpush(cp);  DefMarkID = 0;          // no length
     toCompile();
-    fence = cp;
+    latest = cp;
     ConSP = 0;
 }
 
@@ -1084,9 +1088,11 @@ SV BrackDefined(void) {
     Dpush(r);
 }
 
-SV SaveLength(void) {                   // resolve length of definition
-    if (DefMarkID)
+SV EndDefinition(void) {                   // resolve length of definition
+    if (DefMarkID) {
         Header[DefMarkID].length = cp - DefMark;
+        Header[DefMarkID].smudge = 0;
+    }
 }
 
 SV CompMacro(void) {
@@ -1160,9 +1166,33 @@ SV See (void) {                         // ( <name> -- )
     }
 }
 
+SV Locate(void) {
+    if (tick()) {
+        uint8_t i = Header[me].srcFile;
+        char* filename = FilePaths[i].filepath;
+        int line = Header[me].srcLine;
+        printf("%s", filename);
+        FILE* fp = fopenx(filename, "r");
+        if (fp == NULL) {
+            printf(", Line# %d\n", line);
+        }
+        else {
+            printf("\n");
+            char b[LineBufferSize];
+            for (int i = 1 - line; i < 10; i++) {
+                if (fgets(b, LineBufferSize, fp) == NULL) break;
+                if (i >= 0)
+                    printf("%4d: %s", line++, b);
+            }
+            fclose(fp);
+        }
+    }
+}
+
 SV Later(void) {
     Colon();  toImmediate();  toCode(jump);
     Header[hp].w2 = MAGIC_LATER;
+    EndDefinition();
 }
 
 SV Resolves(void) {                     // ( xt <name> -- )
@@ -1177,7 +1207,8 @@ SV SkipToPar(void) {
 }
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
-SV EndCode   (void) { SaveLength();  OrderPop();  Dpop();  sane();}
+SV EndCode   (void) { EndDefinition();  OrderPop();  Dpop();  sane();}
+SV Recurse   (void) { CompCall(Header[DefMarkID].target); }
 SV Bye       (void) { error = BYE; }
 SV EchoToPar (void) { SkipToPar();  printf("%s", tok); }
 SV Cr        (void) { printf("\n"); }
@@ -1186,8 +1217,8 @@ SV BrackTick (void) { Literal(tick()); }
 SV There     (void) { Dpush(cp); }
 SV Torg      (void) { cp = Dpop(); }
 SV WrProtect (void) { writeprotect = CodeFence;  killHostIO(); }
-SV SemiComp  (void) { CompExit();  SaveLength();  toImmediate();  sane();}
-SV Semicolon (void) { SaveLength();  sane(); }
+SV SemiComp  (void) { CompExit();  EndDefinition();  toImmediate();  sane();}
+SV Semicolon (void) { EndDefinition();  sane(); }
 SV Verbosity (void) { verbose = Dpop(); }
 SV Aligned   (void) { Dpush(aligned(Dpop())); }
 SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
@@ -1388,13 +1419,13 @@ SV GenerateDoc(void) {
     uint16_t i = wordlist[context()];
     while (i) {
         char* na = Header[i].name;
-        uint8_t fileID = Header[i].srcFile;
+        uint8_t fid = Header[i].srcFile;
         if (Header[i].help[0]) {
             fprintf(fpw, "<a name=\"%s\"></a>\n", ReferenceString(i));
             fprintf(fpw, "<h3><ref>%s:</ref> ", ref);
-            if (fileID) {
+            if (fid) {
                 fprintf(fpw, "<a href=\"../%s\">",
-                    &FilePaths[fileID * LineBufferSize]);
+                    FilePaths[fid].filepath);
                 htmlOut(na, fpw);
                 fprintf(fpw, "</a>");
             }
@@ -1519,6 +1550,7 @@ SV LoadKeywords(void) {
     AddEquate("tib",     "1.0075 -- addr", BYTE_ADDR(DataSize) - MaxLineLength);
     AddEquate("|tib|",        "1.0076 -- n",          MaxLineLength);
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
+    AddKeyword("locate",      "1.0085 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
     AddKeyword("load-code",   "1.0100 <filename> --", LoadCodeBin,   noCompile);
     AddKeyword("save-code",   "1.0110 <filename> --", SaveCodeBin,   noCompile);
@@ -1575,6 +1607,7 @@ SV LoadKeywords(void) {
     AddKeyword(":noname",     "1.1220 -- xt",         NoName,        noCompile);
     AddKeyword("exit",        "1.1230 --",            noExecute,     CompExit);
     AddKeyword(";",           "1.1240 --",            Semicolon,     SemiComp);
+    AddKeyword("recurse",     "1.1245 --",            noExecute,     Recurse);
     AddKeyword("CODE",        "1.1250 <name> -- 0",   BeginCode,     noCompile);
     AddKeyword("literal",     "1.1260 x --",          noExecute,     doLITERAL);
     AddKeyword("immediate",   "1.1270 --",            Immediate,     noCompile);
@@ -1829,7 +1862,8 @@ bogus:                          error = UNRECOGNIZED;
                     default: ErrorMessage (error, tok);
                     }
                     while (filedepth) {
-                        printf("%s, Line %d: ", File.FilePath, File.LineNumber);
+                        printf("%s, Line %d: ", 
+                            FilePaths[File.FID].filepath, File.LineNumber);
                         printf("%s\n", File.Line);
                         fclose(File.fp);
                         LogEnd();
@@ -1885,12 +1919,12 @@ uint32_t chadGetHeader (uint32_t select) {
     case 20: return wordlistname[ID / 16][ID % 16];
     case 21: return fileID;
     case 22: return LineBufferSize;
-    case 23: return FilePaths[ID];
     default:
         select = ID & 0x1F;
         switch (field) {
         case 1:  return Header[ID].name[select];
         case 2:  return Header[ID].help[select];
+        case 3:  return FilePaths[ID].filepath[select];
         default: return 0;
         }
     }

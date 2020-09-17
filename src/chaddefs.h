@@ -52,11 +52,14 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 
 struct FileRec {
     char Line[LineBufferSize];          // the current input line
-    char FilePath[LineBufferSize];      // filename
     FILE* fp;                           // input file pointer
     FILE* hfp;                          // html documentation file pointer
     uint32_t LineNumber;                // line number
     int FID;                            // file ID for LOCATE
+};
+
+struct FilePath {
+    char filepath[LineBufferSize];      // filename
 };
 
 typedef void (*VoidFn)();
@@ -74,6 +77,7 @@ struct Keyword {
     uint16_t link;                      // enough for 64k headers
     cell *aux;                          // pointer to aux C data 
     uint8_t notail;                     // inhibit tail recursion
+    uint8_t smudge;                     // hide current definition
     uint8_t isALU;                      // is an ALU word
     uint8_t srcFile;                    // source file ID
     uint16_t srcLine;                   // source line number
@@ -186,7 +190,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_RSTACKUNDER  -6 // Return stack underflow
 #define DIV_BY_ZERO     -10 // Division by 0
 #define UNRECOGNIZED    -13 // Unrecognized word
-#define BAD_NOCOMPILE   -14 // Interpreting a compile-only word
+#define BAD_NOEXECUTE   -14 // Interpreting a compile-only word
 #define BAD_ROMWRITE    -20 // Write to a read-only location
 #define BAD_UNSUPPORTED -21 // Unsupported operation
 #define BAD_CONTROL     -22 // Control structure mismatch
@@ -206,6 +210,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_IS          -74 // Trying to IS a non-DEFER
 #define BAD_WID_OVER    -75 // Too many WORDLISTs
 #define BAD_DOES        -77 // Invalid CREATE DOES> usage
+#define BAD_NOCOMPILE   -98 // Compiling an execute-only word
 #define BAD_INCLUDING   -99 // Nesting overflow during include
 #define BAD_CREATEFILE -198
 #define BAD_OPENFILE   -199 // Can't open file

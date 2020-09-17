@@ -15,38 +15,86 @@
 <hr>
 <h2>Definitions in instruction memory</h2>
 <hr>
+<!-- No reference for f\ -->
+<!-- No reference for \source -->
+<!-- No reference for /source -->
+<!-- No reference for source -->
 <!-- No reference for fib -->
 <!-- No reference for hi -->
-<a name="2.4070"></a>
-<h3><ref>2.4070:</ref> <a href="../../flash.f">f&gt;</a> <com><i>( c -- )</i></com></h3>
+<a name="2.4090"></a>
+<h3><ref>2.4090:</ref> <a href="../../flash.f">read</a> <com><i>( c-addr u -- )</i></com></h3>
 <a name="2.4060"></a>
 <h3><ref>2.4060:</ref> <a href="../../flash.f">read[</a> <com><i>( fa -- )</i></com></h3>
+
+<p>Start reading flash at address <tok>sector&lt;&lt;16+addr</tok>.
+</p>
+<a name="2.4045"></a>
+<h3><ref>2.4045:</ref> <a href="../../flash.f">write</a> <com><i>( c-addr u -- )</i></com></h3>
 <a name="2.4040"></a>
 <h3><ref>2.4040:</ref> <a href="../../flash.f">&gt;f</a> <com><i>( c -- )</i></com></h3>
+
+<p>Append a byte to flash and bump <tok>fp</tok>.
+</p>
+<!-- No reference for bump_fp -->
 <a name="2.4030"></a>
 <h3><ref>2.4030:</ref> <a href="../../flash.f">write[</a> <com><i>( fa -- )</i></com></h3>
+
+<p>Set <tok>fp</tok> = <tok>fa</tok>.
+If <tok>addr</tok> is at a 4KB boundary, erase the sector.
+Start a page write at address <tok>sector&lt;&lt;16+addr</tok>. 
+</p>
+<!-- No reference for erase4K -->
+<!-- No reference for is256? -->
+<!-- No reference for is4K? -->
+<!-- No reference for mask16b -->
+<a name="2.4070"></a>
+<h3><ref>2.4070:</ref> <a href="../../flash.f">f&gt;</a> <com><i>( c -- )</i></com></h3>
+
+<p>Read the next byte from flash.
+</p>
 <a name="2.4050"></a>
 <h3><ref>2.4050:</ref> <a href="../../flash.f">]write</a> <com><i>( -- )</i></com></h3>
-<a name="2.4080"></a>
-<h3><ref>2.4080:</ref> <a href="../../flash.f">]read</a> <com><i>( -- )</i></com></h3>
+
+<p>End the page program command.
+</p>
 <!-- No reference for sendaddr24 -->
+<!-- No reference for waitflash -->
 <!-- No reference for fl_wrdi -->
 <!-- No reference for fl_wren -->
-<!-- No reference for waitflash -->
-<!-- No reference for SPIend -->
+<a name="2.4081"></a>
+<h3><ref>2.4081:</ref> <a href="../../flash.f">SPIend</a> <com><i>( -- )</i></com></h3>
+<a name="2.4080"></a>
+<h3><ref>2.4080:</ref> <a href="../../flash.f">]read</a> <com><i>( -- )</i></com></h3>
+
+<p>End the read command.
+</p>
 <!-- No reference for SPIcommand -->
 <!-- No reference for readSPI -->
 <!-- No reference for sendSPI -->
 <!-- No reference for waitSPI -->
 <a name="2.4020"></a>
 <h3><ref>2.4020:</ref> <a href="../../flash.f">flash-wp</a> <com><i>( sector key -- )</i></com></h3>
+
+<p>Set the first writable 64KB flash sector.
+Ignored if <tok>key</tok> doesn&apos;t match flwp_en.
+</p>
 <a name="2.4010"></a>
 <h3><ref>2.4010:</ref> <a href="../../flash.f">fp</a> <com><i>( -- a-addr )</i></com></h3>
+
+<p>Variable for a 16-bit index into the 64 KB sector.
+</p>
 <a name="2.4000"></a>
 <h3><ref>2.4000:</ref> <a href="../../flash.f">sector</a> <com><i>( -- a-addr )</i></com></h3>
+
+<p>Variable for the current flash sector number.
+</p>
 <!-- No reference for fwren1 -->
 <!-- No reference for fwren0 -->
-<!-- No reference for flwp_en -->
+<a name="2.4021"></a>
+<h3><ref>2.4021:</ref> <a href="../../flash.f">flwp_en</a> <com><i>( -- x )</i></com></h3>
+
+<p>The <tok>key</tok> to enable flash-wp. Usage is <tok>flwp_en flash-wp</tok>.
+</p>
 <!-- No reference for flashcon1 -->
 <!-- No reference for flashcon0 -->
 <a name="2.3320"></a>
@@ -195,6 +243,20 @@ along with that many byte-wide characters in data space.
 
 <p>A pointer variable for numeric conversion.
 </p>
+<a name="2.2980"></a>
+<h3><ref>2.2980:</ref> <a href="../../frame.f">roll</a> <com><i>( xu..x0 u -- xu-1..x0 xu )</i></com></h3>
+
+<p>Remove <tok>u</tok>. Rotate <tok>u+1</tok> items on the top of the stack.
+An ambiguous condition exists if there are less than u+2 items
+on the stack before <tok>roll</tok> is executed.
+</p>
+<a name="2.2970"></a>
+<h3><ref>2.2970:</ref> <a href="../../frame.f">pick</a> <com><i>( xu...x0 u -- xu...x0 xu )</i></com></h3>
+
+<p>Remove <tok>u</tok>. Copy the <tok>xu</tok> to the top of the stack.
+An ambiguous condition exists if there are less than u+2
+items on the stack before <tok>pick</tok> is executed.
+</p>
 <a name="2.2960"></a>
 <h3><ref>2.2960:</ref> <a href="../../frame.f">]stack</a> <com><i>( ? -- ? )</i></com></h3>
 
@@ -276,6 +338,11 @@ The actions in a table are:
 
 <p>8-bit UART output buffer.
 </p>
+<a name="2.1100"></a>
+<h3><ref>2.1100:</ref> <a href="../../coreext.f">third</a> <com><i>( x1 x2 x3 -- x1 x2 x3 x1 )</i></com></h3>
+
+<p>Equivalent to <tok>2 pick</tok>.
+</p>
 <a name="2.1090"></a>
 <h3><ref>2.1090:</ref> <a href="../../coreext.f">2r@</a> <com><i>( -- d | d -- d )</i></com></h3>
 
@@ -309,15 +376,23 @@ Semantically equivalent to <tok>swap &gt;r &gt;r</tok>.
 
 <p>flag is true if and only if <tok>x</tok> is not equal to zero.
 </p>
-<a name="2.1020"></a>
-<h3><ref>2.1020:</ref> <a href="../../coreext.f">within</a> <com><i>( u ulo uhi -- flag )</i></com></h3>
+<a name="2.1030"></a>
+<h3><ref>2.1030:</ref> <a href="../../coreext.f">/string</a> <com><i>( addr1 u1 n -- addr2 u2 )</i></com></h3>
 
-<p>Perform a comparison of a test value n1 | u1 with a lower limit n2 | u2
-and an upper limit n3 | u3,
-returning true if either (n2 | u2 &lt; n3 | u3 and (n2 | u2 &lt;= n1 | u1 and n1 | u1 &lt; n3 | u3))
-or (n2 | u2 &gt; n3 | u3 and (n2 | u2 &lt;= n1 | u1 or n1 | u1 &lt; n3 | u3)) is true, returning false otherwise. 
-An ambiguous condition exists n1 | u1, n2 | u2, and n3 | u3
-are not all the same type.
+<p>Adjust the character string at <tok>addr1</tok> by <tok>n</tok> characters.
+The resulting character string, specified by <tok>addr2 u2</tok>,
+begins at <tok>addr1</tok> plus <tok>n</tok> characters and is <tok>u1 - n</tok> characters long.
+</p>
+<a name="2.1020"></a>
+<h3><ref>2.1020:</ref> <a href="../../coreext.f">within</a> <com><i>( x xlo xhi -- flag )</i></com></h3>
+
+<p>Perform a comparison of a test value <tok>u</tok> with a lower limit <tok>xlo</tok>
+and an upper limit <tok>xhi</tok>, returning true if:
+</p>
+<ul>
+<li>(<tok>xlo</tok> &lt; <tok>xhi</tok>) and (<tok>xlo</tok> &lt;= <tok>x</tok> and <tok>x</tok> &lt; <tok>uhi</tok>), or</li><li>(<tok>xlo</tok> &gt; <tok>xhi</tok>) and (<tok>xlo</tok> &lt;= <tok>x</tok> or <tok>x</tok> &lt; <tok>xhi</tok>)</li></ul>
+
+<p><tok>x</tok>, <tok>xlo</tok>, and <tok>xhi</tok> may be either signed or unsigned, but not mixed.
 </p>
 <a name="2.1010"></a>
 <h3><ref>2.1010:</ref> <a href="../../coreext.f">true</a> <com><i>( -- true )</i></com></h3>

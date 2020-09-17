@@ -55,6 +55,9 @@ So, we don't do it.
  Size in bytes of the text input buffer.
 =1.0080: stats ( -- )
  Prints simulator statistics.
+=1.0085: locate ( <name> -- )
+ Display the source file path and source code of a word.
+ If the file can't be opened, display the line number.
 =1.0090: verbosity ( flags -- )
  There are four bit flags in the verbosity setting that control what the
  interpreter prints out.
@@ -289,9 +292,10 @@ H</ul>
  Append the initiation semantics given below to the current definition.
 
  The execution semantics of name will be determined by the words compiled
- into the body of the definition. The current definition is findable in the dictionary, unlike ANS Forth.
+ into the body of the definition. The current definition shall not be
+ findable in the dictionary until it is ended.
 
- `:` does not change the stack, another entitlement not given by ANS.
+ `:` does not change the stack, an entitlement not given by ANS.
  You can feed in literal data from the outside, such as:
 
  `123 : foo literal + ;`

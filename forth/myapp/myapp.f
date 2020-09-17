@@ -23,18 +23,25 @@ include ../flash.f
 
 \ Examples
 
-\ Use colorForth style of recursion
-\ This kind of recursion is non-ANS.
-\ We don't hide a word within its definition.
-
 : fib ( n1 -- n2 )
     dup 2 < if drop 1 exit then
-    dup  1 - fib
-    swap 2 - fib  + ;
+    dup  1 - recurse
+    swap 2 - recurse  + ;
 
 \ Try 25 fib, then stats
 
 ' fib resolves cold
+
+: source   tib tibs @ ;
+: /source  source >in @ /string ;
+: \source  /source  tibs @ >in ! ;
+
+: f\
+	0 flwp_en flash-wp
+	0 sector !
+    \source  0 write[ dup >f write ]write
+;
+
 
 .( Total instructions: ) there . cr
 \ 0 there dasm
@@ -46,3 +53,4 @@ gendoc ../wiki/wikiroot.txt html/root.html
 asm +order
 gendoc ../wiki/wikiasm.txt html/asm.html
 only forth
+
