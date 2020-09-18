@@ -21,15 +21,23 @@
 <!-- No reference for source -->
 <!-- No reference for fib -->
 <!-- No reference for hi -->
+<!-- No reference for decipher -->
+<!-- No reference for encipher -->
+<!-- No reference for xtermb -->
+<!-- No reference for xterma -->
+<!-- No reference for xshift -->
+<!-- No reference for xrounds -->
+<!-- No reference for xdelta -->
+<!-- No reference for xkey -->
 <a name="2.4090"></a>
 <h3><ref>2.4090:</ref> <a href="../../flash.f">read</a> <com><i>( c-addr u -- )</i></com></h3>
+<a name="2.4045"></a>
+<h3><ref>2.4045:</ref> <a href="../../flash.f">write</a> <com><i>( c-addr u -- )</i></com></h3>
 <a name="2.4060"></a>
 <h3><ref>2.4060:</ref> <a href="../../flash.f">read[</a> <com><i>( fa -- )</i></com></h3>
 
 <p>Start reading flash at address <tok>sector&lt;&lt;16+addr</tok>.
 </p>
-<a name="2.4045"></a>
-<h3><ref>2.4045:</ref> <a href="../../flash.f">write</a> <com><i>( c-addr u -- )</i></com></h3>
 <a name="2.4040"></a>
 <h3><ref>2.4040:</ref> <a href="../../flash.f">&gt;f</a> <com><i>( c -- )</i></com></h3>
 
@@ -215,7 +223,12 @@ In <tok>chad</tok>, numeric conversion is done at the top of data space:
 <p>Convert the number n to the double-cell number d with the
 same numerical value.
 </p>
-<!-- No reference for type -->
+<a name="2.3140"></a>
+<h3><ref>2.3140:</ref> <a href="../../numout.f">type</a> <com><i>( c-addr u -- )</i></com></h3>
+
+<p>If <tok>u</tok> is greater than zero, display the character string specified by
+c-addr and u. The output device should handle UTF-8 as a standard.
+</p>
 <!-- No reference for hex -->
 <!-- No reference for decimal -->
 <a name="2.3110"></a>
@@ -330,8 +343,22 @@ The actions in a table are:
 
 <p>8-bit UART output buffer.
 </p>
-<!-- No reference for rshift -->
-<!-- No reference for lshift -->
+<a name="2.1120"></a>
+<h3><ref>2.1120:</ref> <a href="../../coreext.f">rshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
+
+<p>Perform a logical right shift of u bit-places on x1, giving x2.
+Put zeroes into the most significant bits vacated by the shift.
+An ambiguous condition exists if u is greater than or equal to
+the number of bits in a cell.
+</p>
+<a name="2.1110"></a>
+<h3><ref>2.1110:</ref> <a href="../../coreext.f">lshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
+
+<p>Perform a logical left shift of u bit-places on x1, giving x2.
+Put zeroes into the least significant bits vacated by the shift.
+An ambiguous condition exists if u is greater than or equal to
+the number of bits in a cell.
+</p>
 <a name="2.1100"></a>
 <h3><ref>2.1100:</ref> <a href="../../coreext.f">third</a> <com><i>( x1 x2 x3 -- x1 x2 x3 x1 )</i></com></h3>
 

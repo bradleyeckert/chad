@@ -167,14 +167,12 @@ RA = T.
 <a name="1.6140"></a>
 <h3><ref>1.6140:</ref> <chad>&gt;&lt;16</chad> <com><i>( n1 -- n2 )</i></com></h3>
 
-<p>T = (T &amp; 1) &lt;&lt; 8 if cellbits &lt; 32.
-T = (T &amp; 3) &lt;&lt; 8 if cellbits = 32.
-W = FFh.
+<p>T = ((T&gt;&gt;16) &amp; 0xFFFF) | ((T &amp; 0xFFFF) &lt;&lt; 16) (swap 16-bit halves)
 </p>
 <a name="1.6130"></a>
 <h3><ref>1.6130:</ref> <chad>&gt;&lt;</chad> <com><i>( n1 -- n2 )</i></com></h3>
 
-<p>T = W &amp; T
+<p>T = ((T&gt;&gt;8) &amp; 0xFF00FF) | ((T &amp; 0xFF00FF)&lt;&lt;8) (swap even/odd bytes)
 </p>
 <a name="1.6120"></a>
 <h3><ref>1.6120:</ref> <chad>T&amp;N</chad> <com><i>( n1 -- n2 )</i></com></h3>

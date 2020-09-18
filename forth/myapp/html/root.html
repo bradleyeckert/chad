@@ -235,13 +235,12 @@ It can immediately follow a <tok>_@</tok>.
 <a name="1.2650"></a>
 <h3><ref>1.2650:</ref> <chad>swapw</chad> <com><i>( x -- y )</i></com></h3>
 
-<p>Logical and <tok>x</tok> with the <tok>w</tok> register.
+<p>Swap the even and odd 16-bit words of zero-extended (if needed) <tok>x</tok>.
 </p>
 <a name="1.2640"></a>
 <h3><ref>1.2640:</ref> <chad>swapb</chad> <com><i>( x -- y )</i></com></h3>
 
-<p>A helper for <tok>c@</tok>. Converts the address to a shift count and loads
-FFh into the <tok>w</tok> register.
+<p>Swap the even and odd bytes of zero-extended (if needed) <tok>x</tok>.
 </p>
 <a name="1.2630"></a>
 <h3><ref>1.2630:</ref> <chad>2dup-</chad> <com><i>( u v -- u v u-v )</i></com></h3>
@@ -300,12 +299,12 @@ A Forth equivalent of this instruction is &quot;tuck !&quot;.
 <a name="1.2530"></a>
 <h3><ref>1.2530:</ref> <chad>-c</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
 
-<p>Same as <tok>+</tok> but does not modify the carry.
+<p>Add n2 to n1, giving the sum n3. The carry is modified.
 </p>
 <a name="1.2530"></a>
 <h3><ref>1.2530:</ref> <chad>+c</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
 
-<p>Same as <tok>+</tok> but does not modify the carry.
+<p>Add n2 to n1, giving the sum n3. The carry is modified.
 </p>
 <a name="1.2520"></a>
 <h3><ref>1.2520:</ref> <chad>&gt;carry</chad> <com><i>( n -- )</i></com></h3>
@@ -376,12 +375,12 @@ A Forth equivalent of this instruction is &quot;tuck !&quot;.
 <a name="1.2090"></a>
 <h3><ref>1.2090:</ref> <chad>-</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
 
-<p>Subtract n2 from n1, giving the difference n3. The carry is modified.
+<p>Subtract n2 from n1, giving the difference n3.
 </p>
 <a name="1.2080"></a>
 <h3><ref>1.2080:</ref> <chad>+</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
 
-<p>Add n2 to n1, giving the sum n3. The carry is modified.
+<p>Add n2 to n1, giving the sum n3.
 </p>
 <a name="1.2070"></a>
 <h3><ref>1.2070:</ref> <chad>and</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>

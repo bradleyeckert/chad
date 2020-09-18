@@ -10,6 +10,7 @@ include ../redirect.f
 include ../frame.f
 include ../numout.f
 include ../flash.f
+include ../ctea.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
