@@ -18,4 +18,16 @@ there
 ; no-tail-recursion
 : third  >r >r dup r> swap r> swap ;    \ 2.1100 x1 x2 x3 -- x1 x2 x3 x1
 
+\ lshift and rshift are hardly ever used so they are slow
+
+: lshift  								\ 2.1110 x1 u -- x2
+    dup if  for  2*  next  exit
+    then drop
+;
+
+: rshift  								\ 2.1120 x1 u -- x2
+    dup if  for  0 >carry 2/c  next  exit
+    then drop
+;
+
 there swap - . .( instructions used by core ext) cr

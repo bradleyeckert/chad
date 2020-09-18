@@ -19,7 +19,7 @@ Chad can call LoadFlashMem to initialize it from a file.
 
 static uint8_t mem[FlashMemorySize];
 
-int LoadFlashMem(char* filename) {     // load binary image
+int LoadFlashMem(char* filename) {      // load binary image
 	memset(mem, 0, FlashMemorySize);    // erase flash
 	FILE* fp;
 #ifdef MORESAFE
@@ -68,18 +68,17 @@ enum states {
 
 enum states state = idle;               // FSM state
 static uint8_t format;                  // SPI format, 0 = 1-bit
-static uint64_t mark;                   // SPI busy flag time-out
-static uint64_t fmark;                  // Flash time-out
+static uint64_t mark;                   // Flash time-out
 
 void FlashMemSPIformat(int n) {
-	format = 3 & (n >> 1);
-	if (n & 1)
-		state = idle;                   // CS line high = inactive
+	format = 7 & (n >> 1);
+	if ((n & 1) == 0)
+		state = idle;                   // CS line low = inactive
 #ifdef VERBOSE
 	if (n & 1)
-		printf("]\n");
-	else
 		printf("[");
+	else
+		printf("]\n");
 #endif
 }
 
@@ -89,32 +88,20 @@ void FlashMemSPIformat(int n) {
 // 10 = 8-bit QSPI mode receive
 // 11 = 16-bit QSPI mode receive
 
-int FlashMemSPIbusy(void) {
-	return (chadCycles() < mark);
-}
-
 static int FlashBusy(void) {
-	return (chadCycles() < fmark) ? 1 : 0;
+	return (chadCycles() < mark) ? 1 : 0;
 }
 
 // Return value is the SPI return or error code
-
 // RDJDID (9F command) is custom: 0xAA, 0xHH, 0xFF number of 4K blocks
 
-int FlashMemSPI(int n) {
+static int FlashMemSPI8(uint8_t cin) {
 	static uint8_t command = 0;         // current command
 	static uint8_t wen = 0;             // write enable
 	static uint8_t qe = 0;              // quad rate enable
 	static uint32_t addr;
 	static uint32_t dummy;
-	uint8_t cin = (uint8_t)(n & 0xFF);
 	uint16_t cout = 0x00FF;
-	uint8_t beats = 2;
-	switch (format) {
-	case 0: beats = 8;  break;
-	case 3: beats = 4;  break;
-	}
-	mark = chadCycles() + (uint64_t)beats * clockDivisor;
 #ifdef VERBOSE
 	if (state != idle)
 	printf("{%X}", cin);
@@ -169,7 +156,7 @@ int FlashMemSPI(int n) {
 				if (wen) {
 					wen = 0;
 					memset(&mem[addr & (~0xFFF)], 0, 4096);
-					fmark = chadCycles() + (uint64_t)ERASE_DELAY;
+					mark = chadCycles() + (uint64_t)ERASE_DELAY;
 				} break;
 			case 0x03:
 				state = read;  break;
@@ -180,7 +167,7 @@ int FlashMemSPI(int n) {
 				if (qe == 0) { goto notenabled; }
 			case 0x02:
 				if (wen) { 
-					fmark = chadCycles() + (uint64_t)BYTE0_DELAY;
+					mark = chadCycles() + (uint64_t)BYTE0_DELAY;
 					state = write;  break; 
 				}
 			notenabled:  wen = 0;
@@ -192,9 +179,6 @@ int FlashMemSPI(int n) {
 		break;
 	case read:						// read as long as you want
 		cout = 0xFF & ~mem[addr++];
-		if (format == 3) {			// big-endian, unfortunately
-			cout = (cout << 8) | (0xFF & ~mem[addr++]);
-		}
 		break;
 	case write:						// write byte to flash
 		if (mem[addr]) {			// 0 = blank
@@ -202,7 +186,7 @@ int FlashMemSPI(int n) {
 			return BAD_NOTBLANK;
 		}
 		mem[addr++] = ~cin;
-		fmark += (uint64_t)BYTE_DELAY;
+		mark += (uint64_t)BYTE_DELAY;
 		if ((addr & 0xFF) == 0) {	// reached end of write page
 			wen = 0;  state = wait;
 		}
@@ -211,10 +195,30 @@ int FlashMemSPI(int n) {
 		state++;  break;
 	case wrsrb:
 		qe = cin & 2;				// bit 9 of status write
-		fmark = chadCycles() + (uint64_t)WRSR_DELAY;
+		mark = chadCycles() + (uint64_t)WRSR_DELAY;
 		state = idle;  break;
 	default:
 		state = idle;
 	}
 	return cout;
 }
+
+// format supports different modes
+
+int32_t FlashMemSPI(uint16_t x) {
+	int first = FlashMemSPI8((uint8_t)x);
+	if (((format & 1) == 0) || (first & 0x8000))
+		return first;
+	int second = FlashMemSPI8((uint8_t)x);
+	if (second & 0x8000)
+		return second;
+	return second<<8 | first;		// little endian 16-bit
+}
+
+// 000 = 8 - bit SPI
+// 001 = 16 - bit SPI
+// 100 = 8 - bit QSPI mode receive
+// 101 = 16 - bit QSPI mode receive
+// 110 = 8 - bit QSPI mode transmit
+// 111 = 16 - bit QSPI mode transmit
+

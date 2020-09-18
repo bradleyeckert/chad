@@ -21,7 +21,8 @@
 #define MaxKeywords   2000      /* Number of headers                        */
 #define MaxNameSize     32      /* Number of chars in a name (less 1)       */
 #define MaxAnchorSize   40      /* Number of chars in an anchor string (-1) */
-#define MaxFiles        32      /* Max unique files                         */
+#define MaxFiles        16      /* Max open files                           */
+#define MaxFilePaths    32      /* Max unique files                         */
 #define MaxWordlists    20      /* Max number of wordlists                  */
 
 #ifdef _MSC_VER                 /* Visual Studio wants "safe" functions.    */

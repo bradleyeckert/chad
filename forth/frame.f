@@ -48,7 +48,7 @@ tib |framestack| - equ frp0             \ bottom of frame stack
 : stack[  ( ... n -- x[n-1] ... x[0] )  \ 2.2950 n --
     depth
     2dup- 0< if
-        r> frp @  spstat 8 rshift 63 and ( RA fp rdepth )
+        r> frp @  spstat swapb 63 and   ( RA fp rdepth )
         1 - 0 max                       \ leave a little on the return stack
         swap over                       ( RA rdepth fp cnt | ... )
         begin  dup  while 1 -
@@ -87,7 +87,6 @@ tib |framestack| - equ frp0             \ bottom of frame stack
         mem>ds drop  r>
     then
 ;
-
 
 there swap - . .( instructions used by stack framing) cr
 

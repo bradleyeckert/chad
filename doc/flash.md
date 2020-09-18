@@ -70,19 +70,57 @@ I/O space of SPI flash simulator:
 
 | Addr | Read     | Write    |
 | ---- | -------- | -------- |
-| 4    | `busy`   | `format` |
-| 5    | `result` | `spi`    |
+| 4    | `retrig` | `spitx`  |
+| 5    | `result` | `format` |
+| 6    |          | `rate`   |
 
-- `busy` = `1` if the SPI is busy, `0` otherwise.
-- `result` = `1` is the SPI data read from the flash.
-- `format` sets chip select CSN to T\[0] and the format to T\[3:2].
-- `spi` write triggers a SPI transfer.
+Hardware is assumed to freeze the CPU if the relevant read or write
+occurs before the SPI transfer is finished.
+
+- `result` is data read from the flash.
+- `retrig` is data read from the flash, triggering another read.
+- `format` sets chip select CSN to ~T\[0] and the format to T\[3:1].
+- `spitx` write triggers a SPI transfer.
+- `rate` sets the SPI clock rate `div` = T\[5:0].
 
 The format determines the width and format of the transfer:
 
-- 00 = 8-bit old school SPI
-- 01 = 8-bit QSPI mode transmit
-- 10 = 8-bit QSPI mode receive
-- 11 = 16-bit QSPI mode receive
+- 000 = 8-bit SPI
+- 001 = 16-bit SPI
+- 100 = 8-bit QSPI mode receive
+- 101 = 16-bit QSPI mode receive
+- 110 = 8-bit QSPI mode transmit
+- 111 = 16-bit QSPI mode transmit
 
-The simulator currently supports only format 00.
+## Hardware
+
+The clock could be gated to run the SPI at the `chad` processor
+frequency, but to keep it simple assume the maximum SPI clock
+is half the processor clock. 
+The `rate` register sets the SPI clock frequency to `sysclk/2(n+1)`.
+
+A 16-bit shift register is the basis for the SPI.
+In QSPI mode, the four I/O lines are `data`. The formats are:
+
+- 000: 1-wire mode, MISO shifts into bit 0 and MOSI shifts out of bit 7.
+- 001: 1-wire mode, MISO shifts into bit 0 and MOSI shifts out of bit 15.
+- 10x: 4-wire receive, `data` is shifted into the lower 4 bits.
+- 110: 4-wire transmit, `data` is driven by SR\[7:4].
+- 111: 4-wire transmit, `data` is driven by SR\[15:11].
+
+Writing to `spitx` or reading from `retrig` will trigger a SPI transfer.
+
+The `result` is muxed from SR depending on the LSB of format:
+
+- 0: SR\[7:0].
+- 1: SR\[7:0]:SR\[15:8].
+
+The `rate` register sets the SPI clock rate `div` = T\[5:0] and
+a chip select decoder T\[7:6]. 
+It selects both the SCLK frequency and the CS line to use,
+so you can have multiple SPI devices on the same SPI bus.
+For example:
+
+- SPI flash
+- SPI SRAM
+- Output port expansion: 74HC595s, etc.

@@ -10,15 +10,11 @@ variable hld                            \ 2.3000 -- c-addr
 : count   dup 1+ swap c@ ;              \ 2.3110 a u -- a+1 u-1
 : decimal 10 base ! ;
 : hex     16 base ! ;
-: type    dup if                        \ 2.3140 c-addr u --
-            for  count emit  next  drop
-          else  2drop
-          then
-;
+:noname   count emit ;  ( xt )          \ send string to output device
+: type    literal times drop ;          \ 2.3140 c-addr u --
 : s>d     dup 0< ;                      \ 2.3150 n -- d
 : space   bl emit ;                     \ 2.3160 --
-: spaces  dup 1- 0< if  drop exit  then \ 2.3170 n --
-          for space next ;
+: spaces  ['] space times ;             \ 2.3170 n --
 
 \ Numeric conversion. `d.r` uses frame stack protection to prevent overflow
 \ when the stacks have significant content. Since `d.r` ia typically at the

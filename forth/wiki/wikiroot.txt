@@ -413,9 +413,9 @@ _
 =1.2070: and ( n1 n2 -- n3 )
  x3 is the bit-by-bit logical-and of x1 with x2.
 =1.2080: + ( n1 n2 -- n3 )
- Add n2 to n1, giving the sum n3. The carry is modified.
+ Add n2 to n1, giving the sum n3.
 =1.2090: - ( n1 n2 -- n3 )
- Subtract n2 from n1, giving the difference n3. The carry is modified.
+ Subtract n2 from n1, giving the difference n3.
 =1.2100: dup ( x -- x x )
  Duplicate x.
 =1.2110: over ( x1 x2 -- x1 x2 x1 )
@@ -436,22 +436,6 @@ _
  Move x from the return stack to the data stack. "r-from".
 =1.2190: r@ ( -- x|x -- x )
  Copy x from the return stack to the data stack. "r-fetch"
-=1.2200: rshift ( x1 u -- x2 )
- Perform a logical right shift of u bit-places on x1, giving x2.
- Put zeroes into the most significant bits vacated by the shift.
- The LSBs of `u` control a barrel shifter.
- If the cell size is not an exact power of two, the shift capability
- is limited to the next smaller exact value.
- For example, an 18-bit cell has a maximum shift count of 15.
- An ambiguous condition exists if u is greater than or equal to
- the number of bits in a cell or the next lower exact power of two
- in the case of cells that are not a power of two wide.
-=1.2210: lshift ( x1 u -- x2 )
- Perform a logical left shift of u bit-places on x1, giving x2.
- Put zeroes into the least significant bits vacated by the shift.
- An ambiguous condition exists if u is greater than or equal to
- the number of bits in a cell or the next lower exact power of two
- in the case of cells that are not a power of two wide.
 =1.2500: carry ( -- n )
  Read the carry bit.
 #
@@ -463,8 +447,10 @@ _
  Read the `w` register.
 =1.2520: >carry ( n -- )
  Set the carry to the LSB of `n`. Also set the `w` register to `n`.
-=1.2530: _+ ( n1 n2 -- n3 )
- Same as `+` but does not modify the carry.
+=1.2530: +c ( n1 n2 -- n3 )
+ Add n2 to n1, giving the sum n3. The carry is modified.
+=1.2531: -c ( n1 n2 -- n3 )
+ Subtract n2 from n1, giving the difference n3. The carry is modified.
 =1.2540: _@ ( addr -- addr )
  Begins a memory read operation by creating a read-enable strobe.
 =1.2550: _@_ ( addr -- )
@@ -489,11 +475,10 @@ _
  Same as `2dup +`.
 =1.2630: 2dup- ( u v -- u v u-v )
  Same as `2dup -`.
-=1.2640: mask ( addr -- cnt )
- A helper for `c@`. Converts the address to a shift count and loads
- FFh into the `w` register.
-=1.2650: wand ( x -- x&w )
- Logical and `x` with the `w` register.
+=1.2640: swapb ( x -- y )
+ Swap the even and odd bytes of zero-extended (if needed) `x`.
+=1.2650: swapw ( x -- y )
+ Swap the even and odd 16-bit words of zero-extended (if needed) `x`.
 =1.2660: overand ( u v -- u u&v )
  Same as `over and`.
 =1.2670: overxor ( u v -- u u^v )
@@ -506,7 +491,7 @@ _
  Same as `dup >r`.
 =1.2710: rdrop ( --|x -- )
  Same as `r> drop`.
-=1.2720: +c ( u v -- u+v+c )
+=1.2720: c+c ( u v -- u+v+c )
  Add `u` to `v` with carry, giving the sum `u+v+c`. The carry is modified.
 =1.2730: dup@ ( addr -- addr x )
  Ends a memory read operation while duplicating addr.

@@ -23,6 +23,7 @@ static uint8_t nohostAPI;           // prohibit access to host API
 static int termKey(void);
 
 uint32_t readIOmap (uint32_t addr) {
+    int32_t r, temp;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
@@ -33,9 +34,16 @@ uint32_t readIOmap (uint32_t addr) {
 #else
         return 0;
 #endif
-    case 2: return 0;               // UART tx is never busy
-    case 4: return FlashMemSPIbusy();
-    case 5: return SPIresult;       // return SPI result
+    case 2:
+        return 0;                   // UART tx is never busy
+    case 4: 
+        temp = SPIresult;           // get result and start another transfer
+        r = FlashMemSPI(0);
+        SPIresult = (uint16_t)r;
+        if (r < 0) { chadError(r); }
+        return temp;
+    case 5: 
+        return SPIresult;           // get result
     case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }
@@ -61,12 +69,12 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     case 3:
         nohostAPI = x;  break;
     case 4:
-        FlashMemSPIformat(x);  break;
-    case 5:
         r = FlashMemSPI((int)x);
         SPIresult = (uint16_t)r;
         if (r < 0) {chadError(r);}
         break;
+    case 5:
+        FlashMemSPIformat(x);  break;
     case 8:
         TFTLCDwrite(x);
     case 0x8000:                    // trigger a header data read 

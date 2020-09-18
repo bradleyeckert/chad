@@ -257,9 +257,10 @@ SI CPUsim(int single) {
             case 0x05: _t = s ^ t;                           break; /*    T^N */
             case 0x15: _t = ~t;                              break; /*     ~T */
             case 0x06: _t = s & t;                           break; /*    T&N */
-            case 0x16: _t = w & t;                           break; /*    T&W */
-            case 0x07: _t = (t & (CELLS-1)) << 3; // {0,8,16,24}
-                w = 0xFF;                                    break; /*   mask */
+            case 0x07: _t = ((t >> 8) & 0xFF00FF) | ((t & 0xFF00FF) << 8);
+                break;                                              /*     >< */
+            case 0x17: _t = ((t >> 16) & 0xFFFF) | ((t & 0xFFFF) << 16);
+                break;                                              /*   ><16 */
             case 0x08: sum = (sum_t)s + (sum_t)t;
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    T+N */
             case 0x18: sum = (sum_t)s + (sum_t)t + cy;
@@ -269,8 +270,8 @@ SI CPUsim(int single) {
             case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*   N-Tc */
             case 0x0A: _t = (t) ? 0 : -1;                    break; /*    T0= */
-            case 0x0B: _t = s >> (t & CELL_AMASK);           break; /*   N>>T */
-            case 0x0C: _t = s << (t & CELL_AMASK);           break; /*   N<<T */
+//          case 0x0B: _t = s >> (t & CELL_AMASK);           break; /*   N>>T */
+//          case 0x0C: _t = s << (t & CELL_AMASK);           break; /*   N<<T */
 
             case 0x0D: _t = Rstack[RP];                      break; /*      R */
             case 0x1D: _t = Rstack[RP] - 1;                  break; /*    R-1 */
@@ -442,7 +443,7 @@ SV doNext(void) {
 
 SI fileID = 0;                          // cumulative file ID
 struct FileRec FileStack[MaxFiles];
-struct FilePath FilePaths[MaxFiles];
+struct FilePath FilePaths[MaxFilePaths];
 SI filedepth = 0;                       // file stack
 static int logcolor = 0;
 static int leadingblanks = 0;
@@ -990,7 +991,7 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
         filedepth--;
         error = BAD_OPENFILE;
     } else {
-        if ((filedepth >= MaxFiles) || (fileID >= MaxFiles))
+        if ((filedepth >= MaxFiles) || (fileID >= MaxFilePaths))
             error = BAD_INCLUDING;
         else {
             SwallowBOM(File.fp);
@@ -1631,8 +1632,8 @@ SV LoadKeywords(void) {
     AddALUinst("2/c",     "1.2050 n -- c+n/2",        shrx  | co);
     AddALUinst("xor",     "1.2060 n1 n2 -- n3",       eor   |        sdn);
     AddALUinst("and",     "1.2070 n1 n2 -- n3",       Tand  |        sdn);
-    AddALUinst("+",       "1.2080 n1 n2 -- n3",       add   | co   | sdn);
-    AddALUinst("-",       "1.2090 n1 n2 -- n3",       sub   | co   | sdn);
+    AddALUinst("+",       "1.2080 n1 n2 -- n3",       add   |        sdn);
+    AddALUinst("-",       "1.2090 n1 n2 -- n3",       sub   |        sdn);
     AddALUinst("dup",     "1.2100 x -- x x",          TtoN  |        sup);
     AddALUinst("over",    "1.2110 x1 x2 -- x1 x2 x1", NtoT  | TtoN | sup);
     AddALUinst("swap",    "1.2120 x1 x2 -- x2 x1",    NtoT  | TtoN);
@@ -1643,12 +1644,13 @@ SV LoadKeywords(void) {
     AddALUinst(">r",      "1.2170 x -- | -- x",       NtoT  | TtoR | sdn | rup);
     AddALUinst("r>",      "1.2180 -- x | x --",       RtoT  | TtoN | sup | rdn);
     AddALUinst("r@",      "1.2190 -- x | x -- x",     RtoT  | TtoN | sup);
-    AddALUinst("rshift",  "1.2200 x1 u -- x2",        shr          | sdn);
-    AddALUinst("lshift",  "1.2210 x1 u -- x2",        shl          | sdn);
+//  AddALUinst("rshift",  "1.2200 x1 u -- x2",        shr          | sdn);
+//  AddALUinst("lshift",  "1.2210 x1 u -- x2",        shl          | sdn);
     AddALUinst("carry",   "1.2500 -- n",              carry | TtoN | sup);
     AddALUinst("w",       "1.2510 -- x",              WtoT  | TtoN | sup);
     AddALUinst(">carry",  "1.2520 n --",              NtoT  | co   | sdn);
-    AddALUinst("_+",      "1.2530 n1 n2 -- n3",       add   |        sdn);
+    AddALUinst("+c",      "1.2530 n1 n2 -- n3",       add   | co   | sdn);
+    AddALUinst("-c",      "1.2531 n1 n2 -- n3",       sub   | co   | sdn);
     AddALUinst("_@",      "1.2540 addr -- addr",              memrd);  // start
     AddALUinst("_@_",     "1.2550 addr -- x",         read);        // end read
     AddALUinst("_!",      "1.2560 x addr -- x",              write | sdn);
@@ -1659,15 +1661,15 @@ SV LoadKeywords(void) {
     AddALUinst("2dupxor", "1.2610 u v -- u v u^v",    eor   | TtoN | sup);
     AddALUinst("2dup+",   "1.2620 u v -- u v u+v",    add   | TtoN | sup);
     AddALUinst("2dup-",   "1.2630 u v -- u v u-v",    sub   | TtoN | sup);
-    AddALUinst("mask",    "1.2640 addr -- cnt",       bmask);
-    AddALUinst("wand",    "1.2650 x -- x&w",          TandW);
+    AddALUinst("swapb",   "1.2640 x -- y",            swapb);
+    AddALUinst("swapw",   "1.2650 x -- y",            swapw);
     AddALUinst("overand", "1.2660 u v -- u u&v",      Tand);
     AddALUinst("overxor", "1.2670 u v -- u u^v",      eor);
     AddALUinst("over+",   "1.2680 u v -- u u+v",      add   | co);
     AddALUinst("over-",   "1.2690 u v -- u u-v",      sub   | co);
     AddALUinst("dup>r",   "1.2700 x -- x | -- x",     TtoR               | rup);
     AddALUinst("rdrop",   "1.2710 -- | x --",                              rdn);
-    AddALUinst("+c",      "1.2720 u v -- u+v+c",      addc  | co   | sdn);
+    AddALUinst("c+c",     "1.2720 u v -- u+v+c",      addc  | co   | sdn);
     AddALUinst("dup@",    "1.2730 addr -- addr x",    read  | TtoN | sup);
     AddALUinst("spstat",  "1.2740 -- rp<<8|sp",       who   | TtoN | sup);
     AddALUinst("(R-1)@",  "1.2750 -- x-1 | x -- x",  RM1toT | TtoN | sup);
@@ -1710,15 +1712,15 @@ SV LoadKeywords(void) {
     AddModifier("T^N",      "1.6100 n1 -- n2",  eor  );
     AddModifier("~T",       "1.6110 n1 -- n2",  com  );
     AddModifier("T&N",      "1.6120 n1 -- n2",  Tand );
-    AddModifier("T&W",      "1.6130 n1 -- n2",  TandW );
-    AddModifier("mask",     "1.6140 n1 -- n2",  bmask );
+    AddModifier("><",       "1.6130 n1 -- n2",  swapb );
+    AddModifier("><16",     "1.6140 n1 -- n2",  swapw );
     AddModifier("T+N",      "1.6150 n1 -- n2",  add  );
     AddModifier("T+Nc",     "1.6160 n1 -- n2",  addc );
     AddModifier("N-T",      "1.6170 n1 -- n2",  sub  );
     AddModifier("N-Tc",     "1.6180 n1 -- n2",  subc );
     AddModifier("T0=",      "1.6190 n1 -- n2",  zeq );
-    AddModifier("N>>T",     "1.6200 n1 -- n2",  shr  );
-    AddModifier("N<<T",     "1.6210 n1 -- n2",  shl  );
+//  AddModifier("N>>T",     "1.6200 n1 -- n2",  shr  );
+//  AddModifier("N<<T",     "1.6210 n1 -- n2",  shl  );
     AddModifier("R",        "1.6220 n1 -- n2",  RtoT );
     AddModifier("R-1",      "1.6230 n1 -- n2",  RM1toT );
     AddModifier("[T]",      "1.6240 n1 -- n2",  read );
@@ -1931,8 +1933,7 @@ uint32_t chadGetHeader (uint32_t select) {
     return 0;
 }
 
-void chadError (uint32_t errorcode) {
-    int n = errorcode;
+void chadError (int32_t n) {
     if (n & MSB) n |= ~CELLMASK;        // sign extend errorcode
     error = n;
 }

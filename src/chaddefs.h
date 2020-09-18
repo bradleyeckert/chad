@@ -116,8 +116,8 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define eor    (0x05 << 9)
 #define com    (0x15 << 9)
 #define Tand   (0x06 << 9)
-#define TandW  (0x16 << 9)
-#define bmask  (0x07 << 9)
+#define swapb  (0x07 << 9)
+#define swapw  (0x17 << 9)
 #define add    (0x08 << 9)
 #define addc   (0x18 << 9)
 #define sub    (0x09 << 9)
@@ -148,13 +148,11 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 // The insn[3:2] field of the ALU instruction is return stack control:
 
 #define rup    (1 << 2)
-#define rdn2   (2 << 2)
 #define rdn    (3 << 2)
 
 // The insn[1:0] field of the ALU instruction is data stack control:
 
 #define sup    1
-#define sdn2   2
 #define sdn    3
 
 // Other instruction types

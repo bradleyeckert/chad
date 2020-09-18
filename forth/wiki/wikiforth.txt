@@ -86,6 +86,8 @@
  Copy the first (top) stack item below the second stack item.
 =2.0400: +! ( n addr -- )
  Add `n` to the single-cell number at a-addr.
+=2.0405: times ( n xt -- )
+ Execute `xt` n times. If n <= 0, do nothing.
 =2.0410: um* ( u1 u2 -- ud )
  Multiply u1 by u2, giving the unsigned double-cell product ud.
  All values and arithmetic are unsigned.
@@ -195,6 +197,16 @@ H</ul>
  Semantically equivalent to `r> r> 2dup >r >r swap`.
 =2.1100: third ( x1 x2 x3 -- x1 x2 x3 x1 )
  Equivalent to `2 pick`.
+=2.1120: rshift ( x1 u -- x2 )
+ Perform a logical right shift of u bit-places on x1, giving x2.
+ Put zeroes into the most significant bits vacated by the shift.
+ An ambiguous condition exists if u is greater than or equal to
+ the number of bits in a cell.
+=2.1110: lshift ( x1 u -- x2 )
+ Perform a logical left shift of u bit-places on x1, giving x2.
+ Put zeroes into the least significant bits vacated by the shift.
+ An ambiguous condition exists if u is greater than or equal to
+ the number of bits in a cell.
 =2.2000: 'TXbuf ( -- ioa )
  8-bit UART output buffer.
 =2.2010: 'TXbusy ( -- ioa )

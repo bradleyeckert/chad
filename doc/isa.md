@@ -5,7 +5,7 @@ How did James Bowman come up with the J1?
 Somehow the stars lined up and out popped the J1.
 What a big architecture for the future of little computing.
 Some small tweaks to the J1 facilitate double precision math, looping,
-large address spaces, bit field operations, and room for user instructions.
+large address spaces, and room for user instructions.
 The result is the Chad ISA.
 
 ## Chad ISA summary
@@ -46,17 +46,16 @@ The `insn[12:8]` field of the ALU instruction is:
 - 1_0100: `W` T = W
 - 0_0101: `T^N` T = N ^ T
 - 1_0101: `~T` T = ~T
-- 0_0110: `T&N` T = N & T
-- 1_0110: `T&W` T = W & T
-- x_0111: `mask` if 16-bit cells: T = T >> 8; W = ~(-1<<T\[7:4]). 
-Otherwise, T = T >> 10; W = ~(-1<<T\[9:5]). W is a bit mask.
+- x_0110: `T&N` T = N & T
+- 0_0111: `><` T = swapped bytes: Even and Odd bytes swapped.
+- 1_0111: `><16` T = swapped words: Even and Odd 16-bit words swapped.
 - 0_1000: `T+N` T = N + T
 - 1_1000: `T+Nc` T = N + T + carry
 - 0_1001: `N-T` T = N - T
 - 1_1001: `N-Tc` T = N - T - carry
 - x_1010: `T0=` T = -1 if T = 0 else 0
-- x_1011: `rshift` T = N >> T
-- x_1100: `lshift` T = N << T
+- x_1011: Unused
+- x_1100: Unused
 - 0_1101: `R` T = R
 - 1_1101: `R-1` T = R - 1
 - 0_1110: `[T]` T = mem_din
@@ -148,6 +147,13 @@ The original J1 read from data memory all the time. Let's add a read strobe.
 It's decoded from three `insn` bits, so it's plenty fast.
 Simulation is set up to model a synchronous-read memory. 
 
+**Missing N>>T and N<<T**
+
+Barrel shifters are not cheap, especially in an FPGA.
+Single-bit shifts are used instead.
+To handle byte packing and unpacking,
+`><` and `><16` are added to swap bytes and 16-bit halves.
+
 ### Memory Spaces
 
 The code space contains ROM to function as a library.
@@ -199,9 +205,9 @@ is busy. Once finished, you can read result registers into `COP`.
 ### SDRAM (TBD)
 
 Coprocessor instructions could be used to page data between SDRAM and
-data RAM. 
-It seems you get a choice between high pin count and high cost when
-choosing a SDRAM. For example, the Infineon/Cypress HyperRam has a reduced
+data RAM. It seems you get a choice between high pin count and high cost
+when choosing a SDRAM. 
+For example, the Infineon/Cypress HyperRam has a reduced
 pin count (5x5 BGA with 1mm ball pitch) but cost $3 to $4 for 64Mb.
 64Mb is 8M bytes.
 
@@ -218,21 +224,23 @@ One shift register for each bit in the cell.
 Power dissipation is caused by wires.
 In a shift register, the bits are right next to each other.
 It should synthesize nicely, with the business end where you want it.
+That is low power computing.
 
 The simulator models stacks with circular buffers. 
 It reports overflow and underflow to avoid the difference in overflow and
 underflow behavior that you would see when using a shift register stack.
 
 Data and return stacks don't need to be deep.
-A frame stack abstraction should
-be used by library code to move excess stack contents to and from the frame
-stack (in data memory) to prevent possible stack overflow.
-A complex chunk of code would be preceded by `f[` *( depth -- )* to minimize
-stacks and `]f` would restore the stacks.
-For example, `2 f[` would leave nothing but two items on the data stack and
-an empty return stack. `d.r` uses `f[`, for example.
+A frame stack abstraction (`frame.f`) can
+be used by library code to move excess stack contents to and from
+the frame stack (in data memory) to prevent possible stack overflow.
+A complex chunk of code would be preceded by `stack[` *( depth -- )* to
+minimize stacks and `]stack` would restore the stacks.
+For example, `2 stack[` would leave nothing but two items on the data
+stack and an almost empty return stack. `d.r` uses `fstack`, for example.
 The simulator word `stats` tells you how deep your code is
 actually stacking.
+With some stack management, 16-cell hardware stacks are sufficient.
 
 ## chad vs MISC
 
@@ -265,15 +273,17 @@ out of 200 or so lines of Verilog.
 What Chuck Moore demonstrated with MISC was the utility of small stacks.
 His Novix architecture from the 1980s had stacks made of 256-cell
 memories. It turns out smaller is better.
+GreenArrays adopted shift register stacks.
 James Bowman's use of shift register stacks in the J1 was a great idea.
+It seems that stack machines may have a future.
+J1-style cores run as fast as you can keep them fed with instructions.
 
-If you look at commercial ASIC processes, ON Semi's 180nm process offers
-RAM with a cycle time of 3.3 to 5 ns. That's slow compared to GreenArrays
-1 ns instructions. In an actual standard cell chip, the processor may
-have to wait on memory. Adding a `hold` signal to the port list would let
-the memories hold off execution to insert wait states. With code memory,
-that wouldn't impact performance much.
-If you use a wider data bus (such as 64-bit) on the ROM and mux it down to
-16-bit, most of the time you would only have the mux delay because the
-64-bit word is already settled. So, a `chad` processor could be very fast
-even in legacy (cheaper) fab processes.
+If you look at commercial ASIC processes, memory is slower than logic.
+In an actual standard cell chip, the processor may have to wait
+on memory. Adding a `cke` (clock enable) signal to the port list would
+let the memories insert wait states.
+With code memory, that wouldn't impact performance much.
+If you use a wider data bus (such as 128-bit) on the ROM and mux it
+down to 16-bit, most of the time you would only have the mux delay
+because the 128-bit word is already settled.
+So, a `chad` processor could be very fast in an ASIC.

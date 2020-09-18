@@ -2,52 +2,45 @@
 
 there
 
-4 equ flashcon0     \ SPI controller registers
-5 equ flashcon1
+\ I/O registers       Read        Write
+4 equ SPIdata       \ retrig      spitx
+5 equ SPIformat     \ result      format
+
 27182 equ flwp_en   \ 2.4021 -- x\ enable for flash-wp.
 
-variable fwren0 \ lowest 64K sector number, set by `fwall`
-variable fwren1 \ inverse of fwren0, used as a backup. Must be ~fwren0.
-variable sector \ 2.4000 -- a-addr
-variable fp     \ 2.4010 -- a-addr
-
-: flash-wp      \ 2.4020 sector key --
+variable fwren0     \ lowest 64K sector number, set by `fwall`
+variable fwren1     \ inverse of fwren0, used as a backup. Must be ~fwren0.
+variable sector     \ 2.4000 -- a-addr
+variable fp         \ 2.4010 -- a-addr
+				    
+: flash-wp          \ 2.4020 sector key --
     flwp_en xor if  drop exit  then
     dup fwren0 !  invert fwren1 !
 ;
-0 flwp_en flash-wp \ testing
+0 flwp_en flash-wp  \ testing
 
-: waitSPI  \ --   \ wait for SPI transfer to finish
-    begin  flashcon0 io@  while  noop  repeat
+: readSPI    \ -- c \ result of transfer
+    SPIformat io@
 ;
-: sendSPI  \ c -- \ transmit an SPI byte
-    waitSPI  flashcon1 io!
-;
-: readSPI  \ -- c \ result of transfer
-    waitSPI  flashcon1 io@
-;
-: SPIcommand  \ c --
-    waitSPI   0 flashcon0 io!           \ drop CS line
-    sendSPI
-;
-: ]read    waitSPI  [ ;                 \ 2.4080 --
-: SPIend   1 flashcon0 io! ;            \ 2.4081 --
-: fl_wren  6 SPIcommand ]read ;
-: fl_wrdi  4 SPIcommand ]read ;
-: waitflash  \ --
+: SPIcommand  1 SPIformat io! [ ;       \ c --\ activate CS line
+: sendSPI     SPIdata io! ;             \ c --\ transmit an SPI byte
+: ]read       0 SPIformat io! ;         \ 2.4080 --\ end read
+: fl_wren     6 SPIcommand ]read ;      \ write enable
+: fl_wrdi     4 SPIcommand ]read ;      \ write disable
+: waitflash   \ --                      \ wait for write or erase to finish
     begin  5 SPIcommand  0 sendSPI
-           readSPI SPIend  1 and
+           readSPI ]read  1 and
     while  noop
     repeat
 ;
 
-: sendaddr24  \ addr --
+: sendaddr24  \ addr --                 \ send address
     sector @ sendSPI
-    dup 8 rshift sendSPI  sendSPI
+    dup swapb sendSPI  sendSPI
 ;
 
-: ]write   ]read  fl_wrdi ;             \ 2.4050 --
-: f>       0 sendSPI  readSPI ;         \ 2.4070 c --
+: ]write   ]read  fl_wrdi ;             \ 2.4050 --\ end write
+: f>       0 sendSPI  readSPI ;         \ 2.4070 c --\ read next flash byte
 : mask16b  65535 and ;                  \ x -- x16
 
 : is4K?  \ fa -- fa flag \ is the pointer at a new sector?
@@ -73,30 +66,22 @@ variable fp     \ 2.4010 -- a-addr
     1+  mask16b  dup fp !               \ bump fp
 ;
 : >f      \ 2.4040 c --\ Write next byte to flash
-    waitSPI  sendSPI  bump_fp
+    sendSPI  bump_fp
     is256? if  ]write      then         \ end write at end of page
     is4K?  if  erase4K     then
     is256? if  dup write[  then         \ start a new page
     drop
 ;
-: write   \ 2.4045 c-addr u --\ Write string to flash
-    dup if
-        for  count  >f  next  drop
-    else  2drop
-    then
-;
 : read[   \ 2.4060 fa --\ Begin fast read
     waitflash  11 SPIcommand  sendaddr24  0 sendSPI
 ;
 
-: read    \ 2.4090 c-addr u --\ Read string from flash
-    dup if
-        for  f> over c! char+  next  drop
-    else  2drop
-    then
-;
+:noname  count >f ;                     \ Write string to flash
+: write  literal times  drop ;          \ 2.4045 c-addr u --
+:noname  f> over c! char+ ;             \ Read string from flash
+: read   literal times  drop ;          \ 2.4090 c-addr u --
 
-\ Bootloader commands:
+\ To Do: Bootloader commands:
 \ `<space>` Launch the app (if possible)
 \ `!` Write next SPI byte, expect 2 hex digits.
 \ `@` Read next SPI byte, return 2 hex digits.

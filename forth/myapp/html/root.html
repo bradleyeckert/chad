@@ -198,7 +198,7 @@ Both are unsigned.
 It can immediately follow a <tok>_@</tok>.
 </p>
 <a name="1.2720"></a>
-<h3><ref>1.2720:</ref> <chad>+c</chad> <com><i>( u v -- u+v+c )</i></com></h3>
+<h3><ref>1.2720:</ref> <chad>c+c</chad> <com><i>( u v -- u+v+c )</i></com></h3>
 
 <p>Add <tok>u</tok> to <tok>v</tok> with carry, giving the sum <tok>u+v+c</tok>. The carry is modified.
 </p>
@@ -233,12 +233,12 @@ It can immediately follow a <tok>_@</tok>.
 <p>Same as <tok>over and</tok>.
 </p>
 <a name="1.2650"></a>
-<h3><ref>1.2650:</ref> <chad>wand</chad> <com><i>( x -- x&amp;w )</i></com></h3>
+<h3><ref>1.2650:</ref> <chad>swapw</chad> <com><i>( x -- y )</i></com></h3>
 
 <p>Logical and <tok>x</tok> with the <tok>w</tok> register.
 </p>
 <a name="1.2640"></a>
-<h3><ref>1.2640:</ref> <chad>mask</chad> <com><i>( addr -- cnt )</i></com></h3>
+<h3><ref>1.2640:</ref> <chad>swapb</chad> <com><i>( x -- y )</i></com></h3>
 
 <p>A helper for <tok>c@</tok>. Converts the address to a shift count and loads
 FFh into the <tok>w</tok> register.
@@ -298,7 +298,12 @@ A Forth equivalent of this instruction is &quot;tuck !&quot;.
 <p>Begins a memory read operation by creating a read-enable strobe.
 </p>
 <a name="1.2530"></a>
-<h3><ref>1.2530:</ref> <chad>_+</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
+<h3><ref>1.2530:</ref> <chad>-c</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
+
+<p>Same as <tok>+</tok> but does not modify the carry.
+</p>
+<a name="1.2530"></a>
+<h3><ref>1.2530:</ref> <chad>+c</chad> <com><i>( n1 n2 -- n3 )</i></com></h3>
 
 <p>Same as <tok>+</tok> but does not modify the carry.
 </p>
@@ -318,29 +323,7 @@ A Forth equivalent of this instruction is &quot;tuck !&quot;.
 <p>Read the carry bit.
 </p>
 <hr><h2>Forth primitives</h2>
-<hr><a name="1.2210"></a>
-<h3><ref>1.2210:</ref> <chad>lshift</chad> <com><i>( x1 u -- x2 )</i></com></h3>
-
-<p>Perform a logical left shift of u bit-places on x1, giving x2.
-Put zeroes into the least significant bits vacated by the shift.
-An ambiguous condition exists if u is greater than or equal to
-the number of bits in a cell or the next lower exact power of two
-in the case of cells that are not a power of two wide.
-</p>
-<a name="1.2200"></a>
-<h3><ref>1.2200:</ref> <chad>rshift</chad> <com><i>( x1 u -- x2 )</i></com></h3>
-
-<p>Perform a logical right shift of u bit-places on x1, giving x2.
-Put zeroes into the most significant bits vacated by the shift.
-The LSBs of <tok>u</tok> control a barrel shifter.
-If the cell size is not an exact power of two, the shift capability
-is limited to the next smaller exact value.
-For example, an 18-bit cell has a maximum shift count of 15.
-An ambiguous condition exists if u is greater than or equal to
-the number of bits in a cell or the next lower exact power of two
-in the case of cells that are not a power of two wide.
-</p>
-<a name="1.2190"></a>
+<hr><a name="1.2190"></a>
 <h3><ref>1.2190:</ref> <chad>r@</chad> <com><i>( -- x | x -- x )</i></com></h3>
 
 <p>Copy x from the return stack to the data stack. &quot;r-fetch&quot;

@@ -70,12 +70,10 @@ _
  T = ~T
 =1.6120: T&N ( n1 -- n2 )
  T = N & T
-=1.6130: T&W ( n1 -- n2 )
- T = W & T
-=1.6140: mask ( n1 -- n2 )
- T = (T & 1) << 8 if cellbits < 32.
- T = (T & 3) << 8 if cellbits = 32.
- W = FFh.
+=1.6130: >< ( n1 -- n2 )
+ T = ((T>>8) & 0xFF00FF) | ((T & 0xFF00FF)<<8) (swap even/odd bytes)
+=1.6140: ><16 ( n1 -- n2 )
+ T = ((T>>16) & 0xFFFF) | ((T & 0xFFFF) << 16) (swap 16-bit halves)
 =1.6150: T+N ( n1 -- n2 )
  T = N + T
 =1.6160: T+Nc ( n1 -- n2 )
@@ -86,10 +84,6 @@ _
  T = N - T - carry
 =1.6190: T0= ( n1 -- n2 )
  T = all '1's if T=0 else all '0's 
-=1.6200: N>>T ( n1 -- n2 )
- T = N >> T
-=1.6210: N<<T ( n1 -- n2 )
- T = N << T
 =1.6220: R ( n1 -- n2 )
  T = R
 =1.6230: R-1 ( n1 -- n2 )
