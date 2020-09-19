@@ -43,6 +43,7 @@ variable hld                            \ 2.3000 -- c-addr
 : ?       @ [ ;                         \ 2.3310 a --
 : .       s>d d. ;                      \ 2.3300 n --
 : <#>     >r  <# begin # next #s #> ;   \ ud digits-1
+: h.2     1 [ ;
 : h.x     base @ >r hex  0 swap <#> r>  \ 2.3320 u n --
           base !  type space ;
 

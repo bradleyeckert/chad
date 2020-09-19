@@ -79,15 +79,6 @@ tib |framestack| - equ frp0             \ bottom of frame stack
     frp @ ds>mem  over >r  mem>ds drop r>
 ;
 
-: roll                                  \ 2.2980 xu..x0 u -- xu-1..x0 xu
-    ?dup if
-        1+  frp @  ds>mem  mem>
-        1-  over cell -                 ( a u' 'xu )
-        dup @ >r  !
-        mem>ds drop  r>
-    then
-;
-
 there swap - . .( instructions used by stack framing) cr
 
 fpclear

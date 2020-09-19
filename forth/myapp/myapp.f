@@ -43,7 +43,6 @@ include ../ctea.f
     \source  0 write[ dup >f write ]write
 ;
 
-
 .( Total instructions: ) there . cr
 \ 0 there dasm
 

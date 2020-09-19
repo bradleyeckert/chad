@@ -1,9 +1,7 @@
 
-: ?dup  dup if dup then ;
 : d2*   swap 2* swap 2*c ;
 : d2/   2/ swap 2/c swap ;
 : -rot  swap >r swap r> ;
-: 2drop drop drop ;
 : 2swap rot >r rot r> ;
 : 2over >r >r 2dup r> r> 2swap ;
 
@@ -17,11 +15,22 @@
    swap r> 0< if  negate  then
    swap r> 0< if  negate  over if  r@ rot -  swap 1-  then then
    r> drop ;
-   
+
 : (umin)  over over- drop carry ;
 : umin   (umin) if swap drop exit then  drop ;
 : umax   (umin) if drop exit then  swap drop ;
 : /string >r swap r@ + swap r> - ;      \ 17.6.1.0245  a u -- a+1 u-1
+
+: roll                                  \ 2.2980 xu..x0 u -- xu-1..x0 xu
+    ?dup if
+        1+  frp @  ds>mem  mem>
+        1-  over cell -                 ( a u' 'xu )
+        dup @ >r  !
+        mem>ds drop  r>
+    then
+;
+
+
 
 depth 0 assert
 2 3 d2* 6 assert 4 assert

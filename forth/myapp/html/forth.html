@@ -23,12 +23,28 @@
 <!-- No reference for hi -->
 <!-- No reference for decipher -->
 <!-- No reference for encipher -->
-<!-- No reference for xtermb -->
-<!-- No reference for xterma -->
-<!-- No reference for xshift -->
-<!-- No reference for xrounds -->
-<!-- No reference for xdelta -->
-<!-- No reference for xkey -->
+<!-- No reference for CTcalcB -->
+<!-- No reference for CTdokey -->
+<!-- No reference for CTcalcA -->
+<!-- No reference for CTshift -->
+<!-- No reference for CTrounds -->
+<!-- No reference for CTdelta -->
+<!-- No reference for CTkey -->
+<!-- No reference for Bootloader -->
+<!-- No reference for BootDispatch -->
+<!-- No reference for SPIenable -->
+<!-- No reference for SPIboiler -->
+<!-- No reference for startSPI -->
+<!-- No reference for stopSPI -->
+<!-- No reference for setSPIlen -->
+<!-- No reference for readNSPI -->
+<!-- No reference for writeNSPI -->
+<!-- No reference for HexByte -->
+<!-- No reference for HexDigit -->
+<!-- No reference for BootKey -->
+<!-- No reference for BootEnabled -->
+<!-- No reference for SPIlength -->
+<!-- No reference for key -->
 <a name="2.4090"></a>
 <h3><ref>2.4090:</ref> <a href="../../flash.f">read</a> <com><i>( c-addr u -- )</i></com></h3>
 <a name="2.4045"></a>
@@ -107,6 +123,7 @@ Ignored if <tok>key</tok> doesn&apos;t match flwp_en.
 
 <p>Display <tok>u</tok> in hex format using <tok>n-1</tok> digits.
 </p>
+<!-- No reference for h.2 -->
 <!-- No reference for <#> -->
 <a name="2.3300"></a>
 <h3><ref>2.3300:</ref> <a href="../../numout.f">.</a> <com><i>( n -- )</i></com></h3>
@@ -247,13 +264,6 @@ along with that many byte-wide characters in data space.
 <h3><ref>2.3000:</ref> <a href="../../numout.f">hld</a> <com><i>( -- c-addr )</i></com></h3>
 
 <p>A pointer variable for numeric conversion.
-</p>
-<a name="2.2980"></a>
-<h3><ref>2.2980:</ref> <a href="../../frame.f">roll</a> <com><i>( xu..x0 u -- xu-1..x0 xu )</i></com></h3>
-
-<p>Remove <tok>u</tok>. Rotate <tok>u+1</tok> items on the top of the stack.
-An ambiguous condition exists if there are less than u+2 items
-on the stack before <tok>roll</tok> is executed.
 </p>
 <a name="2.2970"></a>
 <h3><ref>2.2970:</ref> <a href="../../frame.f">pick</a> <com><i>( xu...x0 u -- xu...x0 xu )</i></com></h3>

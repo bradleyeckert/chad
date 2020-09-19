@@ -16,9 +16,9 @@
 // The `_IORD_` field in an ALU instruction strobes io_rd.
 // In the J1, input devices sit on (mem_addr,io_din)
 
-static uint32_t header_data;        // host API return data
+static uint32_t header_data;            // host API return data
 static uint16_t SPIresult;
-static uint8_t nohostAPI;           // prohibit access to host API
+static uint8_t nohostAPI;               // prohibit access to host API
 
 static int termKey(void);
 
@@ -27,7 +27,7 @@ uint32_t readIOmap (uint32_t addr) {
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
-    case 0: return termKey();       // Get the next incoming stream char
+    case 0: return termKey();           // Get the next incoming stream char
     case 1: // terminal type (control and function keys differ)
 #ifdef __linux__
         return 1;
@@ -35,15 +35,15 @@ uint32_t readIOmap (uint32_t addr) {
         return 0;
 #endif
     case 2:
-        return 0;                   // UART tx is never busy
+        return 0;                       // UART tx is never busy
     case 4: 
-        temp = SPIresult;           // get result and start another transfer
+        temp = SPIresult;               // get result and start another transfer
         r = FlashMemSPI(0);
         SPIresult = (uint16_t)r;
         if (r < 0) { chadError(r); }
         return temp;
     case 5: 
-        return SPIresult;           // get result
+        return SPIresult;               // get result
     case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }
@@ -77,12 +77,12 @@ void writeIOmap (uint32_t addr, uint32_t x) {
         FlashMemSPIformat(x);  break;
     case 8:
         TFTLCDwrite(x);
-    case 0x8000:                    // trigger a header data read 
+    case 0x8000:                        // trigger a header data read 
         header_data = chadGetHeader(x);  break;
-    case 0x8002:                    // trigger an error
+    case 0x8002:                        // trigger an error
         chadError(x);  break;
     default:
-        if (addr >= 0x100) {        // write to code space
+        if (addr >= 0x100) {            // write to code space
             chadToCode(addr, x);
         } else {
             chadError(BAD_IOADDR);
@@ -100,7 +100,7 @@ In an embedded system, KEY should return -1 if there's no key.
 Code should invoke KEY in a loop to replace the functionality of ?KEY.
 */
 
-static char buf[LineBufferSize];
+static uint8_t buf[LineBufferSize];
 static int toin = 0;
 static int len = 0;
 
@@ -113,10 +113,10 @@ static int termKey(void) {              // Get the next byte in the input stream
     if (fgets(buf, LineBufferSize, stdin) != NULL) {
         len = strlen(buf);
     }
-    if (len) {                  // the string ends in newline
+    if (len) {                          // the string ends in newline
         return buf[toin++];
     }
-    return -1;                  // so this shouldn't happen unless bad gets
+    return -1;                          // so this shouldn't happen ever
 }
 
 void killHostIO(void) {

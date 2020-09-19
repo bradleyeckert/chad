@@ -1,57 +1,44 @@
-\ Chad Tiny Encryption Algorithm							9/17/20 BNE
+\ Chad Tiny Encryption Algorithm							9/19/20 BNE
 
 \ XTEA-inspired crypto algorithm for Chad.
 \ Uses 2-cell data and a 4-cell key.
 \ For 18-bit cells, it's 36-bit data and a 72-bit key.
 
-\ This uses a fixed key, but it can easily be variable if needed.
-\ CTEA is used for firmware upload to flash when an FPGA has user flash.
-\ For SPI flash, it's like locking the door but leaving the window open.
-\ However, flash updates shouldn't be in plaintext so it's better to keep
-\ the data private now and shut the window later.
-
-\ Terminal access to Forth in plaintext also leaves the window open.
-\ CTEA isn't SSH, but it's something. A stdio-to-COM-port app wouldn't be
-\ hard to write. But where do you hide the key?
-\ Unless, well, you write it in 8th and encrypt the app.
-
+\ CTEA uses 71 instructions of code space.
 \ The numeric conversion pointer `hld` is used as temporary storage.
 
 there
 
 \ Note: Key lengths over 56-bit may be subject to export controls.
-\ The last cell in the table is 0 to make it a 54-bit key.
+\ The last cell in the table is 0 to make it a 54-bit key (if 18-bit cell).
 
-cellbits |bits|
-: xkey  3 and exec2: [ 123456 | 654321 | 111111 | 0 ] literal ;
-$179B9 equ xdelta
-20 equ xrounds
+align 4 cells buffer: CTkey
+$179B9 equ CTdelta
+18 equ CTrounds \ about 110 cycles per round
 
-: xshift  ( v -- v v' )
-    dup 2* 2* 2* 2*  over 2/ 2/ 2/ 2/ 2/  xor  over +
+: CTshift  ( v -- v v' sum sum )
+    dup 2* 2* 2* 2*  over 2/ 2/ 2/ 2/ 2/  xor  \ could be custom instruction
+	over +	hld @  dup
 ;
-: xterma  ( v -- v v' )
-    xshift  hld @  dup xkey +  xor
-;
-: xtermb  ( v -- v v' )
-    xshift  hld @  dup swapb 2/ 2/ 2/ xkey +  xor
-;
+: CTcalcA  CTshift [ ;
+: CTdokey  3 and cells CTkey + @  +  xor  rot swap ;
+: CTcalcB  CTshift  swapb 2/ 2/ 2/  CTdokey ;
 
 : encipher  ( v0 v1 -- v0' v1' )
     0 hld !
-    xrounds for
-		xterma rot +
-		xdelta hld +!
-		xtermb rot +
+    CTrounds for
+		CTcalcA +
+		CTdelta hld +!
+		CTcalcB +
 	next
+	swap
 ;
 : decipher  ( v0 v1 -- v0' v1' )
-    [ xdelta xrounds * ] literal hld !
-	swap
-    xrounds for
-	    xtermb rot swap -
-		[ xdelta negate ] literal  hld +!
-	    xterma rot swap -
+    [ CTdelta CTrounds * ] literal hld !
+    CTrounds for
+	    CTcalcB -
+		[ CTdelta negate ] literal  hld +!
+	    CTcalcA -
 	next
 ;
 
