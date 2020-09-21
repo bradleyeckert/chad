@@ -20,6 +20,7 @@ The controller types are:
 0 to 3 = ILI9341 (240 x 320 TFT), rotated by (type%4)*90 degrees.
 */
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define reverseRGB  /* define to reverse the RGB order for OpenGL */

@@ -110,8 +110,8 @@ static int termKey(void) {              // Get the next byte in the input stream
     }
     toin = 0;
     len = 0;
-    if (fgets(buf, LineBufferSize, stdin) != NULL) {
-        len = strlen(buf);
+    if (fgets((char*)buf, LineBufferSize, stdin) != NULL) {
+        len = strlen((char*)buf);
     }
     if (len) {                          // the string ends in newline
         return buf[toin++];
