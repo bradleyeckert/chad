@@ -62,7 +62,7 @@ int SaveFlashMem(char* filename) { // save binary image
 */
 
 enum states {
-	idle, wait, rdsr, wrsra, wrsrb, jid1, jid2, jid3,
+	idle, wait_, rdsr, wrsra, wrsrb, jid1, jid2, jid3,
 	addr2, addr1, addr0, cmd, fastread, read, write
 };
 
@@ -126,21 +126,21 @@ static int FlashMemSPI8(uint8_t cin) {
 		case 0x20: /* SER4K  opcd A2 A1 A0 */
 			state = addr2;               break;
 		case 0x06: /* WREN   opcd */
-			state = wait;  wen = 2;      break;
+			state = wait_;  wen = 2;      break;
 		case 0x04: /* WRDI   opcd */
-			state = wait;  wen = 0;      break;
+			state = wait_;  wen = 0;      break;
 		case 0x9F: /* RDJDID opcd -- n1 n2 n3 */
 			state = jid1;                break;
 		} break;
-	case wait: break;				// wait for trailing CS
+	case wait_: break;				// wait for trailing CS
 	case rdsr: cout = wen + FlashBusy();
-		state = wait;  break;
+		state = wait_;  break;
 	case jid1: cout = 0xAA;
 		state = jid2;  break;		// 3-byte RDJDID
 	case jid2: cout = 0xFF & (FlashMemorySize >> 24);
 		state = jid3;  break;
 	case jid3: cout = 0xFF & (FlashMemorySize >> 16);
-		state = wait;  break;
+		state = wait_;  break;
 	case addr2: addr = cin << 16;
 		state = addr1;  break;
 	case addr1: addr += cin << 8;
@@ -149,7 +149,7 @@ static int FlashMemSPI8(uint8_t cin) {
 #ifdef VERBOSE
 		printf("%02X[%06X] ", command, addr);
 #endif
-		state = wait;
+		state = wait_;
 		if (addr < FlashMemorySize) {
 			switch (command) {
 			case 0x20:				// 4K erase
@@ -182,13 +182,13 @@ static int FlashMemSPI8(uint8_t cin) {
 		break;
 	case write:						// write byte to flash
 		if (mem[addr]) {			// 0 = blank
-			wen = 0;  state = wait;
+			wen = 0;  state = wait_;
 			return BAD_NOTBLANK;
 		}
 		mem[addr++] = ~cin;
 		mark += (uint64_t)BYTE_DELAY;
 		if ((addr & 0xFF) == 0) {	// reached end of write page
-			wen = 0;  state = wait;
+			wen = 0;  state = wait_;
 		}
 		break;
 	case wrsra:
