@@ -9,6 +9,38 @@
 #include "TFTsim.h"
 #ifdef __linux__
 #include <unistd.h>
+/**
+ Linux (POSIX) implementation of _kbhit().
+ Morgan McGuire, morgan@cs.brown.edu
+ */
+#include <stdio.h>
+#include <sys/select.h>
+#include <termios.h>
+#include <stropts.h>
+
+int KbHit(void) { // _kbhit in Linux
+    static const int STDIN = 0;
+    static bool initialized = false;
+
+    if (!initialized) {
+        // Use termios to turn off line buffering
+        termios term;
+        tcgetattr(STDIN, &term);
+        term.c_lflag &= ~ICANON;
+        tcsetattr(STDIN, TCSANOW, &term);
+        setbuf(stdin, NULL);
+        initialized = true;
+    }
+
+    int bytesWaiting;
+    ioctl(STDIN, FIONREAD, &bytesWaiting);
+    return bytesWaiting;
+}
+#else
+#include <conio.h>
+int KbHit(void) {
+    return _kbhit();
+}
 #endif
 
 // Host words start at I/O address 8000h.
@@ -21,22 +53,25 @@ static uint16_t SPIresult;
 static uint8_t nohostAPI;               // prohibit access to host API
 
 static int termKey(void);
+static int termQkey(void);
 
 uint32_t readIOmap (uint32_t addr) {
     int32_t r, temp;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
+// ===== 0 to 3 = UART read
     case 0: return termKey();           // Get the next incoming stream char
-    case 1: // terminal type (control and function keys differ)
+    case 1: return termQkey();
+    case 2: // terminal type (control and function keys differ)
 #ifdef __linux__
         return 1;
 #else
         return 0;
 #endif
-    case 2:
-        return 0;                       // UART tx is never busy
-    case 4: 
+    case 3: return 0;                   // UART tx is never busy
+// ===== 4 to 7 = SPI read
+    case 4:
         temp = SPIresult;               // get result and start another transfer
         r = FlashMemSPI(0);
         SPIresult = (uint16_t)r;
@@ -55,10 +90,12 @@ uint32_t readIOmap (uint32_t addr) {
 
 // Code space is writable through this interface.
 void writeIOmap (uint32_t addr, uint32_t x) {
+    static codeaddr = 0;
     int r;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
+// ===== 0 to 3 = UART write
     case 0:
         putchar((char)x);
 #ifdef __linux__
@@ -68,6 +105,7 @@ void writeIOmap (uint32_t addr, uint32_t x) {
         break;
     case 3:
         nohostAPI = x;  break;
+// ===== 4 to 7 = SPI write
     case 4:
         r = FlashMemSPI((int)x);
         SPIresult = (uint16_t)r;
@@ -75,18 +113,17 @@ void writeIOmap (uint32_t addr, uint32_t x) {
         break;
     case 5:
         FlashMemSPIformat(x);  break;
-    case 8:
+    case 8:                             // Start code writes here
+        codeaddr = x;  break;           // addressing 16-bit instructions
+    case 9:                             // write next code word
+        chadToCode(codeaddr++, x);  break;
+    case 12:
         TFTLCDwrite(x);
-    case 0x8000:                        // trigger a header data read 
-        header_data = chadGetHeader(x);  break;
-    case 0x8002:                        // trigger an error
+    case 0x8000:                        // trigger an error
         chadError(x);  break;
-    default:
-        if (addr >= 0x100) {            // write to code space
-            chadToCode(addr, x);
-        } else {
-            chadError(BAD_IOADDR);
-        }
+    case 0x8001:                        // trigger a header data read 
+        header_data = chadGetHeader(x);  break;
+    default: chadError(BAD_IOADDR);
     }
 }
 
@@ -103,6 +140,13 @@ Code should invoke KEY in a loop to replace the functionality of ?KEY.
 static uint8_t buf[LineBufferSize];
 static int toin = 0;
 static int len = 0;
+
+static int termQkey(void) {
+    if (toin < len) {
+        return 1;                       // there are chars in the buffer
+    }
+    return KbHit();
+}
 
 static int termKey(void) {              // Get the next byte in the input stream
     if (toin < len) {

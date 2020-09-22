@@ -10,37 +10,70 @@ there
 
 variable fwren0     \ lowest 64K sector number, set by `fwall`
 variable fwren1     \ inverse of fwren0, used as a backup. Must be ~fwren0.
-variable sector     \ 2.4000 -- a-addr
-variable fp         \ 2.4010 -- a-addr
+variable qe-flag    \ 2.4015 -- a-addr
 
-: flash-wp          \ 2.4020 sector key --
+\ Note: This will be totally re-written to match the .md file.
+
+8 2* cells equ |flashstack|
+variable flsp                           \ flash stack pointer
+|flashstack| buffer: flashstack
+
+0 equ FL_R8                             \ 8-bit read mode
+1 equ FL_R16                            \ 16-bit read mode
+2 equ FL_W8                             \ 8-bit write mode
+3 equ FL_W16                            \ 16-bit write mode
+
+\ Flash status uses a stack of:
+\ 1 byte: mode = {read8, read16, write8, write16}       <-- flsp
+\ 1 byte: sector = current 64K sector                   <-- flsp+1
+\ 2 bytes: fp = flash pointer, next byte to read/write  <-- flsp+2
+
+: pushFL  \ fp sector mode --
+    4 flsp +!                           \ pre-increment SP
+    flsp @  tuck c!  1+
+    tuck c!  2 +  w!
+;
+
+: FLsector  flsp @ 1+ ;                 \ -- c-addr \ current 64K sector
+: FLdp      flsp @ 2 + ;                \ -- a-addr \ current byte in sector
+
+: flash-wp                              \ 2.4020 sector key --
     flwp_en xor if  drop exit  then
     dup fwren0 !  invert fwren1 !
 ;
-0 flwp_en flash-wp  \ testing
 
 : readSPI    \ -- c \ result of transfer
     SPIformat io@
 ;
+
 : SPIcommand  1 SPIformat io! [ ;       \ c --\ activate CS line
 : sendSPI     SPIdata io! ;             \ c --\ transmit an SPI byte
 : ]read       0 SPIformat io! ;         \ 2.4080 --\ end read
 : fl_wren     6 SPIcommand ]read ;      \ write enable
 : fl_wrdi     4 SPIcommand ]read ;      \ write disable
-: waitflash   \ --                      \ wait for write or erase to finish
-    begin  5 SPIcommand  0 sendSPI
-           readSPI ]read  1 and
-    while  noop
-    repeat
+: _fc>        0 sendSPI  readSPI ;      \ 2.4070 -- c\ read next flash byte
+: fc>         SPIdata io@ ;             \ 2.4071 -- c\ read and trigger flash
+: FLdepth     flsp @  [ flashstack 4 - ] literal  2/ 2/ ; \ -- depth
+
+\ Initialize the flash: Clear the flash stack and read the QE bit
+: /flash      \ --
+    [ flashstack 4 - ] literal flsp !   \ clear flash stack
+    53 SPIcommand  _fc>  2 and qe-flag ! ]read \ upper status byte
+    0 flwp_en flash-wp                  \ enable writes to 0
 ;
 
-: sendaddr24  \ addr --                 \ send address
-    sector @ sendSPI
+/flash
+
+: waitflash   \ --                      \ wait for write or erase to finish
+    5 SPIcommand
+    begin  _fc> 1 and  while  noop  repeat ]read
+;
+
+: sendaddr24  \ addr --                 \ send address using 3 bytes
+    FLsector c@ sendSPI
     dup swapb sendSPI  sendSPI
 ;
 
-: ]write   ]read  fl_wrdi ;             \ 2.4050 --\ end write
-: f>       0 sendSPI  readSPI ;         \ 2.4070 c --\ read next flash byte
 : mask16b  65535 and ;                  \ x -- x16
 
 : is4K?  \ fa -- fa flag \ is the pointer at a new sector?
@@ -52,92 +85,73 @@ variable fp         \ 2.4010 -- a-addr
 : erase4K  \ fa -- fa \ erase the 4K sector here
     fl_wren  32 SPIcommand  dup sendaddr24  ]read
 ;
-: write[  \ 2.4030 fa --
+
+\ Open the flash memory for writing. The Page Program (02 command)
+\ is used for programming flash.
+: create-flash  \ 2.4030 fa --
     fwren0 @  dup invert
-    fwren1 @  <> -81 and exception      \ corrupted wall
-    sector @  <  -82 and exception      \ under the wall
-    dup fp !  waitflash
+    fwren1 @   <> -81 and exception     \ corrupted wall
+    FLsector c@ < -82 and exception     \ under the wall
+    dup FLdp !  waitflash
     is4K? if erase4K then
     fl_wren  2 SPIcommand  sendaddr24   \ start page write
 ;
-: bump_fp  \ -- fa \ Bump flash pointer by 1, wrap at 64K boundary
-    fp @  dup mask16b                   ( fa fa16 )
-    65535 = if 1 sector +! then         \ bump sector if fp will wrap
-    1+  mask16b  dup fp !               \ bump fp
+: close-flash  \ 2.4050 --\ end write
+    ]read  fl_wrdi                      \ end the current flash operation
+    -4 flsp +!                          \ un-nest to previous flash operation
+    FLdepth if                          \ was there something going on before?
+    then
 ;
-: >f      \ 2.4040 c --\ Write next byte to flash
+: bump_fp  \ -- fa \ Bump flash pointer by 1, wrap at 64K boundary
+    FLdp @  dup mask16b                   ( fa fa16 )
+    65535 = if 1 sector +! then         \ bump sector if fp will wrap
+    1+  mask16b  dup FLdp !             \ bump fp
+;
+
+\ Write a byte to the next free space in flash. The 256-byte Page Program
+\ is managed so as to freely cross into subsequent pages and sectors.
+: c,f      \ 2.4040 c --\ Write next byte to flash
     sendSPI  bump_fp
-    is256? if  ]write      then         \ end write at end of page
+    is256? if  close-flash      then    \ end write at end of page
     is4K?  if  erase4K     then
-    is256? if  dup write[  then         \ start a new page
+    is256? if  dup create-flash  then   \ start a new page
     drop
 ;
-: read[   \ 2.4060 fa --\ Begin fast read
-    waitflash  11 SPIcommand  sendaddr24  0 sendSPI
+
+\ formats:
+\ 000 = 8-bit SPI
+\ 001 = 16-bit SPI
+\ 100 = 8-bit QSPI mode receive
+\ 101 = 16-bit QSPI mode receive
+\ 110 = 8-bit QSPI mode transmit
+\ 111 = 16-bit QSPI mode transmit
+
+\ Note that the QE bit in the status register must be programmed to '1'
+\ for quad rate commands to work. See the flash data sheet.
+\ Flash read can be in bytes or 16-bit words. The default mode is bytes.
+
+: open-flash  \ fa --
+    waitflash
+    qe-flag @ if
+        $EB SPIcommand                  \ EB single
+        13 SPIformat io!                \ 8-bit QSPI transmit
+        sendaddr24  0 sendSPI           \ 32-bit address and mode, QSPI
+        11 SPIformat io!                \ 16-bit QSPI receive:
+        0 sendSPI                       \ 4 beat dummy
+        9 SPIformat io!                 \ 8-bit QSPI receive:
+    else
+        11 SPIcommand  sendaddr24
+        0 sendSPI
+    then
+    0 sendSPI                           \ first 8-bit read
 ;
 
-:noname  count >f ;                     \ Write string to flash
+\ : fw>    SPIdata io@ swapb ;          \ 2.4071 -- w\ read next flash word
+
+\ Single rate string write and read
+:noname  count c,f ;                    \ Write string to flash
 : write  literal times  drop ;          \ 2.4045 c-addr u --
-:noname  f> over c! char+ ;             \ Read string from flash
+:noname  fc> over c! char+ ;            \ Read string from flash
 : read   literal times  drop ;          \ 2.4090 c-addr u --
-
-
-: key  \ -- c \ Wait for character from the UART
-    begin  0 io@  dup 0< while  drop  repeat
-;
-
-\ Boot loader, not tested, don't have app launcher yet
-
-cvariable SPIlength
-cvariable BootEnabled
-$1234 equ BootKey
-: HexDigit  ( -- n ) key [char] 0 -  dup 9 > 7 and -  15 and ;
-: HexByte   ( -- c ) HexDigit 4 lshift  HexDigit + ;
-:noname  HexByte sendSPI ;
-: writeNSPI ( -- )   SPIlength c@  literal times ;   			\ !
-:noname  readSPI h.2  0 sendSPI ;
-: readNSPI  ( -- )   SPIlength c@  literal times ;   			\ @
-: setSPIlen ( -- )   HexByte  SPIlength c! ;         			\ #
-: stopSPI   ( -- )   ]write  waitflash  [char] . emit ;         \ $
-: startSPI  ( -- )   BootEnabled c@ if  HexByte  SPIcommand then ; \ %
-
-: SPIboiler ( n -- c )											\ &
-    $A4 h.2		\ chad tag
-	0 h.2		\ protocol format 0
-	0 h.2		\ ROM version
-	2 h.2		\ product ID
-	100 h.2		\ company ID
-;
-
-: SPIenable ( -- )												\ '
-    HexByte  [ BootKey swapb 255 and ]  literal =
-    HexByte  [ BootKey 255 and ]        literal = and
-	BootEnabled c!
-;
-
-11 |bits|
-: BootDispatch exec1: [
-    ' writeNSPI | ' writeNSPI | ' readNSPI  | ' setSPIlen |
-	' stopSPI   | ' startSPI  | ' SPIboiler | ' SPIenable ] literal
-;
-
-: Bootloader  \ --
-    [char] ? emit
-	begin key  bl -
-		dup 7 invert and if  drop		\ invalid command char
-		else  BootDispatch
-		then
-	again  [
-;
-
-\ `<space>` Launch the app (if possible)
-\ `!` Write N SPI bytes, expect 2N hex digits.
-\ `@` Read N SPI bytes, return 2N hex digits.
-\ `#` Set `N` parameter, expect 2 hex digits.
-\ `$` Stop SPI flash command, return `.` when flash is not busy.
-\ `%` Start a SPI flash command.
-\ `&` Boilerplate, return 2M hex digits where M is the length of the string.
-\ `'` Enable the bootloader, expect 4 hex digits.
-\ `other` Ignored.
 
 there swap - . .( instructions used by flash access) cr

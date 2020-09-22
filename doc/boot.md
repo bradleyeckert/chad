@@ -169,13 +169,3 @@ such a large RAM buffer for it,
 it seems that editing on the target isn't such a great idea.
 Text file format would be fine.
 The host side of the bootloader can be used to manage the file(s).
-
-Some folks might see plaintext source code in SPI flash as a security risk.
-For them, the delay of CTEA compared with the FIND delay wouldn't be bad.
-
-
-
-
-
-
-

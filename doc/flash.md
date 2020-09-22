@@ -16,47 +16,59 @@ at over 100 MHz.
 
 SPI flash is a simple enough abstraction.
 On-chip flash could be adapted to it.
-The basic primitives for writing to and reading from flash are:
 
-- `flash-wp` *( sector magic -- )* Set the first writable 4K flash sector.
-*magic* works like a PIN number.
+## Streams
+
+The SPI flash is stream-oriented, so generic `open-stream` and `close-stream`
+are used to manage it:
+
+- `open-stream` *( addr_lo addr_hi mode -- *)
+- `close-stream` *( -- )*
+
+`addr_lo` the lower 16 bits of the byte address. `addr_hi` is the upper bits.
+`mode` is the kind of stream to open. `mode` has several bitfields:
+
+- mode\[0] = direction: `0` = read, `1` = write
+- mode\[2:1] = size: `00` = 8-bit, `01` = 16-bit, other=reserved
+- mode\[4:3] = device ID: `00` = SPI flash
+- mode\[10:5] = device rate n: SCLK = sysclk / 2\*(n+1).
+
+This is enough to support a SPI bus with up to 4 devices on it and multiple SCLK
+frequencies.
+
+What happens if you want to open a stream while in another stream?
+The easiest option is to close the stream and open the other one.
+The current status of the stream should be readable so it can be restored
+if you need to pick up where you left off.
+
+## Write protection
+
+Write protection can be managed by programming non-volatile status register
+bits. This can be done by an app running on a host computer along with a
+minimal bootloader that provides low level SPI flash transfers.
+
+The status register needn't be placed in OTP mode since complete bricking
+isn't possible. If the bootloader can be talked to, the flash can be reloaded
+from a USB UART (etc.).
+
+If you're wondering how a malicious virus can brick a motherboard, one way is
+to set the OTP bits in the status register after infecting the BIOS.
+This is a good reason to make the bootloader hard to get into.
+
+## Primitives
+
+The proposed primitives for writing to and reading from flash are:
+
 - `sector` *( -- a-addr )* Variable for the current flash sector number.
 - `fp` *( -- a-addr )* Variable for a 16-bit index into the 64 KB sector.
-- `write[` *( addr -- )* Set `fp` = `addr`.
-If `addr` is at a 4KB boundary , erase the sector.
-Start a page write at address `sector<<16+addr`. 
-- `>f` *( c -- )* Append a byte to flash and bump `fp`.
-- `]write` *( -- )* End the page program command.
-- `read[` *( addr -- )* Start reading flash at address `sector<<16+addr`.
-- `f>` *( -- c )* Read the next byte from flash.
-- `]read` *( -- )* End the read command.
-
-The `>f` sequence is:
- 
-- if `fp[7:0]` is 0, end the page program command.
-- if `fp[11:0]` is 0, erase the next 4KB sector.
-- if `fp[7:0]` is 0, start a new page program command.
-- if `fp[15:0]` is 0, clear `fp` and bump `sector`.
-
-Flash write issues a WREN when starting and a WRDI when finished.
-If `sector<<16+addr` is less than `flash-wp<<12`, WREN is not issued.
-
-## Notes on primitives
-
-\[1] `flash-wp` *( sector magic -- )* is a write-protect feature. 
-You don't want to inadvertently change it,
-so it needs a *magic* parameter to enable it.
-Some sector numbers are unavailable. 
-If *sector* is out of range or *magic* is wrong, nothing changes.
-The proposed value for *magic* is 27182.
-Flash pages below flash-wp are write protected.
-
-Two variables are used for flash-wp.
-One is the inverse of the other so if they get stomped it will be
-detected.
-
-\[2] `write[` *( addr -- )* Can trigger a -81 error if the sector
-is not writable, or just do nothing so the flash chip ignores the data.
+- `open-stream` *( addr_lo addr_hi mode -- *) Open a stream.
+- `close-stream` *( -- )* Close the open stream.
+- `>s` *( x -- )* Write x to stream, size depends on mode.
+- `s>` *( -- x )* Read x from stream, size depends on mode.
+- `dm>s` *( addr u -- )* Write `u` elements from data memory to stream.
+- `s>dm` *( addr u -- )* Read `u` elements from stream to data memory.
+- `cm>s` *( addr u -- )* Write `u` elements from code memory to stream.
+- `s>cm` *( addr u -- )* Read `u` elements from stream to code memory.
 
 ## Implementation
 
@@ -121,6 +133,7 @@ It selects both the SCLK frequency and the CS line to use,
 so you can have multiple SPI devices on the same SPI bus.
 For example:
 
-- SPI flash
+- SPI NOR flash
+- SPI NAND flash
 - SPI SRAM
 - Output port expansion: 74HC595s, etc.

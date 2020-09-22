@@ -11,14 +11,29 @@ include ../frame.f
 include ../numout.f
 include ../flash.f
 include ../ctea.f
+include ../bootload.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
 
-:noname  ( error -- )  ?dup if $8002 io! then
+:noname  ( error -- )  ?dup if $8000 io! then
 ; resolves exception
 
-: hi [char] 你 ;
+later app
+
+\ Without flash memory, initializing data space with non-blanks is
+\ non-trivial. Cold boot starts out most of data space blank.
+\ The app is responsible for initializing its variables.
+\ Shared (with chad.c) variables: >in, tibs, dp, base, state.
+
+:noname  ( -- )
+	here  state
+	[ dm-size state - cell / ] literal
+	for  0 over ! cell +  next  drop	\ erase most everything
+	dp !  decimal  fpclear				\ restore dp, base, frp
+\	app
+; resolves cold
+
 
 .( 你好，世界 ) cr
 
@@ -31,17 +46,18 @@ include ../ctea.f
 
 \ Try 25 fib, then stats
 
-' fib resolves cold
-
 : source   tib tibs @ ;
 : /source  source >in @ /string ;
 : \source  /source  tibs @ >in ! ;
+: f\       \source  dup c,f write ;
 
-: f\
-	0 flwp_en flash-wp
-	0 sector !
-    \source  0 write[ dup >f write ]write
-;
+0 flwp_en flash-wp		\ enable flash writing
+\ 4096 create-flash		\ put data in 4K page starting here
+\ f\ Hello World
+\ close-flash
+
+cm-writable torg		\ compile the app here
+: app  4096 open-flash ;
 
 .( Total instructions: ) there . cr
 \ 0 there dasm

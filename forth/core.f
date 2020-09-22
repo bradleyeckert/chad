@@ -79,10 +79,14 @@ cell 4 = [if]
     : cells 2* ; macro                  \ 2.0170 n1 -- n2
   check_alignment [if]
     : (ta)  over and if  22 invert exception  then ;
+	: w@  [ ;
     : @   1 (ta)  _@ nop _@_ ;          \ 2.0210 a-addr -- x
+	: w!  [ ;
     : !   1 (ta)  _! nop drop ;         \ 2.0200 x a-addr --
   [else]
+	: w@  [ ;
     : @   _@ nop _@_ ;                  \ 2.0210 a-addr -- x
+	: w!  [ ;
     : !   _! nop drop ;                 \ 2.0200 x a-addr --
   [then]
     : c! ( u c-addr -- )                \ 2.0180 c c-addr --
@@ -98,11 +102,7 @@ cell 4 = [if]
     ;
 [then]
 
-dp cell+ dp ! \ variables shared with chad's interpreter
-variable base                           \ 2.0530 -- a-addr
-variable state                          \ 2.0540 -- a-addr
-variable >in                            \ 2.0541 -- a-addr
-variable tibs                           \ 2.0542 -- a-addr
+state cell + dp ! \ skip shared variables
 
 \ Your code can usually use + instead of OR, but if it's needed:
 : or    invert swap invert and invert ; \ 2.0300 n m -- n|m

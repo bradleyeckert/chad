@@ -19,6 +19,13 @@ Chad can call LoadFlashMem to initialize it from a file.
 
 static uint8_t mem[FlashMemorySize];
 
+static void invertMem(uint8_t* m, int n) {
+	while (n--) {
+		uint8_t c = *m;
+		*m++ = ~c;
+	}
+}
+
 int LoadFlashMem(char* filename) {      // load binary image
 	memset(mem, 0, FlashMemorySize);    // erase flash
 	FILE* fp;
@@ -28,15 +35,17 @@ int LoadFlashMem(char* filename) {      // load binary image
 	fp = fopen(filename, "rb");
 #endif
 	if (fp == NULL) return BAD_OPENFILE;
-	fread(mem, FlashMemorySize, 1, fp);
+	int length = fread(mem, 1, FlashMemorySize, fp);
+	invertMem(mem, length);
 	fclose(fp);
 	return 0;
 }
 
-int SaveFlashMem(char* filename) { // save binary image
-	int p = FlashMemorySize;
-	while ((p) && (mem[--p])) {}        // find the unblank size
-	if (!p) return 0;                   // nothing to save
+int SaveFlashMem(char* filename) {		// save binary image
+	int i = FlashMemorySize;
+	while ((i) && (mem[--i] == 0)) {}   // trim
+	if (!i) return 0;                   // nothing to save
+	i++;								// include both endpoints
 	FILE* fp;
 #ifdef MORESAFE
 	errno_t err = fopen_s(&fp, filename, "wb");
@@ -44,7 +53,9 @@ int SaveFlashMem(char* filename) { // save binary image
 	fp = fopen(filename, "wb");
 #endif
 	if (fp == NULL) return BAD_CREATEFILE;
-	fwrite(mem, p, 1, fp);
+	invertMem(mem, i);
+	fwrite(mem, 1, i, fp);
+	invertMem(mem, i);
 	fclose(fp);
 	return 0;
 };
@@ -52,6 +63,7 @@ int SaveFlashMem(char* filename) { // save binary image
 /*------------------------------------------------------------------------------
 | Name   | Hex | Command                           |
 |:-------|-----|----------------------------------:|
+| QFR    | EBh | Read Data Bytes from Memory, QSPI |
 | FR     | 0Bh | Read Data Bytes from Memory       |
 | PP     | 02h | Page Program Data Bytes to Memory |
 | SER    | 20h | Sector Erase 4KB                  |
@@ -62,7 +74,7 @@ int SaveFlashMem(char* filename) { // save binary image
 */
 
 enum states {
-	idle, wait_, rdsr, wrsra, wrsrb, jid1, jid2, jid3,
+	idle, wait_, rdsr, rdsrh, wrsra, wrsrb, jid1, jid2, jid3,
 	addr2, addr1, addr0, cmd, fastread, read, write
 };
 
@@ -82,12 +94,6 @@ void FlashMemSPIformat(int n) {
 #endif
 }
 
-// Formats are:
-// 00 = 8-bit old school SPI
-// 01 = 8-bit QSPI mode transmit
-// 10 = 8-bit QSPI mode receive
-// 11 = 16-bit QSPI mode receive
-
 static int FlashBusy(void) {
 	return (chadCycles() < mark) ? 1 : 0;
 }
@@ -98,7 +104,7 @@ static int FlashBusy(void) {
 static int FlashMemSPI8(uint8_t cin) {
 	static uint8_t command = 0;         // current command
 	static uint8_t wen = 0;             // write enable
-	static uint8_t qe = 0;              // quad rate enable
+	static uint8_t qe = 2;              // quad rate enable
 	static uint32_t addr;
 	static uint32_t dummy;
 	uint16_t cout = 0x00FF;
@@ -113,38 +119,28 @@ static int FlashMemSPI8(uint8_t cin) {
 		printf("#%02X ", cin);
 #endif
 		switch (command) {
-		case 0x01: /* WRSR   opcd n -- */
-			if (wen) { 
-				state = wrsra;
-			}  break;
-		case 0x05: /* RDSR   opcd -- n1 */
-			state = rdsr;                break;
-		case 0xEB:
+		case 0x01: if (wen) { state = wrsra; }  break;
+		case 0x06: state = wait_;  wen = 2;     break;
+		case 0x04: state = wait_;  wen = 0;     break;
+		case 0x35: state = rdsrh;               break;
+		case 0x05: state = rdsr;                break;
+		case 0xEB: // quad rate commands must have QE set
 		case 0x32: if (qe == 0) { break; }
-		case 0x0B: /* FR     opcd A2 A1 A0 xx -- data... */
-		case 0x02: /* PP     opcd A2 A1 A0 d0 d1 d2 ... */
-		case 0x20: /* SER4K  opcd A2 A1 A0 */
-			state = addr2;               break;
-		case 0x06: /* WREN   opcd */
-			state = wait_;  wen = 2;      break;
-		case 0x04: /* WRDI   opcd */
-			state = wait_;  wen = 0;      break;
-		case 0x9F: /* RDJDID opcd -- n1 n2 n3 */
-			state = jid1;                break;
+		case 0x0B: /* FR  opcd A2 A1 A0 xx -- data... */
+		case 0x02: /* PP  opcd A2 A1 A0 d0 d1 d2 ... */
+		case 0x20: /* SER4K */  state = addr2;  break;
+		case 0x9F: /* RDJDID */ state = jid1;   break;
 		} break;
 	case wait_: break;				// wait for trailing CS
-	case rdsr: cout = wen + FlashBusy();
-		state = wait_;  break;
-	case jid1: cout = 0xAA;
-		state = jid2;  break;		// 3-byte RDJDID
+	case rdsr: cout = wen + FlashBusy();        break;
+	case rdsrh: cout = qe;                      break;
+	case jid1: cout = 0xAA;  state = jid2;      break;
 	case jid2: cout = 0xFF & (FlashMemorySize >> 24);
 		state = jid3;  break;
 	case jid3: cout = 0xFF & (FlashMemorySize >> 16);
 		state = wait_;  break;
-	case addr2: addr = cin << 16;
-		state = addr1;  break;
-	case addr1: addr += cin << 8;
-		state = addr0;  break;
+	case addr2: addr = cin << 16;  state = addr1;  break;
+	case addr1: addr += cin << 8;  state = addr0;  break;
 	case addr0: addr += cin;
 #ifdef VERBOSE
 		printf("%02X[%06X] ", command, addr);
@@ -152,20 +148,20 @@ static int FlashMemSPI8(uint8_t cin) {
 		state = wait_;
 		if (addr < FlashMemorySize) {
 			switch (command) {
-			case 0x20:				// 4K erase
+			case 0x20: // 4K erase
 				if (wen) {
 					wen = 0;
 					memset(&mem[addr & (~0xFFF)], 0, 4096);
 					mark = chadCycles() + (uint64_t)ERASE_DELAY;
 				} break;
-			case 0x03:
+			case 0x03: // slow read
 				state = read;  break;
 			case 0xEB:  dummy = 2;
-			case 0x0B:
+			case 0x0B: // fast read
 				state = fastread;  break;
-			case 0x32:
+			case 0x32: // QDR page write
 				if (qe == 0) { goto notenabled; }
-			case 0x02:
+			case 0x02: // page write
 				if (wen) { 
 					mark = chadCycles() + (uint64_t)BYTE0_DELAY;
 					state = write;  break; 
@@ -204,15 +200,18 @@ static int FlashMemSPI8(uint8_t cin) {
 }
 
 // format supports different modes
+// Mode[0]=0: 8-bit out, 8-bit in
+// Mode[0]=1: 16-bit out, 16-bit in big endian
 
 int32_t FlashMemSPI(uint16_t x) {
-	int first = FlashMemSPI8((uint8_t)x);
-	if (((format & 1) == 0) || (first & 0x8000))
-		return first;
-	int second = FlashMemSPI8((uint8_t)x);
-	if (second & 0x8000)
-		return second;
-	return second<<8 | first;		// little endian 16-bit
+	if ((format & 1) == 0) {
+		return FlashMemSPI8((uint8_t)x);
+	}
+	int hi = FlashMemSPI8((uint8_t)(x >> 8));
+	int lo = FlashMemSPI8((uint8_t)x);
+	if (hi < 0) return hi;
+	if (lo < 0) return lo;
+	return (hi << 8) | lo;
 }
 
 // 000 = 8 - bit SPI

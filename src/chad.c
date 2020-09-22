@@ -30,6 +30,7 @@ static uint64_t GetMicroseconds() {
 #include "chaddefs.h"
 #include "iomap.h"
 #include "config.h"
+#include "flash.h"
 
 SI verbose = 0;
 uint8_t sp, rp;                         // stack pointers
@@ -40,11 +41,12 @@ CELL Rstack[StackSize];                 // return stack
 CELL Raddr;                             // data memory read address
 SI error;                               // simulator and interpreter error code
 
-#define dp 0                            // define shared variables
-#define base  (dp + 1)                  // use cells not bytes for compatibility
-#define state (base + 1)                // define cell addresses
-#define toin  (state + 1)               // pointer to next character
-#define tibs  (toin + 1)                // chars in input buffer
+// Shared variables
+#define toin  0                         // pointer to next character
+#define tibs  1                         // chars in input buffer
+#define dp    2                         // define shared variables
+#define base  3                         // use cells not bytes for compatibility
+#define state 4                         // define cell addresses
 
 SV Hex(void) { Data[base] = 16; }
 SV Decimal(void) { Data[base] = 10; }
@@ -782,7 +784,8 @@ SV AddLitOp (char *name, char* help, cell value) {
 
 static char* TargetName (cell addr) {
     if (!addr) return NULL;
-    for (int i = 1; i <= hp; i++) {
+    int i = hp + 1;
+    while (--i) {
         if (Header[i].target == addr) {
             return Header[i].name;
         }
@@ -981,7 +984,7 @@ static FILE* fopenx(char* filename, char* fmt) {
 #endif
 }
 
-SV OpenNewFile(char *name) {            // Push a new file onto the file stack
+SI OpenNewFile(char *name) {            // Push a new file onto the file stack
     filedepth++;  fileID++;
     File.fp = fopenx(name, "r");
     File.LineNumber = 0;
@@ -989,10 +992,10 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
     File.FID = fileID;
     if (File.fp == NULL) {
         filedepth--;
-        error = BAD_OPENFILE;
+        return BAD_OPENFILE;
     } else {
         if ((filedepth >= MaxFiles) || (fileID >= MaxFilePaths))
-            error = BAD_INCLUDING;
+            return BAD_INCLUDING;
         else {
             SwallowBOM(File.fp);
             strmove(FilePaths[fileID].filepath, name, LineBufferSize);
@@ -1000,6 +1003,7 @@ SV OpenNewFile(char *name) {            // Push a new file onto the file stack
             LogBegin(Title(name));
         }
     }
+    return 0;
 }
 
 static char tok[LineBufferSize+1];      // blank-delimited token
@@ -1028,12 +1032,22 @@ SV ParseFilename(void) {
     else {
         parseword(' ');                 // or a filename with no spaces
     }
+    LogColor(COLOR_NONE, 0, tok);
 }
 
 SV Include(void) {                      // Nest into a source file
     ParseFilename();
-    LogColor(COLOR_NONE, 0, tok);
-    OpenNewFile(tok);
+    error = OpenNewFile(tok);
+}
+
+SV LoadFlash(void) {
+    ParseFilename();
+    error = LoadFlashMem(tok);
+}
+
+SV SaveFlash(void) {
+    ParseFilename();
+    error = SaveFlashMem(tok);
 }
 
 // Start a new definition at the code boundary specified by CodeAlignment.
@@ -1043,7 +1057,7 @@ SV Include(void) {                      // Nest into a source file
 
 SV Colon(void) {
     parseword(' ');
-    if (AddHead(tok, "")) {             // define a word that simulates
+    if (AddHead(tok, "")) {             // start a definition
         cp = (cp + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
         LogColor(COLOR_DEF, 0, tok);
         SetFns(cp, Def_Exec, Def_Comp);
@@ -1052,7 +1066,7 @@ SV Colon(void) {
         Header[hp].smudge = 1;
         DefMarkID = hp;                 // save for later reference
         DefMark = cp;
-        latest = cp;                     // code starts here
+        latest = cp;                    // code starts here
         ConSP = 0;
         toCompile();
     }
@@ -1344,7 +1358,7 @@ SV SaveMem(uint8_t* mem, int length) {  // save binary to a file
     if (fp == NULL)
         error = BAD_CREATEFILE;
     else {
-        fwrite(mem, length, 1, fp);
+        fwrite(mem, 1, length, fp);
         fclose(fp);
     }
 };
@@ -1360,7 +1374,7 @@ SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
     if (fp == NULL)
         error = BAD_OPENFILE;
     else {
-        fread(mem, length, 1, fp);
+        fread(mem, 1, length, fp);
         fclose(fp);
     }
 };
@@ -1542,12 +1556,16 @@ SV LoadKeywords(void) {
     current = root_wid;
     AddEquate("root",         "1.0000 -- wid",        root_wid);
     AddEquate("forth-wordlist", "1.0010 -- wid",      forth_wid);
-    AddEquate("cm-writable",  "1.0020 -- addr",       BYTE_ADDR(CodeFence));
-    AddEquate("cm-size",      "1.0030 -- n",          BYTE_ADDR(CodeSize));
+    AddEquate("cm-writable",  "1.0020 -- addr",       CodeFence);
+    AddEquate("cm-size",      "1.0030 -- n",          CodeSize);
     AddEquate("dm-size",      "1.0040 -- n",          BYTE_ADDR(DataSize));
     AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
     AddEquate("cell",         "1.0060 -- n",          CELLS);
-    AddEquate("dp",           "1.0070 -- addr",       BYTE_ADDR(dp));
+    AddEquate(">in",          "1.0070 -- addr",       BYTE_ADDR(toin));
+    AddEquate("tibs",         "1.0071 -- addr",       BYTE_ADDR(tibs));
+    AddEquate("dp",           "1.0072 -- addr",       BYTE_ADDR(dp));
+    AddEquate("base",         "1.0073 -- addr",       BYTE_ADDR(base));
+    AddEquate("state",        "1.0074 -- addr",       BYTE_ADDR(state));
     AddEquate("tib",     "1.0075 -- addr", BYTE_ADDR(DataSize) - MaxLineLength);
     AddEquate("|tib|",        "1.0076 -- n",          MaxLineLength);
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
@@ -1557,6 +1575,8 @@ SV LoadKeywords(void) {
     AddKeyword("save-code",   "1.0110 <filename> --", SaveCodeBin,   noCompile);
     AddKeyword("load-data",   "1.0120 <filename> --", LoadDataBin,   noCompile);
     AddKeyword("save-data",   "1.0130 <filename> --", SaveDataBin,   noCompile);
+    AddKeyword("load-flash",  "1.0135 <filename> --", LoadFlash,     noCompile);
+    AddKeyword("save-flash",  "1.0136 <filename> --", SaveFlash,     noCompile);
     AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
@@ -1585,7 +1605,7 @@ SV LoadKeywords(void) {
     AddKeyword("+order",      "1.0530 wid --",        PlusOrder,     noCompile);
     AddKeyword("lexicon",     "1.0540 <name> --",     Lexicon,       noCompile);
     AddKeyword("include",     "1.1000 <filename> --", Include,       noCompile);
-    AddKeyword("(",           "1.1010 ccc<paren> --",    SkipToPar,  SkipToPar);
+    AddKeyword("(",           "1.1010 ccc<paren> --", SkipToPar,     SkipToPar);
     AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
     AddKeyword(".(",          "1.1030 ccc) --",       EchoToPar,     noCompile);
     AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
