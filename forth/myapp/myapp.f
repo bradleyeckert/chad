@@ -11,7 +11,7 @@ include ../frame.f
 include ../numout.f
 include ../flash.f
 include ../ctea.f
-include ../bootload.f
+\ include ../bootload.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
@@ -19,7 +19,7 @@ include ../bootload.f
 :noname  ( error -- )  ?dup if $8000 io! then
 ; resolves exception
 
-later app
+\ later app
 
 \ Without flash memory, initializing data space with non-blanks is
 \ non-trivial. Cold boot starts out most of data space blank.
@@ -31,6 +31,7 @@ later app
 	[ dm-size state - cell / ] literal
 	for  0 over ! cell +  next  drop	\ erase most everything
 	dp !  decimal  fpclear				\ restore dp, base, frp
+    /profile
 \	app
 ; resolves cold
 
@@ -46,18 +47,40 @@ later app
 
 \ Try 25 fib, then stats
 
+0 [if]
+\ I was going to control flash loading from firmware in ROM.
+\ It's probably the wrong way.
+\ The next step past FPGA is ASIC, so target that.
+\ In an ASIC, you don't start with ROM. Too much risk.
+\ Code space is RAM and a FSM loads it from flash for you.
+\ Let's do the bootloader in hardware.
+
+\ Having that FSM changes strategies for dealing with flash.
+\ Time to put on the hardware hat.
+
 : source   tib tibs @ ;
 : /source  source >in @ /string ;
 : \source  /source  tibs @ >in ! ;
-: f\       \source  dup c,f write ;
+: f\       \source  dup >s dm>s ;
 
-0 flwp_en flash-wp		\ enable flash writing
-\ 4096 create-flash		\ put data in 4K page starting here
-\ f\ Hello World
-\ close-flash
+4096. S_W8 open-stream		\ put data in 4K page starting here
+f\ Hello World
+close-stream
 
-cm-writable torg		\ compile the app here
-: app  4096 open-flash ;
+cm-writable torg		    \ compile the app into code RAM
+:noname  s> emit ;
+: app  4096. S_R8 open-stream
+    s> literal times
+    close-stream
+;
+
+0. S_W16 open-stream		\ put code in 4K page starting here
+cm-writable there over - cm>s \ copy to flash
+close-stream
+
+save-flash hello.bin
+
+[then]
 
 .( Total instructions: ) there . cr
 \ 0 there dasm

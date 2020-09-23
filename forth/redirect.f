@@ -24,6 +24,8 @@ variable ScreenProfile                  \ 2.2100 -- addr
     ' _emit | ' _cr | ' _page
 ] literal ;
 
-' stdout_table ScreenProfile !  \ assign it
+: /profile  ['] stdout_table ScreenProfile ! ;
+
+/profile
 
 there swap - . .( instructions used by I/O redirect) cr

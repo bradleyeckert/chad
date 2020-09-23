@@ -20,7 +20,7 @@ tib |framestack| - equ frp0             \ bottom of frame stack
 
 : fpclear  frp0 frp ! ;                 \ 2.2900 --
 : >mem     _! cell + ;                  \ 2.2910 n a -- a'
-: mem>     cell - _@ dup@ ;             \ 2.2920 a -- a' n
+: mem>     cell - _@ _dup@ ;            \ 2.2920 a -- a' n
 
 \ Move data stack to memory
 \ "4 buf ds>mem" --> mem = x3 x2 x1 x0 4   trivial case: 0

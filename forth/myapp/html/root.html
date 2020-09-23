@@ -192,7 +192,7 @@ The return stack pointer field is left shifted by 8.
 Both are unsigned.
 </p>
 <a name="1.2730"></a>
-<h3><ref>1.2730:</ref> <chad>dup@</chad> <com><i>( addr -- addr x )</i></com></h3>
+<h3><ref>1.2730:</ref> <chad>_dup@</chad> <com><i>( addr -- addr x )</i></com></h3>
 
 <p>Ends a memory read operation while duplicating addr.
 It can immediately follow a <tok>_@</tok>.
@@ -637,6 +637,8 @@ Reserve <tok>n</tok> bytes of data space.
 <tok>c-addr</tok> is the address of the reserved byte.
 The program is responsible for initializing the contents.
 </p>
+<a name="1.1145"></a>
+<h3><ref>1.1145:</ref> <chad>2variable</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
 <a name="1.1140"></a>
 <h3><ref>1.1140:</ref> <chad>cvariable</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
 
@@ -920,6 +922,10 @@ The stack is printed between <tok>\</tok> and <tok>ok&gt;</tok>.
 <p>A synonym of constant that&apos;s guaranteed to not use any target resources
 for its definition. It creates a word that pushes x onto the stack.
 </p>
+<a name="1.0136"></a>
+<h3><ref>1.0136:</ref> <chad>save-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+<a name="1.0135"></a>
+<h3><ref>1.0135:</ref> <chad>load-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
 <a name="1.0130"></a>
 <h3><ref>1.0130:</ref> <chad>save-data</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
 
@@ -988,8 +994,16 @@ If the file can&apos;t be opened, display the line number.
 <p>The text input buffer, populated by <tok>chad</tok> before evaluating it.
 <tok>tib</tok> is placed at the very top of data memory.
 </p>
+<a name="1.0074"></a>
+<h3><ref>1.0074:</ref> <chad>state</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0073"></a>
+<h3><ref>1.0073:</ref> <chad>base</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0072"></a>
+<h3><ref>1.0072:</ref> <chad>dp</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0071"></a>
+<h3><ref>1.0071:</ref> <chad>tibs</chad> <com><i>( -- addr )</i></com></h3>
 <a name="1.0070"></a>
-<h3><ref>1.0070:</ref> <chad>dp</chad> <com><i>( -- addr )</i></com></h3>
+<h3><ref>1.0070:</ref> <chad>&gt;in</chad> <com><i>( -- addr )</i></com></h3>
 
 <p>A variable pointing to the next free byte in data space.
 </p>

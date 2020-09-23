@@ -51,6 +51,7 @@ int KbHit(void) {
 static uint32_t header_data;            // host API return data
 static uint16_t SPIresult;
 static uint8_t nohostAPI;               // prohibit access to host API
+static uint32_t codeaddr;
 
 static int termKey(void);
 static int termQkey(void);
@@ -79,6 +80,8 @@ uint32_t readIOmap (uint32_t addr) {
         return temp;
     case 5: 
         return SPIresult;               // get result
+    case 9:                             // read next code word
+        return chadReadCode(codeaddr++);
     case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }
@@ -90,7 +93,6 @@ uint32_t readIOmap (uint32_t addr) {
 
 // Code space is writable through this interface.
 void writeIOmap (uint32_t addr, uint32_t x) {
-    static codeaddr = 0;
     int r;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
@@ -113,10 +115,12 @@ void writeIOmap (uint32_t addr, uint32_t x) {
         break;
     case 5:
         FlashMemSPIformat(x);  break;
+    case 6: break;                      // SPI rate and device select
     case 8:                             // Start code writes here
         codeaddr = x;  break;           // addressing 16-bit instructions
     case 9:                             // write next code word
-        chadToCode(codeaddr++, x);  break;
+        chadToCode(codeaddr++, x);      // writable part of code space
+        break;
     case 12:
         TFTLCDwrite(x);
     case 0x8000:                        // trigger an error

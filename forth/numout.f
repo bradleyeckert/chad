@@ -7,7 +7,6 @@ decimal
 variable hld                            \ 2.3000 -- c-addr
 32 equ bl                               \ 2.3010 -- char
 
-: count   dup 1+ swap c@ ;              \ 2.3110 a u -- a+1 u-1
 : decimal 10 base ! ;
 : hex     16 base ! ;
 :noname   count emit ;  ( xt )          \ send string to output device

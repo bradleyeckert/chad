@@ -59,16 +59,16 @@ This is a good reason to make the bootloader hard to get into.
 
 The proposed primitives for writing to and reading from flash are:
 
-- `sector` *( -- a-addr )* Variable for the current flash sector number.
-- `fp` *( -- a-addr )* Variable for a 16-bit index into the 64 KB sector.
+- `stream-handle` *( -- a-addr )* Pointer to a 3-cell handle for the stream.
 - `open-stream` *( addr_lo addr_hi mode -- *) Open a stream.
-- `close-stream` *( -- )* Close the open stream.
+- `close-stream` *( -- )* Close the stream.
+- `resume-stream` *( -- )* Open the stream where it closed.
 - `>s` *( x -- )* Write x to stream, size depends on mode.
 - `s>` *( -- x )* Read x from stream, size depends on mode.
-- `dm>s` *( addr u -- )* Write `u` elements from data memory to stream.
-- `s>dm` *( addr u -- )* Read `u` elements from stream to data memory.
-- `cm>s` *( addr u -- )* Write `u` elements from code memory to stream.
-- `s>cm` *( addr u -- )* Read `u` elements from stream to code memory.
+- `dm>s` *( addr u -- )* Write `u` 16-bit words from data memory to stream.
+- `s>dm` *( addr u -- )* Read `u` 16-bit words from stream to data memory.
+- `cm>s` *( addr u -- )* Write `u` 16-bit words from code memory to stream.
+- `s>cm` *( addr u -- )* Read `u` 16-bit words from stream to code memory.
 
 ## Implementation
 
@@ -93,7 +93,7 @@ occurs before the SPI transfer is finished.
 - `retrig` is data read from the flash, triggering another read.
 - `format` sets chip select CSN to ~T\[0] and the format to T\[3:1].
 - `spitx` write triggers a SPI transfer.
-- `rate` sets the SPI clock rate `div` = T\[5:0].
+- `rate` sets the SPI clock rate `div` = T\[10:5].
 
 The format determines the width and format of the transfer:
 
@@ -127,8 +127,8 @@ The `result` is muxed from SR depending on the LSB of format:
 - 0: SR\[7:0].
 - 1: SR\[7:0]:SR\[15:8].
 
-The `rate` register sets the SPI clock rate `div` = T\[5:0] and
-a chip select decoder T\[7:6]. 
+The `rate` register sets the SPI clock rate `div` = T\[10:5] and
+a chip select decoder T\[4:3]. 
 It selects both the SCLK frequency and the CS line to use,
 so you can have multiple SPI devices on the same SPI bus.
 For example:

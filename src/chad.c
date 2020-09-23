@@ -1535,14 +1535,15 @@ CELL getUTF8(void) {
 // shareable. You can build a language with these, but it will only be usable
 // on the host.
 
-SV allot   (int n) { Data[dp] = n + Data[dp]; }
-SV buffer  (int n) { Dpush(Data[dp]);  Constant();  allot(n); }
-SV Buffer   (void) { buffer(Dpop()); }
-SV Cvariable(void) { buffer(1); }
-SV Align    (void) { Data[dp] = aligned(Data[dp]); }
-SV Variable (void) { Align();  buffer(CELLS); }
-SV Char     (void) { parseword(' ');  Dpush(getUTF8()); }
-SV BrackChar(void) { parseword(' ');  Literal(getUTF8()); }
+SV allot     (int n) { Data[dp] = n + Data[dp]; }
+SV buffer    (int n) { Dpush(Data[dp]);  Constant();  allot(n); }
+SV Buffer     (void) { buffer(Dpop()); }
+SV Cvariable  (void) { buffer(1); }
+SV Align      (void) { Data[dp] = aligned(Data[dp]); }
+SV Variable   (void) { Align();  buffer(CELLS); }
+SV Twovariable(void) { Variable();  allot(CELLS); }
+SV Char       (void) { parseword(' ');  Dpush(getUTF8()); }
+SV BrackChar  (void) { parseword(' ');  Literal(getUTF8()); }
 
 // Initialize the dictionary at startup
 
@@ -1618,6 +1619,7 @@ SV LoadKeywords(void) {
     AddKeyword("hex",         "1.1120 --",            Hex,           noCompile);
     AddKeyword("variable",    "1.1130 <name> --",     Variable,      noCompile);
     AddKeyword("cvariable",   "1.1140 <name> --",     Cvariable,     noCompile);
+    AddKeyword("2variable",   "1.1145 <name> --",     Twovariable,   noCompile);
     AddKeyword("buffer:",     "1.1150 n <name> --",   Buffer,        noCompile);
     AddKeyword("[char]",      "1.1160 <c> --",        noExecute,     BrackChar);
     AddKeyword("[",           "1.1170 --",            toImmediate, toImmediate);
@@ -1690,7 +1692,7 @@ SV LoadKeywords(void) {
     AddALUinst("dup>r",   "1.2700 x -- x | -- x",     TtoR               | rup);
     AddALUinst("rdrop",   "1.2710 -- | x --",                              rdn);
     AddALUinst("c+c",     "1.2720 u v -- u+v+c",      addc  | co   | sdn);
-    AddALUinst("dup@",    "1.2730 addr -- addr x",    read  | TtoN | sup);
+    AddALUinst("_dup@",   "1.2730 addr -- addr x",    read  | TtoN | sup);
     AddALUinst("spstat",  "1.2740 -- rp<<8|sp",       who   | TtoN | sup);
     AddALUinst("(R-1)@",  "1.2750 -- x-1 | x -- x",  RM1toT | TtoN | sup);
     AddALUinst("_next_",  "1.2760 n -- flag | x -- n", zeq  | TtoR);
@@ -1817,7 +1819,7 @@ int chad(char * line, int maxlength) {
                     int i = 0;   int radix = Data[base];   char c = 0;
                     if (radix == 0)
                         error = DIV_BY_ZERO;
-                    int64_t x = 0;  int cp = 0;  int neg = 0;
+                    int64_t x = 0;  int cp = -1;  int neg = 0;
                     switch (tok[0]) {   // leading digit
                         case '-': i++;  neg = -1;    break;
                         case '+': i++;               break;
@@ -1848,7 +1850,16 @@ bogus:                          error = UNRECOGNIZED;
                     }
                     if (neg) x = -x;
                     if (!error) {
-                        if (cp) {
+                        if (cp < 0) {
+                            x &= CELLMASK;
+                            if (Data[state]) {
+                                Literal((cell)x);
+                            }
+                            else {
+                                Dpush((cell)(x));
+                            }
+                        }
+                        else {
                             i = (x >> CELLBITS) & CELLMASK;
                             x &= CELLMASK;
                             if (Data[state]) {
@@ -1857,13 +1868,6 @@ bogus:                          error = UNRECOGNIZED;
                             } else {
                                 Dpush((cell)(x));
                                 Dpush((cell)(i));
-                            }
-                        } else {
-                            x &= CELLMASK;
-                            if (Data[state]) {
-                                Literal((cell)x);
-                            } else {
-                                Dpush((cell)(x));
                             }
                         }
                     }
@@ -1960,5 +1964,11 @@ void chadError (int32_t n) {
 
 uint64_t chadCycles(void) {
     return cycles;
+}
+
+uint16_t chadReadCode(uint32_t addr) {
+    uint16_t r = Code[addr & (CodeSize - 1)];
+    if (addr < CodeFence) r = 0;        // ROM is unreadable
+    return r;
 }
 

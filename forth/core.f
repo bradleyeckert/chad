@@ -11,8 +11,13 @@ later cold                              \ 2.0010 -- \ boots here
 later exception                         \ 2.0020 n --
 
 : noop  nop ;                           \ 2.0100 --
+
+\ The I/O is allowed to drop CKE on the processor.
+\ Allow for code memory to double-feed the instruction following the pause
+\ by putting a nop there. Such an allowance is not made for data memory.
 : io@   _io@ nop _io@_ ;                \ 2.0110 addr -- n
 : io!   _io! nop drop ;                 \ 2.0120 n addr --
+
 : =     xor 0= ;                        \ 2.0130 n1 n2 -- flag
 : <>     xor 0= 0= ;                    \ 2.0135 n1 n2 -- flag
 : <     - 0< ; macro                    \ 2.0140 n1 n2 -- flag
@@ -24,8 +29,8 @@ cell 4 = [if]
     : _cw!  \ end a c! or w!            \ u mask addr
         >r  swap over and               \ m u' | addr
         swap invert                     \ u' mask | addr
-        r@  _@ nop _@_  and  +
-        r>  _! nop drop
+        r@  _@ _@_  and  +
+        r>  _! drop
     ;
     : c! ( u c-addr -- )                \ 2.0180 c c-addr --
         dup>r 2 and if
@@ -40,7 +45,7 @@ cell 4 = [if]
         r> _cw!
     ;
     : c@                                \ 2.0200 c-addr -- c
-        _@ nop dup@
+        _@ _dup@
         over 1 and if swapb then
         swap 2 and if swapw then
         $FF and
@@ -49,8 +54,8 @@ cell 4 = [if]
   check_alignment [if]
     : (ta)  ( a mask -- a )
           over and if  22 invert exception  then ;
-    : @   3 (ta)  _@ nop _@_ ;          \ 2.0210 a-addr -- x
-    : !   3 (ta)  _! nop drop ;         \ 2.0200 x a-addr --
+    : @   3 (ta)  _@ _@_ ;              \ 2.0210 a-addr -- x
+    : !   3 (ta)  _! drop ;             \ 2.0200 x a-addr --
     : w!  ( u w-addr -- )               \ 2.0190 w addr --
         1 (ta)
         dup>r 2 and if  swapw  $FFFF0000
@@ -59,19 +64,19 @@ cell 4 = [if]
     ;
     : w@  ( w-addr -- u )               \ 2.0220 addr -- w
         1 (ta)
-        _@ nop dup@  swap 2 and if swapw then
+        _@ _dup@  swap 2 and if swapw then
         $FFFF and
     ;
   [else]
-    : @   _@ nop _@_ ;                  \ 2.0210 a-addr -- x
-    : !   _! nop drop ;                 \ 2.0200 x a-addr --
+    : @   _@ _@_ ;   macro              \ 2.0210 a-addr -- x
+    : !   _! drop ;  macro              \ 2.0200 x a-addr --
     : w! ( u c-addr -- )                \ 2.0190 w w-addr --
         dup>r 2 and if  swapw  $FFFF0000
         else  $FFFF  then
         r> _cw!
     ;
     : w@                                \ 2.0220 w-addr -- w
-        _@ nop dup@  swap 2 and if swapw then
+        _@ _dup@  swap 2 and if swapw then
         $FFFF and
     ;
   [then]
@@ -80,29 +85,29 @@ cell 4 = [if]
   check_alignment [if]
     : (ta)  over and if  22 invert exception  then ;
 	: w@  [ ;
-    : @   1 (ta)  _@ nop _@_ ;          \ 2.0210 a-addr -- x
+    : @   1 (ta)  _@ _@_ ;              \ 2.0210 a-addr -- x
 	: w!  [ ;
-    : !   1 (ta)  _! nop drop ;         \ 2.0200 x a-addr --
+    : !   1 (ta)  _! drop ;             \ 2.0200 x a-addr --
   [else]
 	: w@  [ ;
-    : @   _@ nop _@_ ;                  \ 2.0210 a-addr -- x
+    : @   _@ _@_ ; macro                \ 2.0210 a-addr -- x
 	: w!  [ ;
-    : !   _! nop drop ;                 \ 2.0200 x a-addr --
+    : !   _! drop ; macro               \ 2.0200 x a-addr --
   [then]
     : c! ( u c-addr -- )                \ 2.0180 c c-addr --
         dup>r 1 and if  swapb  $FF00  else  $FF  then
         swap over and                   \ m u' | addr
         swap invert                     \ u' mask | addr
-        r@ _@ nop _@_ and  +
-        r> _! nop drop
+        r@ _@ _@_ and  +
+        r> _! drop
     ;
     : c@                                \ 2.0200 c-addr -- c
-        _@ nop dup@  swap 1 and if swapb then
+        _@ _dup@  swap 1 and if swapb then
         $FF and
     ;
 [then]
 
-state cell + dp ! \ skip shared variables
+state cell + dp ! \ skip shared variables, new variables can now be defined.
 
 \ Your code can usually use + instead of OR, but if it's needed:
 : or    invert swap invert and invert ; \ 2.0300 n m -- n|m
@@ -119,6 +124,7 @@ state cell + dp ! \ skip shared variables
 : tuck   swap over ; macro              \ 2.0390 n1 n2 -- n2 n1 n2
 : +!     tuck @ + swap ! ;              \ 2.0400 n a-addr --
 
+\ This really comes in handy, although there is a small (9T) time penalty.
 : times                                 \ 2.0405 n xt --
     swap dup 1- 0< if  2drop exit  then \ do 0 times
     for  dup>r execute r>  next         \ do 1 or more times
@@ -205,7 +211,6 @@ state cell + dp ! \ skip shared variables
 : ,        align here !  cell allot ;   \ 2.0570 x --
 : c,       here c!  1 allot ;           \ 2.0580 c --
 
-\ We're about at 300 instructions at this point.
 \ Paul Bennett's recommended minimum word set is mostly present.
 \ DO, I, J, and LOOP are not included. Use for next r@ instead.
 \ CATCH and THROW are not included. They use stack.

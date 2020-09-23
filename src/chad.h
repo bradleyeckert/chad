@@ -18,6 +18,9 @@ int chad(char * line, int maxlength);
 // In real hardware, an I/O write can (maybe) write to code space.
 void chadToCode (uint32_t addr, uint32_t x);
 
+// Read from readable part of code space
+uint16_t chadReadCode(uint32_t addr);
+
 // Get data from the header structure so that Forth can reconstruct headers.
 uint32_t chadGetHeader (uint32_t select);
 

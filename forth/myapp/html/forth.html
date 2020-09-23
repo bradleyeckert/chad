@@ -15,12 +15,7 @@
 <hr>
 <h2>Definitions in instruction memory</h2>
 <hr>
-<!-- No reference for f\ -->
-<!-- No reference for \source -->
-<!-- No reference for /source -->
-<!-- No reference for source -->
 <!-- No reference for fib -->
-<!-- No reference for hi -->
 <!-- No reference for decipher -->
 <!-- No reference for encipher -->
 <!-- No reference for CTcalcB -->
@@ -30,92 +25,85 @@
 <!-- No reference for CTrounds -->
 <!-- No reference for CTdelta -->
 <!-- No reference for CTkey -->
-<!-- No reference for Bootloader -->
-<!-- No reference for BootDispatch -->
-<!-- No reference for SPIenable -->
-<!-- No reference for SPIboiler -->
-<!-- No reference for startSPI -->
-<!-- No reference for stopSPI -->
-<!-- No reference for setSPIlen -->
-<!-- No reference for readNSPI -->
-<!-- No reference for writeNSPI -->
-<!-- No reference for HexByte -->
-<!-- No reference for HexDigit -->
-<!-- No reference for BootKey -->
-<!-- No reference for BootEnabled -->
-<!-- No reference for SPIlength -->
-<!-- No reference for key -->
+<!-- No reference for loadcode -->
+<a name="2.4110"></a>
+<h3><ref>2.4110:</ref> <a href="../../flash.f">s&gt;cm</a> <com><i>( addr u -- )</i></com></h3>
+<a name="2.4100"></a>
+<h3><ref>2.4100:</ref> <a href="../../flash.f">cm&gt;s</a> <com><i>( addr u -- )</i></com></h3>
+<!-- No reference for _CodeAddr -->
 <a name="2.4090"></a>
-<h3><ref>2.4090:</ref> <a href="../../flash.f">read</a> <com><i>( c-addr u -- )</i></com></h3>
-<a name="2.4045"></a>
-<h3><ref>2.4045:</ref> <a href="../../flash.f">write</a> <com><i>( c-addr u -- )</i></com></h3>
+<h3><ref>2.4090:</ref> <a href="../../flash.f">s&gt;dm</a> <com><i>( addr u -- )</i></com></h3>
+<a name="2.4080"></a>
+<h3><ref>2.4080:</ref> <a href="../../flash.f">dm&gt;s</a> <com><i>( addr u -- )</i></com></h3>
+
+<p>End the read command.
+</p>
+<a name="2.4070"></a>
+<h3><ref>2.4070:</ref> <a href="../../flash.f">s&gt;</a> <com><i>( -- c )</i></com></h3>
+
+<p>Read the next byte from flash.
+</p>
 <a name="2.4060"></a>
-<h3><ref>2.4060:</ref> <a href="../../flash.f">read[</a> <com><i>( fa -- )</i></com></h3>
+<h3><ref>2.4060:</ref> <a href="../../flash.f">&gt;s</a> <com><i>( n -- )</i></com></h3>
 
 <p>Start reading flash at address <tok>sector&lt;&lt;16+addr</tok>.
 </p>
+<!-- No reference for ?end-page -->
+<a name="2.4050"></a>
+<h3><ref>2.4050:</ref> <a href="../../flash.f">close-stream</a> <com><i>( -- )</i></com></h3>
+
+<p>End the page program command.
+</p>
 <a name="2.4040"></a>
-<h3><ref>2.4040:</ref> <a href="../../flash.f">&gt;f</a> <com><i>( c -- )</i></com></h3>
+<h3><ref>2.4040:</ref> <a href="../../flash.f">open-stream</a> <com><i>( addr_lo addr_hi mode -- )</i></com></h3>
 
 <p>Append a byte to flash and bump <tok>fp</tok>.
 </p>
-<!-- No reference for bump_fp -->
 <a name="2.4030"></a>
-<h3><ref>2.4030:</ref> <a href="../../flash.f">write[</a> <com><i>( fa -- )</i></com></h3>
+<h3><ref>2.4030:</ref> <a href="../../flash.f">resume-stream</a> <com><i>( -- )</i></com></h3>
 
 <p>Set <tok>fp</tok> = <tok>fa</tok>.
 If <tok>addr</tok> is at a 4KB boundary, erase the sector.
 Start a page write at address <tok>sector&lt;&lt;16+addr</tok>. 
 </p>
-<!-- No reference for erase4K -->
-<!-- No reference for is256? -->
-<!-- No reference for is4K? -->
-<!-- No reference for mask16b -->
-<a name="2.4070"></a>
-<h3><ref>2.4070:</ref> <a href="../../flash.f">f&gt;</a> <com><i>( c -- )</i></com></h3>
-
-<p>Read the next byte from flash.
-</p>
-<a name="2.4050"></a>
-<h3><ref>2.4050:</ref> <a href="../../flash.f">]write</a> <com><i>( -- )</i></com></h3>
-
-<p>End the page program command.
-</p>
+<!-- No reference for SDRsize -->
+<!-- No reference for 4Kpage? -->
+<!-- No reference for pagebreak -->
+<!-- No reference for 256page? -->
+<!-- No reference for erase4Ksec -->
 <!-- No reference for sendaddr24 -->
 <!-- No reference for waitflash -->
+<!-- No reference for /flash -->
+<!-- No reference for fc> -->
+<!-- No reference for _fc> -->
 <!-- No reference for fl_wrdi -->
 <!-- No reference for fl_wren -->
-<a name="2.4080"></a>
-<h3><ref>2.4080:</ref> <a href="../../flash.f">]read</a> <com><i>( -- )</i></com></h3>
-
-<p>End the read command.
-</p>
+<!-- No reference for ]SPI -->
 <!-- No reference for sendSPI -->
-<!-- No reference for SPIcommand -->
+<!-- No reference for SPI[ -->
 <!-- No reference for readSPI -->
+<!-- No reference for stream-cell -->
+<!-- No reference for stream-ptr -->
+<!-- No reference for stream-mode -->
+<!-- No reference for stream-parms -->
 <a name="2.4020"></a>
-<h3><ref>2.4020:</ref> <a href="../../flash.f">flash-wp</a> <com><i>( sector key -- )</i></com></h3>
+<h3><ref>2.4020:</ref> <a href="../../flash.f">stream-handle</a> <com><i>( -- a-addr )</i></com></h3>
 
 <p>Set the first writable 64KB flash sector.
 Ignored if <tok>key</tok> doesn&apos;t match flwp_en.
 </p>
 <a name="2.4010"></a>
-<h3><ref>2.4010:</ref> <a href="../../flash.f">fp</a> <com><i>( -- a-addr )</i></com></h3>
+<h3><ref>2.4010:</ref> <a href="../../flash.f">qe-flag</a> <com><i>( -- a-addr )</i></com></h3>
 
 <p>Variable for a 16-bit index into the 64 KB sector.
 </p>
-<a name="2.4000"></a>
-<h3><ref>2.4000:</ref> <a href="../../flash.f">sector</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p>Variable for the current flash sector number.
-</p>
-<!-- No reference for fwren1 -->
-<!-- No reference for fwren0 -->
-<a name="2.4021"></a>
-<h3><ref>2.4021:</ref> <a href="../../flash.f">flwp_en</a> <com><i>( -- x )</i></com></h3>
-
-<p>The <tok>key</tok> to enable flash-wp. Usage is <tok>flwp_en flash-wp</tok>.
-</p>
+<!-- No reference for S_W16 -->
+<!-- No reference for S_R16 -->
+<!-- No reference for S_W8 -->
+<!-- No reference for S_R8 -->
+<!-- No reference for CodeData -->
+<!-- No reference for CodeAddr -->
+<!-- No reference for SPIrate -->
 <!-- No reference for SPIformat -->
 <!-- No reference for SPIdata -->
 <a name="2.3320"></a>
@@ -248,13 +236,6 @@ c-addr and u. The output device should handle UTF-8 as a standard.
 </p>
 <!-- No reference for hex -->
 <!-- No reference for decimal -->
-<a name="2.3110"></a>
-<h3><ref>2.3110:</ref> <a href="../../numout.f">count</a> <com><i>( a u -- a+1 u-1 )</i></com></h3>
-
-<p>Convert a counted string to an address and a length.
-A counted string consists of a 1-byte length value (0 to 255)
-along with that many byte-wide characters in data space.
-</p>
 <a name="2.3010"></a>
 <h3><ref>2.3010:</ref> <a href="../../numout.f">bl</a> <com><i>( -- char )</i></com></h3>
 
@@ -313,6 +294,7 @@ The return stack is emptied except for one cell to keep the sim running.
 <!-- No reference for frp1 -->
 <!-- No reference for frp -->
 <!-- No reference for |framestack| -->
+<!-- No reference for /profile -->
 <!-- No reference for stdout_table -->
 <!-- No reference for _page -->
 <!-- No reference for esc[x -->
@@ -353,6 +335,9 @@ The actions in a table are:
 
 <p>8-bit UART output buffer.
 </p>
+<!-- No reference for 2+! -->
+<!-- No reference for 2! -->
+<!-- No reference for 2@ -->
 <a name="2.1120"></a>
 <h3><ref>2.1120:</ref> <a href="../../coreext.f">rshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
 
@@ -369,6 +354,10 @@ Put zeroes into the least significant bits vacated by the shift.
 An ambiguous condition exists if u is greater than or equal to
 the number of bits in a cell.
 </p>
+<a name="2.1210"></a>
+<h3><ref>2.1210:</ref> <a href="../../coreext.f">xcount</a> <com><i>( a u1 -- a+cell u2 )</i></com></h3>
+<a name="2.1200"></a>
+<h3><ref>2.1200:</ref> <a href="../../coreext.f">count</a> <com><i>( a -- a+1 c )</i></com></h3>
 <a name="2.1100"></a>
 <h3><ref>2.1100:</ref> <a href="../../coreext.f">third</a> <com><i>( x1 x2 x3 -- x1 x2 x3 x1 )</i></com></h3>
 
@@ -635,31 +624,6 @@ Other stack effects are due to the word <tok>execute</tok>d
 In <tok>chad</tok>, <tok>or</tok> is made of <tok>invert</tok> and <tok>and</tok> instructions.
 Most code can get by with <tok>+</tok> instead, if speed matters.
 </p>
-<a name="2.0542"></a>
-<h3><ref>2.0542:</ref> <a href="../../core.f">tibs</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p>The number of characters in the input buffer.
-</p>
-<a name="2.0541"></a>
-<h3><ref>2.0541:</ref> <a href="../../core.f">&gt;in</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p>An index into the <tok>tib</tok> input buffer.
-</p>
-<a name="2.0540"></a>
-<h3><ref>2.0540:</ref> <a href="../../core.f">state</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p><tok>a-addr</tok> is the address of a cell containing the compilation-state flag.
-<tok>state</tok> is true when in compilation state, false otherwise.
-</p>
-
-<p>Note: A program shall not directly alter the contents of <tok>state</tok>.
-</p>
-<a name="2.0530"></a>
-<h3><ref>2.0530:</ref> <a href="../../core.f">base</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p><tok>a-addr</tok> is the address of a cell containing the current
-number-conversion radix {2 ... 36}.
-</p>
 <a name="2.0200"></a>
 <h3><ref>2.0200:</ref> <a href="../../core.f">c@</a> <com><i>( c-addr -- c )</i></com></h3>
 
@@ -675,11 +639,13 @@ number-conversion radix {2 ... 36}.
 
 <p>Store <tok>x</tok> at a-addr.
 </p>
+<!-- No reference for w! -->
 <a name="2.0210"></a>
 <h3><ref>2.0210:</ref> <a href="../../core.f">@</a> <com><i>( a-addr -- x )</i></com></h3>
 
 <p><tok>x</tok> is the value stored at a-addr.
 </p>
+<!-- No reference for w@ -->
 <a name="2.0170"></a>
 <h3><ref>2.0170:</ref> <a href="../../core.f">cells</a> <com><i>( n1 -- n2 )</i></com></h3>
 

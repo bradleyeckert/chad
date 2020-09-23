@@ -1,157 +1,149 @@
-\ SPI flash
+\ SPI flash memory interface                                    9/22/20 BNE
 
 there
 
 \ I/O registers       Read        Write
 4 equ SPIdata       \ retrig      spitx
 5 equ SPIformat     \ result      format
+6 equ SPIrate       \             rate
+8 equ CodeAddr      \             cmaddr
+9 equ CodeData      \ cmdata      cmdata
 
-27182 equ flwp_en   \ 2.4021 -- x\ enable for flash-wp.
+0 equ S_R8                              \ 8-bit read mode
+1 equ S_W8                              \ 8-bit write mode
+2 equ S_R16                             \ 16-bit read mode
+3 equ S_W16                             \ 16-bit write mode
 
-variable fwren0     \ lowest 64K sector number, set by `fwall`
-variable fwren1     \ inverse of fwren0, used as a backup. Must be ~fwren0.
-variable qe-flag    \ 2.4015 -- a-addr
+variable qe-flag                        \ 2.4010 -- a-addr
+variable stream-handle                  \ 2.4020 -- a-addr
+3 cells buffer: stream-parms
+: stream-mode stream-handle @ ;
+: stream-ptr  stream-handle @ cell+ ;
+: stream-cell stream-mode @ 2 and 2/ 1 + ; \ -- n \ bytes per stream element
 
-\ Note: This will be totally re-written to match the .md file.
+: readSPI     SPIformat io@ ;           \ -- c \ result of transfer
+: SPI[        1 SPIformat io! [ ;       \ c -- \ activate CS line and send byte
+: sendSPI     SPIdata io! ;             \ c -- \ transmit an SPI byte
+: ]SPI        0 SPIformat io! ;         \ end SPI cycle
+: fl_wren     6 SPI[ ]SPI ;             \ write enable
+: fl_wrdi     4 SPI[ ]SPI ;             \ write disable
+: _fc>        0 sendSPI  readSPI ;      \ -- c \ read next flash byte
+: fc>         SPIdata io@ ;             \ -- c \ read and trigger flash
 
-8 2* cells equ |flashstack|
-variable flsp                           \ flash stack pointer
-|flashstack| buffer: flashstack
-
-0 equ FL_R8                             \ 8-bit read mode
-1 equ FL_R16                            \ 16-bit read mode
-2 equ FL_W8                             \ 8-bit write mode
-3 equ FL_W16                            \ 16-bit write mode
-
-\ Flash status uses a stack of:
-\ 1 byte: mode = {read8, read16, write8, write16}       <-- flsp
-\ 1 byte: sector = current 64K sector                   <-- flsp+1
-\ 2 bytes: fp = flash pointer, next byte to read/write  <-- flsp+2
-
-: pushFL  \ fp sector mode --
-    4 flsp +!                           \ pre-increment SP
-    flsp @  tuck c!  1+
-    tuck c!  2 +  w!
-;
-
-: FLsector  flsp @ 1+ ;                 \ -- c-addr \ current 64K sector
-: FLdp      flsp @ 2 + ;                \ -- a-addr \ current byte in sector
-
-: flash-wp                              \ 2.4020 sector key --
-    flwp_en xor if  drop exit  then
-    dup fwren0 !  invert fwren1 !
-;
-
-: readSPI    \ -- c \ result of transfer
-    SPIformat io@
-;
-
-: SPIcommand  1 SPIformat io! [ ;       \ c --\ activate CS line
-: sendSPI     SPIdata io! ;             \ c --\ transmit an SPI byte
-: ]read       0 SPIformat io! ;         \ 2.4080 --\ end read
-: fl_wren     6 SPIcommand ]read ;      \ write enable
-: fl_wrdi     4 SPIcommand ]read ;      \ write disable
-: _fc>        0 sendSPI  readSPI ;      \ 2.4070 -- c\ read next flash byte
-: fc>         SPIdata io@ ;             \ 2.4071 -- c\ read and trigger flash
-: FLdepth     flsp @  [ flashstack 4 - ] literal  2/ 2/ ; \ -- depth
-
-\ Initialize the flash: Clear the flash stack and read the QE bit
-: /flash      \ --
-    [ flashstack 4 - ] literal flsp !   \ clear flash stack
-    53 SPIcommand  _fc>  2 and qe-flag ! ]read \ upper status byte
-    0 flwp_en flash-wp                  \ enable writes to 0
+\ Initialize the flash: Read the QE bit and provide a handle
+: /flash            \ --
+    53 SPI[  _fc>  2 and qe-flag ! ]SPI \ upper status byte
+    stream-parms stream-handle !        \ set up a default handle
 ;
 
 /flash
 
-: waitflash   \ --                      \ wait for write or erase to finish
-    5 SPIcommand
-    begin  _fc> 1 and  while  noop  repeat ]read
+: waitflash         \ --                \ wait for write or erase to finish
+    5 SPI[
+    begin  _fc> 1 and  while  noop  repeat ]SPI
 ;
 
-: sendaddr24  \ addr --                 \ send address using 3 bytes
-    FLsector c@ sendSPI
-    dup swapb sendSPI  sendSPI
-;
+\ Cell size dependency: expects 18-bit cells.
+\ Send a 24-bit address using 3 bytes. May use QSPI mode.
 
-: mask16b  65535 and ;                  \ x -- x16
+: sendaddr24        \ --                \ send address using 3 bytes
+    stream-ptr 2@
+    2* 2*  over swapw +  sendSPI
+    dup swapb sendSPI    sendSPI
+;
+: erase4Ksec fl_wren 32 SPI[ sendaddr24 ]SPI ;
+: 256page?   255 [ ;                    \ -- flag
+: pagebreak  stream-ptr cell + @  and 0= ; \ mask -- flag
+: 4Kpage?    4095 pagebreak ;           \ -- flag
 
-: is4K?  \ fa -- fa flag \ is the pointer at a new sector?
-    dup 4095 and 0=
-;
-: is256?  \ fa -- fa flag \ is the pointer at a new page?
-    dup 255 and 0=
-;
-: erase4K  \ fa -- fa \ erase the 4K sector here
-    fl_wren  32 SPIcommand  dup sendaddr24  ]read
-;
-
-\ Open the flash memory for writing. The Page Program (02 command)
-\ is used for programming flash.
-: create-flash  \ 2.4030 fa --
-    fwren0 @  dup invert
-    fwren1 @   <> -81 and exception     \ corrupted wall
-    FLsector c@ < -82 and exception     \ under the wall
-    dup FLdp !  waitflash
-    is4K? if erase4K then
-    fl_wren  2 SPIcommand  sendaddr24   \ start page write
-;
-: close-flash  \ 2.4050 --\ end write
-    ]read  fl_wrdi                      \ end the current flash operation
-    -4 flsp +!                          \ un-nest to previous flash operation
-    FLdepth if                          \ was there something going on before?
+: SDRsize           \ --                \ Set SDR transfer size
+    stream-mode @ 2 and if
+        3 SPIformat io!                 \ 16-bit single-rate SPI
     then
-;
-: bump_fp  \ -- fa \ Bump flash pointer by 1, wrap at 64K boundary
-    FLdp @  dup mask16b                   ( fa fa16 )
-    65535 = if 1 sector +! then         \ bump sector if fp will wrap
-    1+  mask16b  dup FLdp !             \ bump fp
-;
-
-\ Write a byte to the next free space in flash. The 256-byte Page Program
-\ is managed so as to freely cross into subsequent pages and sectors.
-: c,f      \ 2.4040 c --\ Write next byte to flash
-    sendSPI  bump_fp
-    is256? if  close-flash      then    \ end write at end of page
-    is4K?  if  erase4K     then
-    is256? if  dup create-flash  then   \ start a new page
-    drop
 ;
 
 \ formats:
-\ 000 = 8-bit SPI
-\ 001 = 16-bit SPI
-\ 100 = 8-bit QSPI mode receive
-\ 101 = 16-bit QSPI mode receive
-\ 110 = 8-bit QSPI mode transmit
-\ 111 = 16-bit QSPI mode transmit
+\ 0001 = 8-bit SPI
+\ 0011 = 16-bit SPI
+\ 1001 = 8-bit QSPI mode receive
+\ 1011 = 16-bit QSPI mode receive
+\ 1101 = 8-bit QSPI mode transmit
+\ 1111 = 16-bit QSPI mode transmit
 
+\ Start a SPI transfer based on stream-mode.
 \ Note that the QE bit in the status register must be programmed to '1'
 \ for quad rate commands to work. See the flash data sheet.
-\ Flash read can be in bytes or 16-bit words. The default mode is bytes.
-
-: open-flash  \ fa --
-    waitflash
-    qe-flag @ if
-        $EB SPIcommand                  \ EB single
-        13 SPIformat io!                \ 8-bit QSPI transmit
-        sendaddr24  0 sendSPI           \ 32-bit address and mode, QSPI
-        11 SPIformat io!                \ 16-bit QSPI receive:
-        0 sendSPI                       \ 4 beat dummy
-        9 SPIformat io!                 \ 8-bit QSPI receive:
+: resume-stream     \ 2.4030 --
+    stream-mode @
+    dup SPIrate io!                     \ set SCLK frequency and SPI device
+    1 and if
+        4Kpage? if erase4Ksec then
+        fl_wren   2 SPI[  sendaddr24    \ start page write
+        SDRsize
     else
-        11 SPIcommand  sendaddr24
-        0 sendSPI
+        qe-flag @ if
+            $EB SPI[                    \ EB single
+            13 SPIformat io!            \ 8-bit QSPI transmit
+            sendaddr24  0 sendSPI       \ 24-bit address and mode, QSPI
+            11 SPIformat io!            \ 16-bit QSPI receive:
+            0 sendSPI                   \ 4-beat dummy
+            stream-mode @ 2 and 0= if
+                9 SPIformat io!         \ 8-bit QSPI receive:
+            then
+        else
+            11 SPI[  sendaddr24
+            0 sendSPI  SDRsize
+        then
+        0 sendSPI                       \ first read
     then
-    0 sendSPI                           \ first 8-bit read
 ;
 
-\ : fw>    SPIdata io@ swapb ;          \ 2.4071 -- w\ read next flash word
+: open-stream                           \ 2.4040 addr_lo addr_hi mode --
+    stream-mode !  stream-ptr 2!
+    resume-stream
+;
+: close-stream                          \ 2.4050 --
+    ]SPI
+    stream-mode @ 1 and if  waitflash  fl_wrdi  then
+;
 
-\ Single rate string write and read
-:noname  count c,f ;                    \ Write string to flash
-: write  literal times  drop ;          \ 2.4045 c-addr u --
-:noname  fc> over c! char+ ;            \ Read string from flash
-: read   literal times  drop ;          \ 2.4090 c-addr u --
+: ?end-page         \ --
+    256page? if
+        close-stream                    \ end the 256-byte page
+        4Kpage? if  erase4Ksec  waitflash  then
+        resume-stream                   \ start a new page
+    then
+;
+
+\ Write element to the next free space in flash.
+: >s       \ 2.4060 n --\ Write next element to flash
+    sendSPI  stream-cell stream-ptr 2+!
+    ?end-page
+;
+: s>       \ 2.4070 -- c\ read and trigger flash
+    fc> stream-cell stream-ptr 2+!
+;
+
+:noname   count >s ;                    \ Write data bytes to stream
+: dm>s    literal times  drop ;         \ 2.4080 addr u --
+:noname   s> over c! char+ ;            \ Read data bytes from stream
+: s>dm    literal times  drop ;         \ 2.4090 addr u --
+: _CodeAddr  swap CodeAddr io! ;
+:noname   CodeData io@ >s ;             \ Write code cells to stream
+: cm>s    _CodeAddr  literal times ;    \ 2.4100 addr u --
+:noname   s> CodeData io! ;             \ Read code cells from stream
+: s>cm    _CodeAddr  literal times ;    \ 2.4110 addr u --
+
+\ Load an app into code RAM based on boilerplate.
+\ w16 contents
+\  0: c0de
+\  1: destination
+\  2: length
+\  3: checksum (to be added)
+
+: loadcode  ( d-fa -- )
+    S_R16 open-stream
+;
+
 
 there swap - . .( instructions used by flash access) cr
