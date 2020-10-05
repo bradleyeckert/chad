@@ -62,11 +62,14 @@
 
 </font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0260" style="text-decoration: none; color: #00AAAA">[if]</a> 
 \ I was going to control flash loading from firmware in ROM. 
-\ It's probably not the right way. 
+\ It's probably the wrong way. 
 \ The next step past FPGA is ASIC, so target that. 
 \ In an ASIC, you don't start with ROM. Too much risk. 
 \ Code space is RAM and a FSM loads it from flash for you. 
 \ Let's do the bootloader in hardware. 
+
+\ Having that FSM changes strategies for dealing with flash. 
+\ Time to put on the hardware hat. 
 
 : source  &nbsp;tib tibs @ ; 
 : /source  source >in @ /string ; 

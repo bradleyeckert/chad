@@ -265,23 +265,16 @@ SI CPUsim(int single) {
                 break;                                              /*   ><16 */
             case 0x08: sum = (sum_t)s + (sum_t)t;
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    T+N */
-            case 0x18: sum = (sum_t)s + (sum_t)t + cy;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*   T+Nc */
             case 0x09: sum = (sum_t)s - (sum_t)t;
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    N-T */
-            case 0x19: sum = ((sum_t)s - (sum_t)t) - cy;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*   N-Tc */
-            case 0x0A: _t = (t) ? 0 : -1;                    break; /*    T0= */
-//          case 0x0B: _t = s >> (t & CELL_AMASK);           break; /*   N>>T */
-//          case 0x0C: _t = s << (t & CELL_AMASK);           break; /*   N<<T */
-
-            case 0x0D: _t = Rstack[RP];                      break; /*      R */
-            case 0x1D: _t = Rstack[RP] - 1;                  break; /*    R-1 */
-            case 0x0E: _t = Data[Raddr];
+            case 0x0A: _t = Rstack[RP];                      break; /*      R */
+            case 0x0B: _t = Rstack[RP] - 1;                  break; /*    R-1 */
+            case 0x0C: _t = readIOmap(t);                    break; /*  io[T] */
+            case 0x0D: _t = Data[Raddr];
                 if (verbose & VERBOSE_TRACE) {
                     printf("Reading %Xh from cell %Xh\n", _t, Raddr);
                 } break;                                            /*    [T] */
-            case 0x1E: _t = readIOmap(t);                    break; /*  io[T] */
+            case 0x0E: _t = (t) ? 0 : -1;                    break; /*    T0= */
             case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
             }
@@ -965,6 +958,11 @@ static char* RefPath(char* filename) {  // convert filename format
     buf[strlen(buf)] = '\0';
     return buf;
 }
+
+// Industry consensus is that utf-8 files should not need a BOM, which is a
+// Microsoft hack. Try to use an editor that treats files as utf-8 by default.
+// Maybe SwallowBOM should be removed to punish users for putting a BOM in their
+// files, but I'm not going to be the BOM police.
 
 SV SwallowBOM(FILE *fp) {               // swallow leading UTF8 BOM marker
     char BOM[4];                        // to support utf-8 files on Windows
@@ -1691,7 +1689,6 @@ SV LoadKeywords(void) {
     AddALUinst("over-",   "1.2690 u v -- u u-v",      sub   | co);
     AddALUinst("dup>r",   "1.2700 x -- x | -- x",     TtoR               | rup);
     AddALUinst("rdrop",   "1.2710 -- | x --",                              rdn);
-    AddALUinst("c+c",     "1.2720 u v -- u+v+c",      addc  | co   | sdn);
     AddALUinst("_dup@",   "1.2730 addr -- addr x",    read  | TtoN | sup);
     AddALUinst("spstat",  "1.2740 -- rp<<8|sp",       who   | TtoN | sup);
     AddALUinst("(R-1)@",  "1.2750 -- x-1 | x -- x",  RM1toT | TtoN | sup);
@@ -1737,9 +1734,7 @@ SV LoadKeywords(void) {
     AddModifier("><",       "1.6130 n1 -- n2",  swapb );
     AddModifier("><16",     "1.6140 n1 -- n2",  swapw );
     AddModifier("T+N",      "1.6150 n1 -- n2",  add  );
-    AddModifier("T+Nc",     "1.6160 n1 -- n2",  addc );
     AddModifier("N-T",      "1.6170 n1 -- n2",  sub  );
-    AddModifier("N-Tc",     "1.6180 n1 -- n2",  subc );
     AddModifier("T0=",      "1.6190 n1 -- n2",  zeq );
 //  AddModifier("N>>T",     "1.6200 n1 -- n2",  shr  );
 //  AddModifier("N<<T",     "1.6210 n1 -- n2",  shl  );

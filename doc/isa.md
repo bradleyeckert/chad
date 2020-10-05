@@ -15,7 +15,7 @@ The result is the Chad ISA.
     x = unused
     p = 5-bit ALU operation select
     R = return
-    w = strobe select {-, TN, TR, wr, iow, ior, co, TW}
+    w = strobe select
     r = return stack displacement
     s = data stack displacement
 100nnnnn nnnnnnnn = jump
@@ -49,17 +49,13 @@ The `insn[12:8]` field of the ALU instruction is:
 - x_0110: `T&N` T = N & T
 - 0_0111: `><` T = swapped bytes: Even and Odd bytes swapped.
 - 1_0111: `><16` T = swapped words: Even and Odd 16-bit words swapped.
-- 0_1000: `T+N` T = N + T
-- 1_1000: `T+Nc` T = N + T + carry
-- 0_1001: `N-T` T = N - T
-- 1_1001: `N-Tc` T = N - T - carry
-- x_1010: `T0=` T = -1 if T = 0 else 0
-- x_1011: Unused
-- x_1100: Unused
-- 0_1101: `R` T = R
-- 1_1101: `R-1` T = R - 1
-- 0_1110: `[T]` T = mem_din
-- 1_1110: `io[T]` T = io_din
+- x_1000: `T+N` T = N + T
+- x_1001: `N-T` T = N - T
+- x_1010: `R` T = R
+- x_1011: `R-1` T = R - 1
+- x_1100: `io[T]` T = io_din
+- x_1101: `[T]` T = mem_din
+- x_1110: `T0=` T = -1 if T = 0 else 0
 - x_1111: `status` T = status: T\[9:5] = Rdepth; T\[4:0] = Depth, T\[15:10] = ID
 
 The `insn[8]` bit of the ALU instruction is:

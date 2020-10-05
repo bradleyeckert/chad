@@ -1,0 +1,93 @@
+// Unbuffered UART with FIFO-compatible interface               10/2/2020
+// License: This code is a gift to the divine.
+
+`default_nettype none
+module uart
+(
+  input wire            clk,
+  input wire            arstn,          // async reset (active low)
+  output reg            ready,     	// Ready for next byte to send
+  input wire            wr,        	// UART transmit strobe
+  input wire  [7:0]     din,      	// UART transmit data
+  output reg            full,      	// UART has received a byte
+  input wire            rd,        	// UART received strobe
+  output reg  [7:0]     dout,        	// UART received data
+  input wire  [15:0]    bitperiod,      // Clocks per serial bit
+  input wire            rxd,            // Async input
+  output reg            txd
+);
+
+// Synchronize RXD with 3-flop CDC
+  reg rxdi, rxda, rxdb;
+  always @(posedge clk or negedge arstn)
+  if (!arstn) begin
+    rxdi <= 1'b0;  rxda <= 1'b0;  rxdb <= 1'b0;
+  end else begin
+    rxdi <= rxdb;  rxdb <= rxda;  rxda <= rxd;
+  end
+
+// Baud rate is BPS = clk/bitperiod. Example: 100M/868 = 115200 BPS.
+  reg [11:0] baudint;
+  reg [3:0] baudfrac;
+  reg tick;
+  always @(posedge clk or negedge arstn)
+  if (!arstn) begin
+    baudint <= 12'd0;  tick <= 1'b0;
+    baudfrac <= 4'd0;
+  end else begin
+    tick <= 1'b0;
+    if (baudint)
+      baudint <= baudint - 12'd1;
+    else begin
+      tick <= 1'b1;
+      if (bitperiod[3:0] > baudfrac)    // fractional divider:
+           baudint <= bitperiod[15:4];  // stretch by Frac/16 clocks
+      else baudint <= bitperiod[15:4] - 12'd1;
+      baudfrac <= baudfrac + 4'd1;      // 16 ticks/bit
+    end
+  end
+
+  reg tnext, error;
+  wire startbit = ~rxdi & ~error;
+
+// UART
+  reg [7:0] txstate, rxstate, txreg, rxreg;
+  always @(posedge clk or negedge arstn)
+  if (!arstn) begin
+    txstate <= 8'd0;  txreg <= 8'd0;  tnext <= 1'b0;
+    rxstate <= 8'd0;  rxreg <= 8'd0;  error <= 1'b0;
+    dout <=    8'd0;  txd <= 1'b1;    ready <= 1'b1;  full <= 1'b0;
+  end else begin
+    if (tick) begin
+// Transmitter
+      txd <= tnext;
+      if (txstate) begin
+        if (!txstate[3:0])
+          {txreg, tnext} <= {1'b1, txreg[7:0]};
+        txstate <= txstate - 8'd1;
+      end else ready <= 1'b1;
+// Receiver
+      if (rxstate) begin
+        if (!rxstate[3:0])
+          case (rxstate[7:4])
+          4'b1010:
+            if (rxdi) rxstate <= 8'd0;  // false start
+          4'b0001:
+            if (rxdi) {dout, full} <= {rxreg, 1'b1};
+            else  error <= 1'b1;        // '0' at the stop bit (or BREAK)
+          default:
+            rxreg <= {rxdi, rxreg[7:1]};
+          endcase
+        rxstate <= rxstate - 8'd1;
+      end else begin
+        error <= error & ~rxdi;         // stop or mark ('1') clears error
+        if (startbit) rxstate <= 8'hA8; // will be sampled mid-bit
+      end
+    end
+    if (rd) full <= 1'b0;               // reading clears full
+    if (wr) begin                       // retrigger transmission
+      txreg <= din;      tnext <= 1'b0;
+      txstate <= 8'hAF;  ready <= 1'b0; // n,8,1
+    end
+  end
+endmodule

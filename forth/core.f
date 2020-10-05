@@ -175,7 +175,7 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 
 : *     um* drop ;                      \ 2.0430 n1 n2 -- n3
 : dnegate                               \ 2.0440 d -- -d
-        invert swap invert 1 +c swap 0 c+c ;
+        invert swap invert 1 +c swap carry + ;
 : abs   dup 0< if negate then ;         \ 2.0450 n -- u
 : dabs  dup 0< if dnegate then ;        \ 2.0460 d -- ud
 
@@ -217,9 +217,9 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 \ DOES> needs a compilable CREATE.
 
 : u<     -c drop carry 0= 0= ;          \ 2.0700 u1 u2 -- flag
-: min    over over- 0< if               \ 2.0710 n1 n2 -- n3
+: min    2dup- 0< if                    \ 2.0710 n1 n2 -- n3
          swap drop exit then  drop ;
-: max    over over- 0< if               \ 2.0720 n1 n2 -- n3
+: max    2dup- 0< if                    \ 2.0720 n1 n2 -- n3
          drop exit then  swap drop ;
 
 CODE depth                              \ 2.0730 -- +n
