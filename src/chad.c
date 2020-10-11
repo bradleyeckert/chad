@@ -44,9 +44,10 @@ SI error;                               // simulator and interpreter error code
 // Shared variables
 #define toin  0                         // pointer to next character
 #define tibs  1                         // chars in input buffer
-#define dp    2                         // define shared variables
-#define base  3                         // use cells not bytes for compatibility
-#define state 4                         // define cell addresses
+#define atib  2                         // address of input buffer
+#define dp    3                         // define shared variables
+#define base  4                         // use cells not bytes for compatibility
+#define state 5                         // define cell addresses
 
 SV Hex(void) { Data[base] = 16; }
 SV Decimal(void) { Data[base] = 10; }
@@ -121,17 +122,24 @@ static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;             // cycle counter
 static uint32_t latency = 0;            // maximum cycles between return
 
-// The C host uses this (externally) to write to code space.
-// Forth code can only write to code space using iomap.c.
+// The C host uses this (externally) to write to code and data spaces.
+// Addr is a cell address in each case.
 
 void chadToCode (uint32_t addr, uint32_t x) {
-    if (addr > CodeSize) {
+    if (addr >= CodeSize) {
         error = BAD_CODE_WRITE;  return;
     }
     if (addr < writeprotect) {
         error = BAD_ROMWRITE;  return;
     }
-    Code[addr & (CodeSize-1)] = (cell)x;
+    Code[addr & (CodeSize-1)] = (uint16_t)x;
+}
+
+void chadToData(uint32_t addr, uint32_t x) {
+    if (addr >= DataSize) {
+        error = BAD_DATA_WRITE;  return;
+    }
+    Data[addr & (DataSize-1)] = (cell)x;
 }
 
 SV Dpush(cell v)                        // push to on the data stack
@@ -313,6 +321,11 @@ SV Simulate(cell xt) {
     Rpush(0);  pc = xt;
     int result = CPUsim(0);             // run until last RET or error
     if (result < 0) error = result;
+}
+
+SV Cold(void) {                         // cold boot and run until error
+    t = sp = rp = w = lex = cy = 0;
+    Simulate(0);
 }
 
 //##############################################################################
@@ -1506,6 +1519,40 @@ endparagraph:               if (found > 1)
     if (fpr) fclose(fpr);
 }
 
+SI flashPtr;
+SV flashC8(uint8_t c)       { FlashMemStore(flashPtr++, c); }
+SV flashC16(uint16_t w)     { flashC8(w >> 8);  flashC8((uint8_t)w); }
+SV flashAN(uint16_t w) { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
+
+// Write boot data to `flash.c`
+SV MakeBootList(void) {
+    flashPtr = 0;
+    flashC8(0x80);                      // speed up SCLK
+    flashAN(cp);
+    flashC8(1);                         // 16-bit code write
+    for (uint16_t i = 0; i < cp; i++) {
+        flashC16(Code[i]);
+    }
+    uint16_t count = Data[dp];
+    uint8_t bytes = (CELLBITS + 7) >> 3;
+    flashAN(count);
+    flashC8(3 + bytes);                 // 16-bit data write
+    for (uint16_t i = 0; i < count; i++) {
+        cell x = Data[i];
+        uint8_t j = bytes;
+        while (j)
+            flashC8((uint8_t)(x >> (8 * --j)));
+    }
+    flashC8(0xE0);                      // end bootup
+}
+
+SV Boot(void) {
+    LoadFlash();                        // file --> "SPI flash"
+    FlashMemBoot();                     // boot from flash
+    SkipToEOL();                        // don't trust >in anymore
+    Cold();                             // run CPU
+}
+
 SV LoadCodeBin(void) { LoadMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
 SV SaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
 SV LoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
@@ -1561,12 +1608,11 @@ SV LoadKeywords(void) {
     AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
     AddEquate("cell",         "1.0060 -- n",          CELLS);
     AddEquate(">in",          "1.0070 -- addr",       BYTE_ADDR(toin));
-    AddEquate("tibs",         "1.0071 -- addr",       BYTE_ADDR(tibs));
-    AddEquate("dp",           "1.0072 -- addr",       BYTE_ADDR(dp));
-    AddEquate("base",         "1.0073 -- addr",       BYTE_ADDR(base));
-    AddEquate("state",        "1.0074 -- addr",       BYTE_ADDR(state));
-    AddEquate("tib",     "1.0075 -- addr", BYTE_ADDR(DataSize) - MaxLineLength);
-    AddEquate("|tib|",        "1.0076 -- n",          MaxLineLength);
+    AddEquate("#tib",         "1.0071 -- addr",       BYTE_ADDR(tibs));
+    AddEquate("'tib",         "1.0072 -- addr",       BYTE_ADDR(atib));
+    AddEquate("dp",           "1.0073 -- addr",       BYTE_ADDR(dp));
+    AddEquate("base",         "1.0074 -- addr",       BYTE_ADDR(base));
+    AddEquate("state",        "1.0075 -- addr",       BYTE_ADDR(state));
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0085 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
@@ -1576,12 +1622,15 @@ SV LoadKeywords(void) {
     AddKeyword("save-data",   "1.0130 <filename> --", SaveDataBin,   noCompile);
     AddKeyword("load-flash",  "1.0135 <filename> --", LoadFlash,     noCompile);
     AddKeyword("save-flash",  "1.0136 <filename> --", SaveFlash,     noCompile);
+    AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);
+    AddKeyword("boot",        "1.0138 <filename> --", Boot,          noCompile);
     AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
     AddKeyword("see",         "1.0210 <name> --",     See,           noCompile);
     AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          noCompile);
     AddKeyword("sstep",       "1.0230 xt len --",     Steps,         noCompile);
+    AddKeyword("cold",        "1.0235 --",            Cold,          noCompile);
     AddKeyword("words",       "1.0240 --",            Words,         noCompile);
     AddKeyword("bye",         "1.0250 --",            Bye,           noCompile);
     AddKeyword("[if]",        "1.0260 flag --",       BrackIf,       noCompile);
@@ -1769,6 +1818,7 @@ SV CopyBuffer(void) {                   // copy buf to tib region in Data
     cell bytes = Data[tibs];
     cell words = (bytes + CELLS - 1) / CELLS;
     cell addr = DataSize - CELL_ADDR(MaxLineLength);
+    Data[atib] = BYTE_ADDR(addr);
     cell* dest = &Data[addr];
     for (cell i = 0; i < words; i++) {  // pack string into data memory
         uint32_t w = 0;                 // little-endian packing

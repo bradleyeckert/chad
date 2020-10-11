@@ -180,9 +180,9 @@ module spif
   reg [15:0] b_count;                   // length of byte run
   reg [15:0] b_dest;                    // address register for bootup
   reg [11:0] i_count;
-  reg [WIDTH-1:0] boot_data;
+  reg [WIDTH-1:0] b_data;
   reg codeWr, dataWr;
-  reg [1:0] bytes, bytecount;           // bytes per boot_data word
+  reg [1:0] bytes, bytecount;           // bytes per b_data word
   reg bumpDest;                         // trigger address bump
   reg [2:0] b_mode;                     // boot interpreter mode
 
@@ -201,7 +201,7 @@ module spif
     if (!arstn) begin                   // async reset
       f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
       b_dest <= 16'd0;    f_rate <= 4'h7;    i_state <= ISP_IDLE;
-      b_count <= 16'd0;   boot_data <= 0;    ISPack <= 1'b0;
+      b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 3'd0;     bumpDest <= 1'b0;  i_count <= 12'd0;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 2'b00;
       bytecount <= 2'd0;  codeWr <= 1'b0;
@@ -262,13 +262,13 @@ module spif
             ISP_UPLOAD:
               if (b_rxok) begin
                 ISPack <= 1'b1;
-                f_wr <= 1'b1; 	        // send UART byte(s) to flash
+                f_wr <= 1'b1; 	        // UART --> flash
                 if (i_count) i_count <= i_count - 12'd1;
                 else i_state <= ISP_IDLE;
               end
             ISP_DNLOAD:
               if (b_txok) begin
-                u_wr <= 1'b1;
+                u_wr <= 1'b1;           // flash --> UART
 		i_usel <= 2'b00;
                 f_wr <= 1'b1;
                 if (i_count) i_count <= i_count - 12'd1;
@@ -295,14 +295,13 @@ module spif
                   if (f_din[5]) begin
                     f_wr <= 1'b0;
                     f_format <= 3'd0;	// raise CS#
-                    p_reset  <= 1'b0;
+                    p_reset  <= f_din[4];
                     b_state  <= 3'd0; 	// reset FSM
                   end else
-                    b_mode <= {1'b1, f_din[5:4]};
+                    b_mode <= {1'b1, f_din[1:0]};
                 end
               2'b10:               	// SCLK frequency
                 begin
-                  p_reset <= f_din[5];
 		  f_rate <= f_din[3:0];
                 end
               default:             	// data mode
@@ -314,7 +313,7 @@ module spif
               endcase
             2'b01:                      // 01x = write to memory
               begin
-                boot_data <= {boot_data[WIDTH-9:0], f_din};
+                b_data <= {b_data[WIDTH-9:0], f_din};
                 if (bytecount)
                   bytecount <= bytecount - 2'd1;
                 else
@@ -366,7 +365,7 @@ module spif
   wire data_wr = mem_wr | dataWr;
   wire [DATA_SIZE-1:0] data_ia = (dataWr) ? b_dest[DATA_SIZE-1:0]
                                           : mem_addr[DATA_SIZE-1:0];
-  wire [WIDTH-1:0]   data_din = (dataWr) ? boot_data : din;
+  wire [WIDTH-1:0]    data_din = (dataWr) ? b_data : din;
 
 //=======================================
 // Data RAM
@@ -396,7 +395,7 @@ spram
 (
   .clk  ( clk      ),
   .addr ( code_ia  ),
-  .din  ( boot_data[15:0]),
+  .din  ( b_data[15:0]),
   .dout ( insn     ),
   .we   ( codeWr   ),
   .re   ( code_rd  )

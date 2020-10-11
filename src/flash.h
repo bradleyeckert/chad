@@ -7,11 +7,14 @@
 int LoadFlashMem (char *filename);
 int SaveFlashMem (char *filename);
 
-// Start a SPI transfer and return the result, negative result if error.
-int32_t FlashMemSPI(uint16_t x);
+// Write byte to flash directly, used to build boot list
+void FlashMemStore(uint32_t addr, uint8_t c);
 
 // Set the CSN pin state and the SPI format.
 void FlashMemSPIformat(int n);
+
+// 8-bit transfer via SPI: Send byte to SPI flash and receive the result byte.
+int FlashMemSPI8(uint8_t cin);
 
 // Flash memory size in bytes
 #define FlashMemorySize 0x200000

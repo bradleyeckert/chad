@@ -25,87 +25,6 @@
 <!-- No reference for CTrounds -->
 <!-- No reference for CTdelta -->
 <!-- No reference for CTkey -->
-<!-- No reference for loadcode -->
-<a name="2.4110"></a>
-<h3><ref>2.4110:</ref> <a href="../../flash.f">s&gt;cm</a> <com><i>( addr u -- )</i></com></h3>
-<a name="2.4100"></a>
-<h3><ref>2.4100:</ref> <a href="../../flash.f">cm&gt;s</a> <com><i>( addr u -- )</i></com></h3>
-<!-- No reference for _CodeAddr -->
-<a name="2.4090"></a>
-<h3><ref>2.4090:</ref> <a href="../../flash.f">s&gt;dm</a> <com><i>( addr u -- )</i></com></h3>
-<a name="2.4080"></a>
-<h3><ref>2.4080:</ref> <a href="../../flash.f">dm&gt;s</a> <com><i>( addr u -- )</i></com></h3>
-
-<p>End the read command.
-</p>
-<a name="2.4070"></a>
-<h3><ref>2.4070:</ref> <a href="../../flash.f">s&gt;</a> <com><i>( -- c )</i></com></h3>
-
-<p>Read the next byte from flash.
-</p>
-<a name="2.4060"></a>
-<h3><ref>2.4060:</ref> <a href="../../flash.f">&gt;s</a> <com><i>( n -- )</i></com></h3>
-
-<p>Start reading flash at address <tok>sector&lt;&lt;16+addr</tok>.
-</p>
-<!-- No reference for ?end-page -->
-<a name="2.4050"></a>
-<h3><ref>2.4050:</ref> <a href="../../flash.f">close-stream</a> <com><i>( -- )</i></com></h3>
-
-<p>End the page program command.
-</p>
-<a name="2.4040"></a>
-<h3><ref>2.4040:</ref> <a href="../../flash.f">open-stream</a> <com><i>( addr_lo addr_hi mode -- )</i></com></h3>
-
-<p>Append a byte to flash and bump <tok>fp</tok>.
-</p>
-<a name="2.4030"></a>
-<h3><ref>2.4030:</ref> <a href="../../flash.f">resume-stream</a> <com><i>( -- )</i></com></h3>
-
-<p>Set <tok>fp</tok> = <tok>fa</tok>.
-If <tok>addr</tok> is at a 4KB boundary, erase the sector.
-Start a page write at address <tok>sector&lt;&lt;16+addr</tok>. 
-</p>
-<!-- No reference for SDRsize -->
-<!-- No reference for 4Kpage? -->
-<!-- No reference for pagebreak -->
-<!-- No reference for 256page? -->
-<!-- No reference for erase4Ksec -->
-<!-- No reference for sendaddr24 -->
-<!-- No reference for waitflash -->
-<!-- No reference for /flash -->
-<!-- No reference for fc> -->
-<!-- No reference for _fc> -->
-<!-- No reference for fl_wrdi -->
-<!-- No reference for fl_wren -->
-<!-- No reference for ]SPI -->
-<!-- No reference for sendSPI -->
-<!-- No reference for SPI[ -->
-<!-- No reference for readSPI -->
-<!-- No reference for stream-cell -->
-<!-- No reference for stream-ptr -->
-<!-- No reference for stream-mode -->
-<!-- No reference for stream-parms -->
-<a name="2.4020"></a>
-<h3><ref>2.4020:</ref> <a href="../../flash.f">stream-handle</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p>Set the first writable 64KB flash sector.
-Ignored if <tok>key</tok> doesn&apos;t match flwp_en.
-</p>
-<a name="2.4010"></a>
-<h3><ref>2.4010:</ref> <a href="../../flash.f">qe-flag</a> <com><i>( -- a-addr )</i></com></h3>
-
-<p>Variable for a 16-bit index into the 64 KB sector.
-</p>
-<!-- No reference for S_W16 -->
-<!-- No reference for S_R16 -->
-<!-- No reference for S_W8 -->
-<!-- No reference for S_R8 -->
-<!-- No reference for CodeData -->
-<!-- No reference for CodeAddr -->
-<!-- No reference for SPIrate -->
-<!-- No reference for SPIformat -->
-<!-- No reference for SPIdata -->
 <a name="2.3320"></a>
 <h3><ref>2.3320:</ref> <a href="../../numout.f">h.x</a> <com><i>( u n -- )</i></com></h3>
 
@@ -236,6 +155,7 @@ c-addr and u. The output device should handle UTF-8 as a standard.
 </p>
 <!-- No reference for hex -->
 <!-- No reference for decimal -->
+<!-- No reference for numbuf -->
 <a name="2.3010"></a>
 <h3><ref>2.3010:</ref> <a href="../../numout.f">bl</a> <com><i>( -- char )</i></com></h3>
 

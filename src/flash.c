@@ -8,7 +8,6 @@
 /*
 Flash Memory Simulator
 The interface to flash memory is through a SPI interface.
-A 16-bit word size is sufficient for the SPI.
 
 Flash memory is a static array of bytes that C initializes to 0.
 Read and write invert the data so that blank means 0xFF.
@@ -18,6 +17,11 @@ Chad can call LoadFlashMem to initialize it from a file.
 //#define VERBOSE
 
 static uint8_t mem[FlashMemorySize];
+
+void FlashMemStore(uint32_t addr, uint8_t c) {
+	if (addr < FlashMemorySize)
+		mem[addr] = ~c;
+}
 
 static void invertMem(uint8_t* m, int n) {
 	while (n--) {
@@ -87,7 +91,7 @@ void FlashMemSPIformat(int n) {
 	if ((n & 1) == 0)
 		state = idle;                   // CS line low = inactive
 #ifdef VERBOSE
-	if (n & 1)
+	if (n)
 		printf("[");
 	else
 		printf("]\n");
@@ -98,10 +102,11 @@ static int FlashBusy(void) {
 	return (chadCycles() < mark) ? 1 : 0;
 }
 
+// Simulate a byte connection to SPI flash: 8-bit in, 8-bit out.
 // Return value is the SPI return or error code
 // RDJDID (9F command) is custom: 0xAA, 0xHH, 0xFF number of 4K blocks
 
-static int FlashMemSPI8(uint8_t cin) {
+int FlashMemSPI8(uint8_t cin) {
 	static uint8_t command = 0;         // current command
 	static uint8_t wen = 0;             // write enable
 	static uint8_t qe = 2;              // quad rate enable
@@ -198,26 +203,4 @@ static int FlashMemSPI8(uint8_t cin) {
 	}
 	return cout;
 }
-
-// format supports different modes
-// Mode[0]=0: 8-bit out, 8-bit in
-// Mode[0]=1: 16-bit out, 16-bit in big endian
-
-int32_t FlashMemSPI(uint16_t x) {
-	if ((format & 1) == 0) {
-		return FlashMemSPI8((uint8_t)x);
-	}
-	int hi = FlashMemSPI8((uint8_t)(x >> 8));
-	int lo = FlashMemSPI8((uint8_t)x);
-	if (hi < 0) return hi;
-	if (lo < 0) return lo;
-	return (hi << 8) | lo;
-}
-
-// 000 = 8 - bit SPI
-// 001 = 16 - bit SPI
-// 100 = 8 - bit QSPI mode receive
-// 101 = 16 - bit QSPI mode receive
-// 110 = 8 - bit QSPI mode transmit
-// 111 = 16 - bit QSPI mode transmit
 

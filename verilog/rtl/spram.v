@@ -1,15 +1,17 @@
 // Generic synchronous read/write single-port RAM               9/30/2020 BNE
 
+`default_nettype none
+
 module spram
 #(parameter ADDR_WIDTH = 10,
   parameter DATA_WIDTH = 16
 )
-( input 			clk,
-  input   [ADDR_WIDTH-1:0]	addr,
-  input   [DATA_WIDTH-1:0]	din,
-  output  [DATA_WIDTH-1:0]	dout,
-  input 			we,
-  input 			re
+( input wire                   clk,
+  input wire  [ADDR_WIDTH-1:0] addr,
+  input wire  [DATA_WIDTH-1:0] din,
+  output wire [DATA_WIDTH-1:0] dout,
+  input wire                   we,
+  input wire                   re
 );
 
   reg [DATA_WIDTH-1:0] 	tmp_data;

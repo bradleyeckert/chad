@@ -9,9 +9,8 @@ include ../coreext.f
 include ../redirect.f
 include ../frame.f
 include ../numout.f
-include ../flash.f
+\ include ../flash.f
 include ../ctea.f
-\ include ../bootload.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
@@ -19,22 +18,17 @@ include ../ctea.f
 :noname  ( error -- )  ?dup if $8000 io! then
 ; resolves exception
 
-\ later app
+\ Hardware loads code and data RAMs from flash. Upon coming out of reset,
+\ both are initialized. The PC can launch from 0 (cold).
 
-\ Without flash memory, initializing data space with non-blanks is
-\ non-trivial. Cold boot starts out most of data space blank.
-\ The app is responsible for initializing its variables.
-\ Shared (with chad.c) variables: >in, tibs, dp, base, state.
+\ A very simple app would output some numbers and then hang.
 
 :noname  ( -- )
-	here  state
-	[ dm-size state - cell / ] literal
-	for  0 over ! cell +  next  drop	\ erase most everything
-	dp !  decimal  fpclear				\ restore dp, base, frp
-    /profile
-\	app
+    10 for r@ . next
+    begin noop again
 ; resolves cold
 
+\ You can now run the app with "cold"
 
 .( 你好，世界 ) cr
 
@@ -47,44 +41,14 @@ include ../ctea.f
 
 \ Try 25 fib, then stats
 
-0 [if]
-\ I was going to control flash loading from firmware in ROM.
-\ It's probably the wrong way.
-\ The next step past FPGA is ASIC, so target that.
-\ In an ASIC, you don't start with ROM. Too much risk.
-\ Code space is RAM and a FSM loads it from flash for you.
-\ Let's do the bootloader in hardware.
-
-\ Having that FSM changes strategies for dealing with flash.
-\ Time to put on the hardware hat.
-
-: source   tib tibs @ ;
-: /source  source >in @ /string ;
-: \source  /source  tibs @ >in ! ;
-: f\       \source  dup >s dm>s ;
-
-4096. S_W8 open-stream		\ put data in 4K page starting here
-f\ Hello World
-close-stream
-
-cm-writable torg		    \ compile the app into code RAM
-:noname  s> emit ;
-: app  4096. S_R8 open-stream
-    s> literal times
-    close-stream
-;
-
-0. S_W16 open-stream		\ put code in 4K page starting here
-cm-writable there over - cm>s \ copy to flash
-close-stream
-
-save-flash hello.bin
-
-[then]
+make-boot               \ create a boot record in flash
+save-flash myapp.bin    \ save to a file
+\ You can now run the app with "boot myapp.bin".
 
 .( Total instructions: ) there . cr
 \ 0 there dasm
 
+\ Now let's generate a language standard
 only forth
 gendoc ../wiki/wikiforth.txt html/forth.html
 previous

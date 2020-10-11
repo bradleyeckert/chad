@@ -46,7 +46,7 @@ module mcu
   wire                f_wr;             // Flash transmit strobe          o
   wire                f_who;            // Who is requesting the transfer?o
   wire [7:0]          f_dout;           // Flash transmit data            o
-  wire [1:0]          f_format;         // Flash format                   o
+  wire [2:0]          f_format;         // Flash format                   o
   wire [3:0]          f_rate;           // Flash configuration setup      o
   wire [7:0]          f_din;            // Flash received data            i
 
@@ -91,6 +91,7 @@ module mcu
     .u_rate   (u_rate   ),
     .f_ready  (f_ready  ),
     .f_wr     (f_wr     ),
+    .f_who    (f_who    ),
     .f_dout   (f_dout   ),
     .f_format (f_format ),
     .f_rate   (f_rate   ),

@@ -22,7 +22,7 @@
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../redirect.f 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../frame.f 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../numout.f 
-</font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../flash.f 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>include ../flash.f 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../ctea.f 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>include ../bootload.f 
 
@@ -32,22 +32,21 @@
 </font><font color=#00AAAA><a href = "root.html#1.1220" style="text-decoration: none; color: #00AAAA">:noname</a>  <a href = "root.html#1.1010" style="text-decoration: none; color: #00AAAA">(</a> </font><font color=#008800>error --  ) </font><font color=#0000FF><a href = "forth.html#2.0325" style="text-decoration: none; color: #0000FF">?dup</a> </font><font color=#00AAAA><a href = "root.html#1.2930" style="text-decoration: none; color: #00AAAA">if</a> </font><font color=#AA0000>$8000 </font><font color=#0000FF><a href = "forth.html#2.0120" style="text-decoration: none; color: #0000FF">io!</a> </font><font color=#00AAAA><a href = "root.html#1.2950" style="text-decoration: none; color: #00AAAA">then</a> 
 </font><font color=#00AAAA><a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> <a href = "root.html#1.1320" style="text-decoration: none; color: #00AAAA">resolves</a> </font><font color=#0000FF><a href = "forth.html#2.0020" style="text-decoration: none; color: #0000FF">exception</a> 
 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>later app 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Hardware loads code and data RAMs from flash. Upon coming out of reset, 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>both are initialized. The PC can launch from 0 (cold). 
 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Without flash memory, initializing data space with non-blanks is 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>non-trivial. Cold boot starts out most of data space blank. 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>The app is responsible for initializing its variables. 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Shared (with chad.c) variables: >in, tibs, dp, base, state. 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>A very simple app would output some numbers and then hang. 
 
 </font><font color=#00AAAA><a href = "root.html#1.1220" style="text-decoration: none; color: #00AAAA">:noname</a>  <a href = "root.html#1.1010" style="text-decoration: none; color: #00AAAA">(</a> </font><font color=#008800>--  )
- </font><font color=#0000FF><a href = "forth.html#2.0560" style="text-decoration: none; color: #0000FF">here</a>  </font><font color=#AA00AA><a href = "root.html#1.0074" style="text-decoration: none; color: #AA00AA">state</a> 
- </font><font color=#00AAAA><a href = "root.html#1.1170" style="text-decoration: none; color: #00AAAA">[</a> </font><font color=#AA00AA><a href = "root.html#1.0040" style="text-decoration: none; color: #AA00AA">dm-size</a> <a href = "root.html#1.0074" style="text-decoration: none; color: #AA00AA">state</a> </font><font color=#FF00FF><a href = "root.html#1.2090" style="text-decoration: none; color: #FF00FF">-</a> </font><font color=#AA00AA><a href = "root.html#1.0060" style="text-decoration: none; color: #AA00AA">cell</a> </font><font color=#0000FF><a href = "forth.html#2.0490" style="text-decoration: none; color: #0000FF">/</a> </font><font color=#00AAAA><a href = "root.html#1.1180" style="text-decoration: none; color: #00AAAA">]</a> <a href = "root.html#1.1260" style="text-decoration: none; color: #00AAAA">literal</a> 
- </font><font color=#00AAAA><a href = "root.html#1.2980" style="text-decoration: none; color: #00AAAA">for</a>  </font><font color=#AA0000>0 </font><font color=#FF00FF><a href = "root.html#1.2110" style="text-decoration: none; color: #FF00FF">over</a> </font><font color=#0000FF><a href = "forth.html#2.0200" style="text-decoration: none; color: #0000FF">!</a> </font><font color=#AA00AA><a href = "root.html#1.0060" style="text-decoration: none; color: #AA00AA">cell</a> </font><font color=#FF00FF><a href = "root.html#1.2080" style="text-decoration: none; color: #FF00FF">+</a>  </font><font color=#00AAAA><a href = "root.html#1.2990" style="text-decoration: none; color: #00AAAA">next</a>  </font><font color=#FF00FF><a href = "root.html#1.2130" style="text-decoration: none; color: #FF00FF">drop</a> </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>erase most everything 
- </font><font color=#AA00AA><a href = "root.html#1.0072" style="text-decoration: none; color: #AA00AA">dp</a> </font><font color=#0000FF><a href = "forth.html#2.0200" style="text-decoration: none; color: #0000FF">!</a>  <a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">decimal</a>  <a href = "forth.html#2.2900" style="text-decoration: none; color: #0000FF">fpclear</a>   &nbsp;</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>restore dp, base, frp 
-   &nbsp;</font><font color=#0000FF><a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">/profile</a> 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>app 
+   &nbsp;</font><font color=#AA0000>10 </font><font color=#00AAAA><a href = "root.html#1.2980" style="text-decoration: none; color: #00AAAA">for</a> </font><font color=#FF00FF><a href = "root.html#1.2190" style="text-decoration: none; color: #FF00FF">r@</a> </font><font color=#0000FF><a href = "forth.html#2.3300" style="text-decoration: none; color: #0000FF">.</a> </font><font color=#00AAAA><a href = "root.html#1.2990" style="text-decoration: none; color: #00AAAA">next</a> 
+   &nbsp;</font><font color=#00AAAA><a href = "root.html#1.2900" style="text-decoration: none; color: #00AAAA">begin</a> </font><font color=#0000FF><a href = "forth.html#2.0100" style="text-decoration: none; color: #0000FF">noop</a> </font><font color=#00AAAA><a href = "root.html#1.2910" style="text-decoration: none; color: #00AAAA">again</a> 
 </font><font color=#00AAAA><a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> <a href = "root.html#1.1320" style="text-decoration: none; color: #00AAAA">resolves</a> </font><font color=#0000FF><a href = "forth.html#2.0010" style="text-decoration: none; color: #0000FF">cold</a> 
 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Which works. The next step is to save a boot image to flash and make chad 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>load its RAMs from that. Maybe this syntax: 
+
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>boot myapp.bin 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>which does a load-flash, a boot-interpret, and finally Cold start. 
 
 </font><font color=#00AAAA><a href = "root.html#1.1030" style="text-decoration: none; color: #00AAAA">.(</a> </font><font color=#008800>你好，世界  )</font><font color=#0000FF><a href = "forth.html#2.2111" style="text-decoration: none; color: #0000FF">cr</a> 
 
@@ -61,20 +60,13 @@
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Try 25 fib, then stats 
 
 </font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0260" style="text-decoration: none; color: #00AAAA">[if]</a> 
-\ I was going to control flash loading from firmware in ROM. 
-\ It's probably the wrong way. 
-\ The next step past FPGA is ASIC, so target that. 
-\ In an ASIC, you don't start with ROM. Too much risk. 
-\ Code space is RAM and a FSM loads it from flash for you. 
-\ Let's do the bootloader in hardware. 
-
-\ Having that FSM changes strategies for dealing with flash. 
-\ Time to put on the hardware hat. 
 
 : source  &nbsp;tib tibs @ ; 
 : /source  source >in @ /string ; 
 : \source  /source  tibs @ >in ! ; 
 : f\      &nbsp;\source  dup >s dm>s ; 
+
+\ Note: requires stream.f, which needs to be changed to the spif model. 
 
 4096. S_W8 open-stream  \ put data in 4K page starting here 
 f\ Hello World 
@@ -94,6 +86,9 @@ close-stream
 save-flash hello.bin 
 
 [then] 
+
+</font><font color=#00AAAA><a href = "root.html#1.0137" style="text-decoration: none; color: #00AAAA">make-boot</a>                              &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>create a boot record in flash 
+</font><font color=#00AAAA><a href = "root.html#1.0136" style="text-decoration: none; color: #00AAAA">save-flash</a> </font><font color=#000000>myapp.bin                   &nbsp;</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>save to a file 
 
 </font><font color=#00AAAA><a href = "root.html#1.1030" style="text-decoration: none; color: #00AAAA">.(</a> </font><font color=#008800>Total instructions:  )</font><font color=#00AAAA><a href = "root.html#1.1290" style="text-decoration: none; color: #00AAAA">there</a> </font><font color=#0000FF><a href = "forth.html#2.3300" style="text-decoration: none; color: #0000FF">.</a> <a href = "forth.html#2.2111" style="text-decoration: none; color: #0000FF">cr</a> 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>0 there dasm 

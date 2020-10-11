@@ -134,8 +134,7 @@ that have their `RET` bits set.
 
 Most code that uses `or` can use `+` instead.
 If not, `or` is a cheap definition: `: or  invert swap invert and invert ;`.
-Thanks to Chuck Moore for discovering this in his MISC work
-and for disabusing me of smudge bits.
+Thanks to Chuck Moore for discovering this in his MISC work.
 
 **\_MEMRD_**
 
@@ -149,6 +148,17 @@ Barrel shifters are not cheap, especially in an FPGA.
 Single-bit shifts are used instead.
 To handle byte packing and unpacking,
 `><` and `><16` are added to swap bytes and 16-bit halves.
+
+**0000 is nop instead of jump**
+
+The J1 ISA is set up so that execution of blank code space jumps to 0 which
+does a cold boot. Kinda cool.
+I noticed that rather late, but `nop` has the same effect.
+The PC wraps back around to 0 when it walks off the end of code space.
+I programmed my first computer using a pencil and paper for the assembler
+and a DIP switch and a pushbutton to program a UV EPROM.
+I could turn bad code into NOPs by overwriting it with zeros.
+The idea stuck, so 0 is a `nop` although these days it doesn't matter.
 
 ### Memory Spaces
 
@@ -264,7 +274,7 @@ Any synthesis tool,
 which you can get for free if you are targeting an FPGA,
 or can get at all if you are targeting an ASIC,
 will readily synthesize a `chad` processor
-out of 200 or so lines of Verilog.
+out of its 200 or so lines of Verilog.
 
 What Chuck Moore demonstrated with MISC was the utility of small stacks.
 His Novix architecture from the 1980s had stacks made of 256-cell

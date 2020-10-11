@@ -18,7 +18,7 @@ Another reason for RAM-based code space is speed. ROM is slower.
 4K bytes of code RAM would be 0.2 mm2 in a 180nm process,
 or 0.8mm2 in a 350nm process. Either way the chip is probably pad-limited.
 
-ISP is possible using a cheap ($0.30) USB UART chip, the CH330N.
+ISP over USB is possible using a cheap ($0.30) USB UART chip, the CH330N.
 
 FPGAs that boot from SPI flash are usually programmed by using another 
 controller connected to the SPI flash.
@@ -103,7 +103,7 @@ When the `who` signal is `1`, the flash may opt to return blank data.
 This would prevent the reading of internal flash via UART ISP.
 Although it's not very useful with a board-mounted SPI flash,
 a flash subsystem on an ASIC could have lock bits added for security.
-A locked flash could return the "Write In Progress" status as data. 
+A locked flash could return the "Write In Progress" status as data.
 
 f_format is the bus format of the SPI:
 
@@ -161,6 +161,22 @@ Some example ISP sequences are:
 - `42` returns 3 bytes of boilerplate data
 - `00 04 81 0B 00 00 00 00 31 C1 80` reads 50 bytes from flash to the UART
 
+### Programming time
+
+Page programming occurs as follows:
+
+- Program a 256-byte page sending 520 chars out the serial port.
+- Poll the WIP flag via the UART, falls normally 2.5ms after programming.
+- The OS (Windows etc.) inserts another 1 ms (a USB frame) of delay.
+- Read back 256 bytes (512 chars) for verification.
+
+A baud rate of 2M BPS would give a program and verify time of 35ms per KB,
+or 35 seconds per MB.
+That can be supported by a USB-FS bridge chip like the $0.33 CH330N.
+Raising the baud rate wouldn't speed up programming much due to the delays.
+Production programming of flash (if you're using much of it) would be
+better done by a motherboard flasher like the Dediprog SF100.
+
 ## Boot Loader
 
 At power-up, the controller loads code and data memories from flash
@@ -171,12 +187,12 @@ memory types, etc. The stream starts at address 0 (or BASEBLOCK<<16)
 using the "fast read" (0Bh) flash command. Boot loader command bytes are:
 
 - `0xxxxmbb` = Load memory from flash, b+1 bytes/word, to code or data space
-- `10rxssss` = r=reset, s=SCLK divisor
+- `10xxssss` = Set SCLK divisor
 - `110xxx00` = Load dest\[7:0] with 8-bit value
 - `110xxx01` = Load dest with 16-bit value (big endian)
 - `110xxx10` = Load length\[7:0] with 8-bit value
 - `110xxx11` = Load length with 16-bit value (big endian)
-- `111xxxxx` = End bootup and start processor
+- `111rxxxx` = End bootup and start processor, r = reset (FF keeps in reset)
 
 The memory type is `0` for code and `1` for data when loading memories from
 flash. The protocol has room for a 5-bit memory selection field, so it could
@@ -216,18 +232,74 @@ and trigger a DMA memory load.
 
 Make sure to poll io\[4] to wait until the jammed command has been processed.
 
-## Synthesis results
+## Sample MCU
 
-A demo MCU with UART, SPI flash interface, 18-bit cells, 16-deep stacks
-produced these synthesis results:
+The MCU in the `verilog` folder connects to SPI flash and a USB UART such as
+CH330N. A pushbutton can keep CS# high so the MCU bootloader sees a blank flash
+so that it doesn't try to boot up.
+The UART then has free reign over the SPI flash for programming it.
 
-**Intel/Altera 10M08SCE144A7G**
+Any synthesis tool will infer the RAMs, although some will
+warn you about possible simulation mismatch. Such problems occur if you try to
+read back a word that was written to the same address in the previous cycle.
+That probably won't happen in this architecture, the way `chad` is set up.
 
-- 1529 LEs (19% of chip)
-- Slow 125C model: 111 MHz
+![MCU Image](mcu.png)
+
+### Synthesis results
+
+A demo MCU with UART, SPI flash interface, 18-bit cells, 16-deep stacks, and the
+`chad` processor produced these synthesis results for sub-$10 FPGAs:
+
+**Intel/Altera MAX 10, 10M08SCE144C8G**
+
+- 1535 LEs (19% of chip)
+- Slow 125C model: Fmax = 106 MHz
+- Digikey price $13.62 (100pc)
+
+**Intel/Altera Cyclone 10 LP, 10CL006YE144C8G**
+
+- 1542 LEs (25% of chip)
+- Slow 85C model: Fmax = 92 MHz
+- Digikey price $6.74 (60pc)
+- Faster part (C6G) is $10.77, has Fmax of 128 MHz.
 
 **Lattice ICE5LP4K-SG48ITR**
 
-- 1516 LUT4s (40% of chip)
-- 53 MHz worst case
+- 1533 LUT4s (40% of chip) using LSE synthesis
+- Fmax = 53 MHz
+- Digikey price $4.40 (100pc)
+
+**Lattice LFE5U-12F-6BG256C**
+
+- 1523 LUT4s (13% of chip) using LSE synthesis
+- Fmax = 60 MHz
+- Digikey price $5.50 (100pc)
+
+## Why spif?
+
+The `spif` hardware itself takes 217 LEs, so putting SPI flash and the UART
+in I/O space without the `spif` functionality would reduce LUT utilization
+by 18%. Should I have stuck with a boot ROM? The advantages of `spif` are:
+
+- No ROM required: RAMs are loaded by hardware at bootup.
+- No extra mux in the `inst` datapath, which would slow instruction decoding.
+- The UART can be used for programming flash memory without a ROM.
+- It's a lot easier to include a cypher for code protection.
+- Code may stream in flash data using DMA instead of code.
+
+Thanks to the DMA, the processor can work on data streamed in from flash while
+loading the next data it's going to use.
+So, that extra 18% of logic frees up processing power that would otherwise
+be spent spinning in a loop waiting for bytes to move through the SPI.
+
+### Encryption
+
+The easiest method of encryption is to use a stream cipher like Grain-128a to
+decrypt the boot stream inside of `spif` as `b_data` is loaded.
+This is left for future implementation, but it should be easy.
+A new byte to XOR with the byte stream can be produced in eight cycles,
+concurrent with other activities. Only POR can reset the keystream.
+Along with the fact that random read of code space isn't supported,
+making the plaintext unavailable, the attack surface can be rather small.
 

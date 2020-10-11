@@ -95,3 +95,9 @@ The documentation is re-built each time you build your app.
 
 The 20th Century was great and all, with its books and PDF equivalents.
 We have web browsers now.
+
+## Status
+
+Hardware was defined for an MCU to check synthesis results.
+The CPU has not been verified yet.
+The C-based model boots and runs an app from simulated flash memory. 

@@ -43,45 +43,164 @@ int KbHit(void) {
 }
 #endif
 
+//#define VERBOSE
+
+// Flash stream interpreter
+// Start with a byte in SPIresult, FlashMemSPIformat is already set up.
+// 0xxxxmbb = Load memory from flash, b+1 bytes/word, to code or data space
+// 10xxssss = Set SCLK divisor
+// 110xxx00 = Load dest[7:0] with 8-bit value
+// 110xxx01 = Load dest with 16-bit value(big endian)
+// 110xxx10 = Load length[7:0] with 8-bit value
+// 110xxx11 = Load length with 16-bit value(big endian)
+// 111rxxxx = End bootup and start processor
+
+static uint8_t SPIresult;
+
+static void FlashSPI(uint8_t c) {
+    int r = FlashMemSPI8(c);
+    if (r < 0) chadError(r);
+    SPIresult = r;
+}
+
+static void FlashInterpret(void) {      // see spif.v, line 288
+    uint8_t bytecount = 0;
+    uint8_t bytes = 0;
+    uint8_t b_mode = 0;
+    uint32_t boot_data = 0;
+    uint16_t b_dest = 0;
+    uint16_t b_count = 0;
+    while (1) {
+        switch (b_mode >> 1) {
+        case 0:                         // command mode
+            switch (SPIresult & 0xC0) {
+            case 0xC0:
+                if (SPIresult & 0x20) { // 111xxxxx
+                    FlashMemSPIformat(0);
+                    return;
+                }
+                else {                  // 110xxxmm
+                    b_mode = 4 + (SPIresult & 3); // 4 to 7
+                }
+            case 0x80: break;           // f_rate doesn't matter
+            default:
+                b_mode = 2 + ((SPIresult >> 2) & 1); // 2 to 3
+                bytecount = bytes = (SPIresult & 3);
+            } break;
+        case 1:                         // data mode
+            boot_data = (boot_data << 8) + SPIresult;
+            if (bytecount)
+                bytecount--;
+            else {
+                bytecount = bytes;
+                if (b_mode & 1) {
+#ifdef VERBOSE
+                    printf("data[%Xh]=%Xh\n", b_dest, boot_data);
+#endif
+                    chadToData(b_dest++, boot_data);
+                }
+                else {
+#ifdef VERBOSE
+                    printf("code[%Xh]=%Xh\n", b_dest, boot_data);
+#endif
+                    chadToCode(b_dest++, boot_data);
+                }
+                boot_data = 0;
+                if (b_count)  b_count--;
+                else          b_mode = 0;
+            } break;
+        case 2:
+            if (b_mode & 1) {
+                b_dest = (b_dest & 0x00FF) | (SPIresult << 8);
+                b_mode--;
+            }
+            else {
+                b_dest = (b_dest & 0xFF00) | SPIresult;
+                b_mode = 0;
+            } break;
+        default:
+            if (b_mode & 1) {
+                b_count = (b_count & 0x00FF) | (SPIresult << 8);
+                b_mode--;
+            }
+            else {
+                b_count = (b_count & 0xFF00) | SPIresult;
+                b_mode = 0;
+            } break;
+        }
+        FlashSPI(0);
+    }
+}
+
+void FlashMemBoot(void) {
+    FlashMemSPIformat(0);
+    FlashMemSPIformat(2);
+    FlashSPI(0x0B);
+    FlashSPI(0);                // 3-byte address
+    FlashSPI(0);
+    FlashSPI(0);
+    FlashSPI(0);                // dummy byte
+    FlashSPI(0);                // read first byte
+    FlashInterpret();
+}
+
+// ISP interpreter. In a real system, the UART can control the ISP.
+// In a PC environment, stdin is not given this access.
+// But, the processor can jam ISP bytes into a simulated ISP interpreter.
+// JamISP keeps a little internal state.
+
+// `00nnnnnn` set 12 - bit run length N(use two of these)
+// `01xxxbpr` b = boot, p = ping, r = reset cpu
+// `10xxxxff` Write N+1 bytes to flash using format f
+// `11xxxxff` Read N+1 bytes from flash using format f
+
+static void JamISP(uint8_t c) {
+    static state = 0;
+    static n = 0;
+    int sel = c >> 6;
+    switch (state) {
+    case 0: // command
+        switch (sel) {
+        case 1: // ignore reset and ping flags
+            if (c & 2) { printf("ISP: no ping\n"); }
+            if (c & 4) { FlashMemBoot(); }
+            break;
+        case 2: state = sel;  break;
+        case 3: state = sel;  break;
+        default: n = (n << 6) + (c & 0x3F);
+        } break;
+    case 2: // write makes sense
+        FlashSPI(c);
+        if (n) n--; else { state = 0; }
+        break;
+    case 3: printf("ISP: read-to-UART not supported\n");
+    default: state = 0; // weird state
+    }
+}
+
+
+
 // Host words start at I/O address 8000h.
 
 // The `_IORD_` field in an ALU instruction strobes io_rd.
 // In the J1, input devices sit on (mem_addr,io_din)
 
 static uint32_t header_data;            // host API return data
-static uint16_t SPIresult;
 static uint8_t nohostAPI;               // prohibit access to host API
-static uint32_t codeaddr;
 
 static int termKey(void);
 static int termQkey(void);
 
 uint32_t readIOmap (uint32_t addr) {
-    int32_t r, temp;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
-// ===== 0 to 3 = UART read
     case 0: return termKey();           // Get the next incoming stream char
     case 1: return termQkey();
-    case 2: // terminal type (control and function keys differ)
-#ifdef __linux__
-        return 1;
-#else
-        return 0;
-#endif
-    case 3: return 0;                   // UART tx is never busy
-// ===== 4 to 7 = SPI read
-    case 4:
-        temp = SPIresult;               // get result and start another transfer
-        r = FlashMemSPI(0);
-        SPIresult = (uint16_t)r;
-        if (r < 0) { chadError(r); }
-        return temp;
-    case 5: 
-        return SPIresult;               // get result
-    case 9:                             // read next code word
-        return chadReadCode(codeaddr++);
+    case 2: return 0;                   // UART tx is never busy
+    case 3: return SPIresult;           // SPI result
+    case 4: return 0;                   // Jam status, not busy
+    case 5: return 0;                   // DMA status, not busy
     case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }
@@ -91,38 +210,22 @@ uint32_t readIOmap (uint32_t addr) {
 // The `iow` field in an ALU instruction strobes io_wr.
 // In the J1, output devices sit on (mem_addr,dout)
 
-// Code space is writable through this interface.
 void writeIOmap (uint32_t addr, uint32_t x) {
-    int r;
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
-// ===== 0 to 3 = UART write
-    case 0:
-        putchar((char)x);
+    case 0:                             // emit
+        putchar(x);
 #ifdef __linux__
     fflush(stdout);
     usleep(1000);
 #endif
         break;
-    case 3:
-        nohostAPI = x;  break;
-// ===== 4 to 7 = SPI write
-    case 4:
-        r = FlashMemSPI((int)x);
-        SPIresult = (uint16_t)r;
-        if (r < 0) {chadError(r);}
-        break;
-    case 5:
-        FlashMemSPIformat(x);  break;
-    case 6: break;                      // SPI rate and device select
-    case 8:                             // Start code writes here
-        codeaddr = x;  break;           // addressing 16-bit instructions
-    case 9:                             // write next code word
-        chadToCode(codeaddr++, x);      // writable part of code space
-        break;
-    case 12:
-        TFTLCDwrite(x);
+    case 2: break;                      // set baud rate
+    case 3: FlashInterpret();  break;
+    case 4: JamISP(x);  break;          // Jam ISP byte
+    case 7: nohostAPI = x;  break;
+    case 12: TFTLCDwrite(x);  break;
     case 0x8000:                        // trigger an error
         chadError(x);  break;
     case 0x8001:                        // trigger a header data read 

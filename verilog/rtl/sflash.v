@@ -82,7 +82,7 @@ module sflash
   if (!arstn) begin
     divider <= 4'd0;  qdo <= 4'd0;  phase <= 1'b0;
     ready <= 1'b1;  state <= SPI_IDLE;
-    sr <= 8'd0;     count <= 4'd8;  sclk <= 1'b1;
+    sr <= 8'd0;  dout <= 8'd0;  count <= 4'd8;  sclk <= 1'b1;
   end else
     case (state)
     SPI_IDLE:

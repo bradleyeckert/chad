@@ -3,6 +3,7 @@
 \ Placed near the top of data space, grows upward.
 64 cells equ |framestack|
 \ Leave enough room above the frame stack for numeric conversion.
+\ See numout.f: frp0 is also the end of the numeric conversion buffer.
 
 \ The frame stack is for freeing up stack space for library code to run
 \ without overflowing the hardware stack.
@@ -14,9 +15,9 @@
 
 there
 variable frp                            \ frame stack pointer
-variable frp1                           \ frame pointer
+variable frp1                           \ temporary frame pointer
 20 cells buffer: fpad                   \ frame pad
-tib |framestack| - equ frp0             \ bottom of frame stack
+'tib @ |framestack| - equ frp0          \ bottom of frame stack
 
 : fpclear  frp0 frp ! ;                 \ 2.2900 --
 : >mem     _! cell + ;                  \ 2.2910 n a -- a'
@@ -40,6 +41,10 @@ tib |framestack| - equ frp0             \ bottom of frame stack
         for  mem> swap  next  exit
     then drop
 ;
+
+\ The `stack[` and `]stack` pair consumes 7 data and 5 return stack cells
+\ plus whatever is on the stack. At the time they are called, the stacks
+\ shouldn't be so full that calling them causes an overflow.
 
 \ Move the data stack to the frame stack, leaving n cells on top.
 \ The return stack is emptied except for one cell to keep the sim running.
@@ -75,6 +80,8 @@ tib |framestack| - equ frp0             \ bottom of frame stack
     frp1 @  mem>ds  drop                \ restore top
 ; no-tail-recursion
 
+\ Pick pushes the data stack to the frame stack, gets xu, and pops the data
+\ stack from the frame stack.
 : pick                                  \ 2.2970 xu...x0 u -- xu...x0 xu
     frp @ ds>mem  over >r  mem>ds drop r>
 ;

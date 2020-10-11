@@ -1,5 +1,10 @@
 # Welcome to your new cult
 
+Okay, maybe not a cult. A cult shuns you when you leave. Computer programming
+is jokingly referred to as a religion. Well, it kind of is, but so is culture
+in general. There's a whole groupthink that goes along with the shadows on the
+wall of Plato's cave.
+
 Maybe it's time for something new.
 Why not get real about what it means to be a computer programmer?
 Like programming as a way of being, a creative download from the Universe.
@@ -10,7 +15,8 @@ If you're up for it, you might consider...
 - A monastic lifestyle, meaning:
 - Celibacy, but including meditative practice.
 - Living in a yoga center or other such conditioned space.
-- You have to understand C well enough to see what `chad` does.
+
+Nikola Tesla figured this out first, but here's my interpretation.
 
 You are a blessing. A gift to God (or creation or universe or whathaveyou).
 Each new day starts with you.
@@ -38,16 +44,26 @@ If you're looking for a cult leader, I'm probably not the guy.
 I'm willing to learn from the legendary Charles H. Moore himself,
 who didn't want to be one either. I only wrote `chad`.
 
-If this is all just too much, stick with C.
-You know, the language for writing operating systems.
-Because computers were expensive and had to pay for themselves.
-And, computer languages evolved out of the military.
-An Admiral in the US Navy started this whole language business.
-Let me guess. Your embedded app doesn't look much like an OS
-and isn't designed to make things go *kaboom*.
+## Oh jeez, one of the crazies.
 
-It comes back to intent.
-The whole way that industry uses computers.
+Probably. But let's look at results.
+I invented the Mirari Cold Plasma System, which was one big Cosmic Giggle.
+We got everything right by accident because nobody can set out to build such
+a thing. Nobody on this planet, anyway. But it happened.
+When a miracle happens, shouldn't you figure out how it happened so everybody
+can replicate it? Instead of going "Ima just ignore that".
+I thought about it for years. I don't have a complete picture,
+but I know enough to point the way. If you want to build something "from beyond",
+you have to "go beyond".
+
+Intent matters. It's the seed. Once the seed sprouts and grows, it's going to
+remain the same tree. Forth was designed for exploration. Exploration of space,
+the solar system, the bottom of the ocean.
+If you are an explorer, Forth is for you.
+
+Where did C come from?
+It evolved out of Algol, which evolved out of the military computers.
+An Admiral in the US Navy started this whole language business.
 That zeitgeist led to everyone on the planet having an ARM processor
 in their hands.
 How about that? The entire world is ARMed. 
@@ -70,6 +86,8 @@ Tiny cores scale up. Need more power? Put in more cores.
 Create a pool usage model like GPUs use.
 A modern CPU could have thousands of `chad` cores,
 each running at multi-GHz speeds.
+Although application-specific hardware is where Moore's Law is going.
+`chad` molds like putty due to its simplicity.
 
 If your code is so great, why shouldn't everyone on the planet be 
 able to run it without it being hosted by
