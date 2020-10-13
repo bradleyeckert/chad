@@ -195,6 +195,8 @@ module spif
   wire b_rxok = ISPfull & ~ISPack;
   wire b_txok = u_ready & ~u_wr;
   wire f_ok = f_ready & ~f_wr;
+  reg init;                             // init memory
+  reg [CODE_SIZE-1:0] init_cnt;
 
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
@@ -202,147 +204,156 @@ module spif
       f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
       b_dest <= 16'd0;    f_rate <= 4'h7;    i_state <= ISP_IDLE;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
-      b_mode <= 3'd0;     bumpDest <= 1'b0;  i_count <= 12'd0;
+      b_mode <= 3'd0;     bumpDest <= 1'b0;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 2'b00;
       bytecount <= 2'd0;  codeWr <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  // start in boot mode
       p_reset <= 1'b1;    u_wr <= 1'b0;
+      init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
     end else begin
-      u_wr <= 1'b0;
-      case (b_state)
-        3'b000 : f_dout <= ISPbyte;
-        3'b001 : f_dout <= FAST_READ;
-        3'b010 : f_dout <= BASEBLOCK[7:0];
-        default: f_dout <= 8'h00;
-      endcase
-      bumpDest <= 1'b0;
-      ISPack <= 1'b0;
       codeWr <= 1'b0;
       dataWr <= 1'b0;
-      f_wr <= 1'b0;
-      if (f_ok) begin
-        f_wr <= 1'b1;
-        f_who <= 1'b0;
-        if (b_state == 3'd1)  f_format <= 3'b010;
+      bumpDest <= 1'b0;
+      if (init) begin
+        codeWr <= 1'b1;
+        dataWr <= 1'b1;
+        bumpDest <= 1'b1;
+        if (i_count) i_count <= i_count - 1;
+        else init <= 1'b0;
+      end else begin
+        u_wr <= 1'b0;
         case (b_state)
-        3'b000:
-          begin
-            f_wr <= 1'b0; // ========== Interpret ISP bytes ==========
-            f_who <= 1'b1;
-            case (i_state)
-            ISP_IDLE:
-              if (b_rxok) begin
-                ISPack <= 1'b1;
-                case (ISPbyte[7:6])
-                2'b00:          	// set 12-bit run length
-                  i_count <= {i_count[5:0], ISPbyte[5:0]};
-                2'b01:          	// various strobes
-                  begin
-                    p_reset <= ISPbyte[0];
-                    if (ISPbyte[1]) begin
-                      i_state <= ISP_PING;
-                      i_count <= 12'd3;
+          3'b000 : f_dout <= ISPbyte;
+          3'b001 : f_dout <= FAST_READ;
+          3'b010 : f_dout <= BASEBLOCK[7:0];
+          default: f_dout <= 8'h00;
+        endcase
+        ISPack <= 1'b0;
+        f_wr <= 1'b0;
+        if (f_ok) begin
+          f_wr <= 1'b1;
+          f_who <= 1'b0;
+          if (b_state == 3'd1)  f_format <= 3'b010;
+          case (b_state)
+          3'b000:
+            begin
+              f_wr <= 1'b0; // ========== Interpret ISP bytes ==========
+              f_who <= 1'b1;
+              case (i_state)
+              ISP_IDLE:
+                if (b_rxok) begin
+                  ISPack <= 1'b1;
+                  case (ISPbyte[7:6])
+                  2'b00:          	// set 12-bit run length
+                    i_count <= {i_count[5:0], ISPbyte[5:0]};
+                  2'b01:          	// various strobes
+                    begin
+                      p_reset <= ISPbyte[0];
+                      if (ISPbyte[1]) begin
+                        i_state <= ISP_PING;
+                        i_count <= 12'd3;
+                      end
+                      if (ISPbyte[2])
+                        b_state <= 3'd1;  // reboot from flash
                     end
-                    if (ISPbyte[2])
-                      b_state <= 3'd1;  // reboot from flash
-                  end
-                2'b10:          	// send a run of bytes to flash
+                  2'b10:          	// send a run of bytes to flash
+                    begin
+                      i_state <= ISP_UPLOAD;
+                      f_format <= ISPbyte[2:0];
+                    end
+                  2'b11:          	// read a run of bytes from flash
+                    begin
+                      i_state <= ISP_DNLOAD;
+                      f_format <= ISPbyte[2:0];
+                      f_wr <= 1'b1;
+                    end
+                  endcase
+                end
+              ISP_UPLOAD:
+                if (b_rxok) begin
+                  ISPack <= 1'b1;
+                  f_wr <= 1'b1; 	        // UART --> flash
+                  if (i_count) i_count <= i_count - 12'd1;
+                  else i_state <= ISP_IDLE;
+                end
+              ISP_DNLOAD:
+                if (b_txok) begin
+                  u_wr <= 1'b1;           // flash --> UART
+	  	i_usel <= 2'b00;
+                  f_wr <= 1'b1;
+                  if (i_count) i_count <= i_count - 12'd1;
+                  else i_state <= ISP_IDLE;
+                end
+              ISP_PING:
+                if (b_txok) begin
+                  u_wr <= 1'b1;
+	  	i_usel <= i_count[1:0];
+                  if (i_count) i_count <= i_count - 12'd1;
+                  else i_state <= ISP_IDLE;
+                end
+              default:
+                i_state <= ISP_IDLE;
+              endcase
+            end
+          3'b111: // ========== Interpret flash bytes ==========
+            begin
+              case (b_mode[2:1])          // what kind of byte is it?
+              2'b00:                      // 00x = command
+                case (f_din[7:6])
+                2'b11:               	// blank = "end"
                   begin
-                    i_state <= ISP_UPLOAD;
-                    f_format <= ISPbyte[2:0];
+                    if (f_din[5]) begin
+                      f_wr <= 1'b0;
+                      f_format <= 3'd0;	// raise CS#
+                      p_reset  <= f_din[4];
+                      b_state  <= 3'd0; 	// reset FSM
+                    end else
+                      b_mode <= {1'b1, f_din[1:0]};
                   end
-                2'b11:          	// read a run of bytes from flash
+                2'b10:               	// SCLK frequency
                   begin
-                    i_state <= ISP_DNLOAD;
-                    f_format <= ISPbyte[2:0];
-                    f_wr <= 1'b1;
+	  	  f_rate <= f_din[3:0];
+                  end
+                default:             	// data mode
+                  begin
+                    b_mode <= {2'b01, f_din[2]};
+                    bytes <= f_din[1:0];
+                    bytecount <= f_din[1:0];
                   end
                 endcase
-              end
-            ISP_UPLOAD:
-              if (b_rxok) begin
-                ISPack <= 1'b1;
-                f_wr <= 1'b1; 	        // UART --> flash
-                if (i_count) i_count <= i_count - 12'd1;
-                else i_state <= ISP_IDLE;
-              end
-            ISP_DNLOAD:
-              if (b_txok) begin
-                u_wr <= 1'b1;           // flash --> UART
-		i_usel <= 2'b00;
-                f_wr <= 1'b1;
-                if (i_count) i_count <= i_count - 12'd1;
-                else i_state <= ISP_IDLE;
-              end
-            ISP_PING:
-              if (b_txok) begin
-                u_wr <= 1'b1;
-		i_usel <= i_count[1:0];
-                if (i_count) i_count <= i_count - 12'd1;
-                else i_state <= ISP_IDLE;
-              end
-            default:
-              i_state <= ISP_IDLE;
-            endcase
-          end
-        3'b111: // ========== Interpret flash bytes ==========
-          begin
-            case (b_mode[2:1])          // what kind of byte is it?
-            2'b00:                      // 00x = command
-              case (f_din[7:6])
-              2'b11:               	// blank = "end"
+              2'b01:                      // 01x = write to memory
                 begin
-                  if (f_din[5]) begin
-                    f_wr <= 1'b0;
-                    f_format <= 3'd0;	// raise CS#
-                    p_reset  <= f_din[4];
-                    b_state  <= 3'd0; 	// reset FSM
-                  end else
-                    b_mode <= {1'b1, f_din[1:0]};
+                  b_data <= {b_data[WIDTH-9:0], f_din};
+                  if (bytecount)
+                    bytecount <= bytecount - 2'd1;
+                  else
+                    begin
+                      bytecount <= bytes;
+                      codeWr <= ~b_mode[0];
+                      dataWr <=  b_mode[0];
+                      bumpDest <= 1'b1;
+                      if (b_count)  b_count <= b_count - 16'd1;
+                      else          b_mode <= 3'd0;
+                    end
                 end
-              2'b10:               	// SCLK frequency
-                begin
-		  f_rate <= f_din[3:0];
+              2'b10:                      // 10x = set destination address
+                if (b_mode[0]) begin
+                  b_dest[15:8] <= f_din;   b_mode[0] <= 1'b0;
+                end else begin
+                  b_dest[7:0] <= f_din;    b_mode <= 3'd0;
                 end
-              default:             	// data mode
-                begin
-                  b_mode <= {2'b01, f_din[2]};
-                  bytes <= f_din[1:0];
-                  bytecount <= f_din[1:0];
+              default:                    // 11x = set data length
+                if (b_mode[0]) begin
+                  b_count[15:8] <= f_din;  b_mode[0] <= 1'b0;
+                end else begin
+                  b_count[7:0] <= f_din;   b_mode <= 3'd0;
                 end
               endcase
-            2'b01:                      // 01x = write to memory
-              begin
-                b_data <= {b_data[WIDTH-9:0], f_din};
-                if (bytecount)
-                  bytecount <= bytecount - 2'd1;
-                else
-                  begin
-                    bytecount <= bytes;
-                    codeWr <= ~b_mode[0];
-                    dataWr <=  b_mode[0];
-                    bumpDest <= 1'b1;
-                    if (b_count)  b_count <= b_count - 16'd1;
-                    else          b_mode <= 3'd0;
-                  end
-              end
-            2'b10:                      // 10x = set destination address
-              if (b_mode[0]) begin
-                b_dest[15:8] <= f_din;   b_mode[0] <= 1'b0;
-              end else begin
-                b_dest[7:0] <= f_din;    b_mode <= 3'd0;
-              end
-            default:                    // 11x = set data length
-              if (b_mode[0]) begin
-                b_count[15:8] <= f_din;  b_mode[0] <= 1'b0;
-              end else begin
-                b_count[7:0] <= f_din;   b_mode <= 3'd0;
-              end
-            endcase
-          end
-        default:
-          b_state <= b_state + 3'd1;
-        endcase
+            end
+          default:
+            b_state <= b_state + 3'd1;
+          endcase
+        end
       end
       if (bumpDest)
         b_dest <= b_dest + 16'd1;

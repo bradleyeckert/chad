@@ -31,7 +31,7 @@ module chad
   reg  reboot;
   wire [14:0] pc_plus_1 = pc + 15'd1;
 
-  assign mem_addr = st0[14:0];
+  assign mem_addr = (WIDTH == 32) ? st0[16:2] : st0[15:1];
   assign code_addr = pcN;
   reg [1:0] dspI, rspI;
 
@@ -132,7 +132,7 @@ module chad
   assign io_wr =  !reboot & func_iow;
   assign io_rd =  !reboot & func_ior;
 
-  assign rstkD = (insn[13]) ? st0 : {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0};
+  assign rstkD = (insn[15]) ? {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0} : st0;
 
   always @*
   begin

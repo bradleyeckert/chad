@@ -9,7 +9,6 @@ include ../coreext.f
 include ../redirect.f
 include ../frame.f
 include ../numout.f
-\ include ../flash.f
 include ../ctea.f
 
 \ iomap.c sends errors to the Chad interpreter
@@ -23,10 +22,12 @@ include ../ctea.f
 
 \ A very simple app would output some numbers and then hang.
 
-:noname  ( -- )
+: myapp  ( -- )
     10 for r@ . next
     begin noop again
-; resolves cold
+;
+
+' myapp resolves cold
 
 \ You can now run the app with "cold"
 
@@ -42,7 +43,9 @@ include ../ctea.f
 \ Try 25 fib, then stats
 
 make-boot               \ create a boot record in flash
-save-flash myapp.bin    \ save to a file
+save-flash myapp.bin    \ save to a file you can boot from
+save-flash-h myapp.txt  \ also save in hex for flash memory model
+
 \ You can now run the app with "boot myapp.bin".
 
 .( Total instructions: ) there . cr

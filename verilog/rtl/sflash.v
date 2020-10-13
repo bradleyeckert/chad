@@ -39,9 +39,10 @@ module sflash
 
   assign cs_n = (format[2:1]) ? 1'b0 : 1'b1;
 
-  reg [1:0] state;
-  localparam SPI_IDLE = 2'b01;
-  localparam SPI_RUN  = 2'b10;
+  reg [2:0] state;
+  localparam SPI_IDLE = 3'b001;
+  localparam SPI_RUN  = 3'b010;
+  localparam SPI_LAST = 3'b100;
 
 // SPI chip pins, GD25Q16C datasheet:
 // Standard SPI: SCLK, CS#, SI, SO, WP#, HOLD#
@@ -53,8 +54,8 @@ module sflash
              oe = 4'b0000;
     else
     case (format) // {none, none, sdr, sdr, ddrT, ddrR, qdrT, qdrR}
-    3'b010:  oe = 4'b0010;
-    3'b011:  oe = 4'b0010;
+    3'b010:  oe = 4'b0001;
+    3'b011:  oe = 4'b0001;
     3'b100:  oe = 4'b0011;
     3'b110:  oe = 4'b1111;
     default: oe = 4'b0000;
@@ -89,6 +90,7 @@ module sflash
       if (wr) begin
         sr <= din;
         ready <= 1'b0;
+        phase <= 1'b0;
         case (format[2:1])
         2'b10:   count <= 4'd4;
         2'b11:   count <= 4'd2;
@@ -110,16 +112,18 @@ module sflash
             endcase
             if (count)
               count <= count - 3'd1;
-            else begin
-              state <= SPI_IDLE;
-              dout <= sr;
-              ready <= 1'b1;
-            end
+            else
+              state <= SPI_LAST;
           end
           if (count) sclk <= ~sclk;
           else sclk <= 1'b1;
           phase <= ~phase;
         end
+      end
+    SPI_LAST: begin
+        state <= SPI_IDLE;
+        dout <= sr;
+        ready <= 1'b1;
       end
     default:
       state <= SPI_IDLE;

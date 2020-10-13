@@ -4,8 +4,9 @@
 #ifndef __FLASH_H__
 #define __FLASH_H__
 
-int LoadFlashMem (char *filename);
-int SaveFlashMem (char *filename);
+int LoadFlashMem(char *filename);
+int SaveFlashMem(char* filename);
+int SaveFlashMemHex(char* filename);
 
 // Write byte to flash directly, used to build boot list
 void FlashMemStore(uint32_t addr, uint8_t c);

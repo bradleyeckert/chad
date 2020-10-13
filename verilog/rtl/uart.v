@@ -1,4 +1,4 @@
-// Unbuffered UART with FIFO-compatible interface               10/2/2020
+// Unbuffered UART with FIFO-compatible interface               10/12/2020
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -21,7 +21,7 @@ module uart
   reg rxdi, rxda, rxdb;
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    rxdi <= 1'b0;  rxda <= 1'b0;  rxdb <= 1'b0;
+    rxdi <= 1'b1;  rxda <= 1'b1;  rxdb <= 1'b1;
   end else begin
     rxdi <= rxdb;  rxdb <= rxda;  rxda <= rxd;
   end
@@ -54,7 +54,7 @@ module uart
   reg [7:0] txstate, rxstate, txreg, rxreg;
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    txstate <= 8'd0;  txreg <= 8'd0;  tnext <= 1'b0;
+    txstate <= 8'd0;  txreg <= 8'd0;  tnext <= 1'b1;
     rxstate <= 8'd0;  rxreg <= 8'd0;  error <= 1'b0;
     dout <=    8'd0;  txd <= 1'b1;    ready <= 1'b1;  full <= 1'b0;
   end else begin
@@ -74,7 +74,7 @@ module uart
             if (rxdi) rxstate <= 8'd0;  // false start
           4'b0001:
             if (rxdi) {dout, full} <= {rxreg, 1'b1};
-            else  error <= 1'b1;        // '0' at the stop bit (or BREAK)
+            else      error <= 1'b1;    // '0' at the stop bit (or BREAK)
           default:
             rxreg <= {rxdi, rxreg[7:1]};
           endcase

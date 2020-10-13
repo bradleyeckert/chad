@@ -64,6 +64,27 @@ int SaveFlashMem(char* filename) {		// save binary image
 	return 0;
 };
 
+int SaveFlashMemHex(char* filename) {		// save binary image
+	int i = FlashMemorySize;
+	while ((i) && (mem[--i] == 0)) {}   // trim
+	if (!i) return 0;                   // nothing to save
+	i++;								// include both endpoints
+	FILE* fp;
+#ifdef MORESAFE
+	errno_t err = fopen_s(&fp, filename, "w");
+#else
+	fp = fopen(filename, "w");
+#endif
+	if (fp == NULL) return BAD_CREATEFILE;
+	invertMem(mem, i);
+	fprintf(fp, "@000000\n");
+	for (int n = 0; n < i; n++)
+		fprintf(fp, "%02X\n", mem[n]);
+	invertMem(mem, i);
+	fclose(fp);
+	return 0;
+};
+
 /*------------------------------------------------------------------------------
 | Name   | Hex | Command                           |
 |:-------|-----|----------------------------------:|

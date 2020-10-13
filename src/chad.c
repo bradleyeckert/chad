@@ -1061,6 +1061,11 @@ SV SaveFlash(void) {
     error = SaveFlashMem(tok);
 }
 
+SV SaveFlashHex(void) {
+    ParseFilename();
+    error = SaveFlashMemHex(tok);
+}
+
 // Start a new definition at the code boundary specified by CodeAlignment.
 // Use CodeAlignment > 1 for Code memory (ROM) that's slow.
 // For example, a ROM with a 64-bit prefetch buffer would have
@@ -1354,42 +1359,6 @@ static void BrackIf(void) {
     }
 }
 
-// Save and Load binary memory images.
-// They are not large, save the entire space.
-// The result differs between little-endian and big-endian machines.
-
-SV SaveMem(uint8_t* mem, int length) {  // save binary to a file
-    ParseFilename();
-    FILE* fp;
-#ifdef MORESAFE
-    errno_t err = fopen_s(&fp, tok, "wb");
-#else
-    fp = fopen(tok, "wb");
-#endif
-    if (fp == NULL)
-        error = BAD_CREATEFILE;
-    else {
-        fwrite(mem, 1, length, fp);
-        fclose(fp);
-    }
-};
-
-SV LoadMem(uint8_t* mem, int length) {  // load binary from a file
-    ParseFilename();
-    FILE* fp;
-#ifdef MORESAFE
-    errno_t err = fopen_s(&fp, tok, "rb");
-#else
-    fp = fopen(tok, "rb");
-#endif
-    if (fp == NULL)
-        error = BAD_OPENFILE;
-    else {
-        fread(mem, 1, length, fp);
-        fclose(fp);
-    }
-};
-
 //##############################################################################
 // HTML reference document generator
 
@@ -1553,11 +1522,6 @@ SV Boot(void) {
     Cold();                             // run CPU
 }
 
-SV LoadCodeBin(void) { LoadMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
-SV SaveCodeBin(void) { SaveMem((uint8_t*)Code, CodeSize * sizeof(uint16_t)); }
-SV LoadDataBin(void) { LoadMem((uint8_t*)Data, DataSize * sizeof(cell)); }
-SV SaveDataBin(void) { SaveMem((uint8_t*)Data, DataSize * sizeof(cell)); }
-
 // char and [char] support utf-8:
 // bytes  from       to          1st        2nd         3rd         4th
 // 1	  U + 0000   U + 007F    0xxxxxxx
@@ -1616,11 +1580,8 @@ SV LoadKeywords(void) {
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0085 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
-    AddKeyword("load-code",   "1.0100 <filename> --", LoadCodeBin,   noCompile);
-    AddKeyword("save-code",   "1.0110 <filename> --", SaveCodeBin,   noCompile);
-    AddKeyword("load-data",   "1.0120 <filename> --", LoadDataBin,   noCompile);
-    AddKeyword("save-data",   "1.0130 <filename> --", SaveDataBin,   noCompile);
     AddKeyword("load-flash",  "1.0135 <filename> --", LoadFlash,     noCompile);
+    AddKeyword("save-flash-h","1.0136 <filename> --", SaveFlashHex,  noCompile);
     AddKeyword("save-flash",  "1.0136 <filename> --", SaveFlash,     noCompile);
     AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);
     AddKeyword("boot",        "1.0138 <filename> --", Boot,          noCompile);

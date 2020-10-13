@@ -249,30 +249,32 @@ That probably won't happen in this architecture, the way `chad` is set up.
 ### Synthesis results
 
 A demo MCU with UART, SPI flash interface, 18-bit cells, 16-deep stacks, and the
-`chad` processor produced these synthesis results for sub-$10 FPGAs:
+`chad` processor produced these synthesis results for sub-$10 FPGAs.
+Note that Fmax varies with synthesis tool settings.
+These were with out-of-the-box defaults. Consider them approximations.
 
-**Intel/Altera MAX 10, 10M08SCE144C8G**
+**Intel/Altera MAX 10, 10M04SCE144C8G**
 
-- 1535 LEs (19% of chip)
-- Slow 125C model: Fmax = 106 MHz
-- Digikey price $13.62 (100pc)
+- 1568 LEs (38% of chip)
+- Slow 125C model: Fmax = 108 MHz
+- Digikey price $8.92 (100pc)
 
 **Intel/Altera Cyclone 10 LP, 10CL006YE144C8G**
 
-- 1542 LEs (25% of chip)
-- Slow 85C model: Fmax = 92 MHz
+- 1566 LEs (25% of chip)
+- Slow 85C model: Fmax = 98 MHz
 - Digikey price $6.74 (60pc)
 - Faster part (C6G) is $10.77, has Fmax of 128 MHz.
 
 **Lattice ICE5LP4K-SG48ITR**
 
-- 1533 LUT4s (40% of chip) using LSE synthesis
+- 1563 LUT4s (40% of chip) using LSE synthesis
 - Fmax = 53 MHz
 - Digikey price $4.40 (100pc)
 
 **Lattice LFE5U-12F-6BG256C**
 
-- 1523 LUT4s (13% of chip) using LSE synthesis
+- 1563 LUT4s (13% of chip) using LSE synthesis
 - Fmax = 60 MHz
 - Digikey price $5.50 (100pc)
 

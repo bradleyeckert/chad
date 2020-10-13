@@ -925,33 +925,10 @@ for its definition. It creates a word that pushes x onto the stack.
 <h3><ref>1.0137:</ref> <chad>make-boot</chad> <com><i>( -- )</i></com></h3>
 <a name="1.0136"></a>
 <h3><ref>1.0136:</ref> <chad>save-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+<a name="1.0136"></a>
+<h3><ref>1.0136:</ref> <chad>save-flash-h</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
 <a name="1.0135"></a>
 <h3><ref>1.0135:</ref> <chad>load-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
-<a name="1.0130"></a>
-<h3><ref>1.0130:</ref> <chad>save-data</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
-
-<p>Saves the data space to a binary file.
-</p>
-<a name="1.0120"></a>
-<h3><ref>1.0120:</ref> <chad>load-data</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
-
-<p>Loads the data space from a binary file.
-</p>
-<a name="1.0110"></a>
-<h3><ref>1.0110:</ref> <chad>save-code</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
-
-<p>Saves the code space to a binary file.
-</p>
-<a name="1.0100"></a>
-<h3><ref>1.0100:</ref> <chad>load-code</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
-
-<p>Loads the code space from a binary file.
-</p>
-
-<p>The word data types of code and data are simply cast to <tok>char*</tok> so the
-binary is not endian-agnostic. This only matters if your desktop is
-big-endian. The rest of the world is little-endian.
-</p>
 <a name="1.0090"></a>
 <h3><ref>1.0090:</ref> <chad>verbosity</chad> <com><i>( flags -- )</i></com></h3>
 

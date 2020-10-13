@@ -1,7 +1,7 @@
 // Minimal MCU based on J1-type CPU                             10/2/2020 BNE
 // License: This code is a gift to the divine.
 
-// This is expected to be wrapped by a pad ring that steers bidirectional
+// This is expected to be wrapped by an I/O ring that steers bidirectional
 // signals and conditions the reset signal.
 
 `default_nettype none
@@ -50,9 +50,11 @@ module mcu
   wire [3:0]          f_rate;           // Flash configuration setup      o
   wire [7:0]          f_din;            // Flash received data            i
 
+  wire p_reset_n = ~p_reset;
+
   chad #(18) u0 (
     .clk      (clk      ),
-    .resetq   (p_reset  ),
+    .resetq   (p_reset_n),
     .hold     (p_hold   ),
     .io_rd    (io_rd    ),
     .io_wr    (io_wr    ),
