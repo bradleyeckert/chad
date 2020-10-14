@@ -69,7 +69,7 @@ module mcu
   );
 
   // spif is the SPI flash controller for the chad processor
-  spif #(11, 18, 10, 0, 3, 4, 868) u1 (
+  spif #(11, 18, 10, 0, 3, 4, 50) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (io_rd    ),

@@ -1,4 +1,5 @@
-// Modified J1
+// Chad processor                                               10/13/2020 BNE
+// License: This code is a gift to the divine.
 
 module chad
 #(
@@ -70,11 +71,10 @@ module chad
   always @*
   begin // carry out
     case (insn[12:9])
-    4'b0010: co = st0[0];
     4'b0011: co = st0[WIDTH-1];
     4'b1000: co = sum[WIDTH];
     4'b1001: co = diff[WIDTH];
-    default: co = 1'b0;
+    default: co = st0[0];
     endcase
   end
 
@@ -111,7 +111,7 @@ module chad
       4'b1011: st0N = rst0 + {WIDTH{1'b1}};             // R-1
       4'b1100: st0N = io_din;
       4'b1101: st0N = mem_din;
-      4'b1110: st0N = (st0) ? {WIDTH{1'b1}} : {WIDTH{1'b0}}; // 0=
+      4'b1110: st0N = (st0) ? {WIDTH{1'b0}} : {WIDTH{1'b1}}; // 0=
       4'b1111: st0N = {{(WIDTH - 13){1'b0}}, rsp, 3'b000, dsp};
       default: st0N = {WIDTH{1'bx}};                    // abnormal
       endcase
@@ -124,7 +124,7 @@ module chad
   wire func_iow =   (insn[6:4] == 5) & ~insn[15];       // N->io[T]
   wire func_ior =   (insn[6:4] == 6) & ~insn[15];       // _IORD_
   wire func_co =    (insn[6:4] == 7) & ~insn[15];       // co
-  wire islex =      (insn[15:12] == 4'b1111);
+  wire islex =      (insn[15:12] == 4'b1110);
 
   assign mem_rd = !reboot & func_read;
   assign mem_wr = !reboot & func_write;

@@ -27,8 +27,8 @@ The Chad CPU, like the J1, has excellent semantic density.
 The application of the J1 was a UDP stack in a Xilinx FPGA.
 The code was 70% smaller than the equivalent C on a MicroBlaze.
 The code just wouldn't fit in memory, so the J1 was used instead.
-Chad improves on the J1 to facilitate bigger apps.
 
+Chad improves on the J1 to facilitate bigger apps.
 `chad` protects your software investment by targeting a very simple but
 very powerful (for its size) stack computer.
 Modern desktop computers are fast enough to simulate the CPU on the order of at-speed.
@@ -98,6 +98,13 @@ We have web browsers now.
 
 ## Status
 
-Hardware was defined for an MCU to check synthesis results.
-The CPU has not been verified yet.
-The C-based model boots and runs an app from simulated flash memory. 
+The "myapp" demo boots and runs in both `chad` and a Verilog simulator.
+
+`chad` boots and runs an app from simulated flash memory. 
+A minimal SoC (MCU) in Verilog demonstrates synthesis results and
+performs the following:
+
+- `spif` clears the code and data RAMs
+- `spif` loads RAMs from SPI flash (S25FL064L) using FMF model
+- `chad` starts running the "myapp" demo after bootup
+- The demo sends a series of numbers out the UART

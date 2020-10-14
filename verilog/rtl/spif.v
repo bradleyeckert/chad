@@ -145,12 +145,13 @@ module spif
 
   reg  [2:0] b_state;                   // boot FSM state
   wire booting = (b_state) ? 1'b1 : 1'b0;
+  wire txbusy = ~u_ready;
 
   always @* begin                       // i/o read mux
     case (mem_addr[2:0])                // Verilog zero-extends smaller vectors
     3'b000:    io_dout = uartRXbyte;    // char
     3'b001:    io_dout = uartRXfull;    // char is in the buffer
-    3'b010:    io_dout = u_ready;       // okay to EMIT
+    3'b010:    io_dout = txbusy;        // EMIT is busy?
     3'b011:    io_dout = f_din;         // flash SPI result
     3'b100:    io_dout = ISPfull;       // jammed byte is still pending
     3'b101:    io_dout = booting;       // still reading flash?
@@ -159,6 +160,7 @@ module spif
   end
 
   reg [1:0] i_usel;
+  reg [7:0] u_txbyte;                   // manual UART output
   always @* begin                       // UART output mux
     if (ispActive)
       case (i_usel)
@@ -167,7 +169,7 @@ module spif
       2'b10:   u_dout <= PRODUCT_ID0[7:0];
       default: u_dout <= BASEBLOCK[7:0];
       endcase
-    else       u_dout <= din[7:0];
+    else       u_dout <= u_txbyte;
   end
 
 //==============================================================================
@@ -196,7 +198,6 @@ module spif
   wire b_txok = u_ready & ~u_wr;
   wire f_ok = f_ready & ~f_wr;
   reg init;                             // init memory
-  reg [CODE_SIZE-1:0] init_cnt;
 
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
@@ -208,7 +209,7 @@ module spif
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 2'b00;
       bytecount <= 2'd0;  codeWr <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  // start in boot mode
-      p_reset <= 1'b1;    u_wr <= 1'b0;
+      p_reset <= 1'b1;    u_wr <= 1'b0;      u_txbyte <= 0;
       init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
     end else begin
       codeWr <= 1'b0;
@@ -359,7 +360,10 @@ module spif
         b_dest <= b_dest + 16'd1;
       if (io_wr)
         case (mem_addr[2:0])
-        3'b000: u_wr <= 1'b1;           // write to UART
+        3'b000: begin
+            u_wr <= 1'b1;               // write to UART
+            u_txbyte <= din[7:0];
+          end
 	3'b011: b_state <= 3'd6;        // interpret flash byte stream
         endcase
     end

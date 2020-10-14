@@ -23,6 +23,7 @@ include ../ctea.f
 \ A very simple app would output some numbers and then hang.
 
 : myapp  ( -- )
+    cr
     10 for r@ . next
     begin noop again
 ;

@@ -254,9 +254,9 @@ SI CPUsim(int single) {
             case 0x10: _t = 0;                               break; /*    COP */
             case 0x01: _t = (t & MSB) ? -1 : 0;              break; /*    T<0 */
             case 0x11: _t = cy;                              break; /*      C */
-            case 0x02: _c = t & 1;  temp = (t & MSB);
+            case 0x02: temp = (t & MSB);
                 _t = (t >> 1) | temp;                        break; /*    T2/ */
-            case 0x12: _c = t & 1;
+            case 0x12:
                 _t = (t >> 1) | (cy << (CELLBITS-1));        break; /*   cT2/ */
             case 0x03: _c = t >> (CELLBITS-1);
                        _t = t << 1;                          break; /*    T2* */
@@ -277,7 +277,7 @@ SI CPUsim(int single) {
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    N-T */
             case 0x0A: _t = Rstack[RP];                      break; /*      R */
             case 0x0B: _t = Rstack[RP] - 1;                  break; /*    R-1 */
-            case 0x0C: _t = readIOmap(t);                    break; /*  io[T] */
+            case 0x0C: _t = readIOmap(CELL_ADDR(t));         break; /*  io[T] */
             case 0x0D: _t = Data[Raddr];
                 if (verbose & VERBOSE_TRACE) {
                     printf("Reading %Xh from cell %Xh\n", _t, Raddr);
@@ -298,7 +298,7 @@ SI CPUsim(int single) {
                 } Data[temp & (DataSize - 1)] = s;           break; /* N->[T] */
             case  4: Raddr = CELL_ADDR(t);                         /* _MEMRD_ */
                 if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
-            case  5: writeIOmap(t, s);                     break; /* N->io[T] */
+            case  5: writeIOmap(CELL_ADDR(t), s);          break; /* N->io[T] */
                // 6 = IORD strobe
             case  7: cy = _c;  w = t;                        break;   /*   co */
             default: break;

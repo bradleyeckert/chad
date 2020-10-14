@@ -3,8 +3,8 @@
 there
 
 \ Equates take up no code space. Have as many as you want.
-0 equ 'TXbuf                            \ 2.2000 -- ioa \ output register
-2 equ 'TXbusy                           \ 2.2010 -- ioa \ tx busy flag
+0 cells equ 'TXbuf                      \ 2.2000 -- ioa \ output register
+2 cells equ 'TXbusy                     \ 2.2010 -- ioa \ tx busy flag
 
 variable ScreenProfile                  \ 2.2100 -- addr
 : ExecScreen  ( n -- ) ScreenProfile @ execute execute ;

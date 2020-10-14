@@ -1,9 +1,8 @@
 // MCU testbench                                     10/10/2020 BNE
 // License: This code is a gift to the divine.
-// status: crude start, not tested
 
 // The MCU connects to a SPI flash model from FMF.
-// The UART should be monitored so it displays chars.
+// Run this for 600 usec.
 
 `timescale 1ns/10ps
 
@@ -40,7 +39,7 @@ module mcu_tb();
     .RESETNeg     (rst_n)
   );
 
-  pullup(qd[3]);
+  pullup(qd[3]);                // pullup resistors on all four lines
   pullup(qd[2]);
   pullup(qd[1]);
   pullup(qd[0]);
@@ -66,13 +65,26 @@ module mcu_tb();
       rst_n <= 1'b1;
       @(posedge cs_n);
       $display("Finished booting");
-      #100000000
+      #160000
       $stop();
     end
 
+  // Capture UART data puttering along at 2 MBPS
+  reg [7:0] uart_rxdata;
+  always @(negedge txd) begin   // wait for start bit
+    #250
+    uart_rxdata = 8'd0;
+    repeat (8) begin
+      #500
+      uart_rxdata = {txd, uart_rxdata[7:1]};
+    end
+    #500
+    $display("UART: %02Xh", uart_rxdata);
+  end
+
+  // Dump signals for EPWave, a free waveform viewer on Github.
   initial
     begin
-      // Required to dump signals to EPWave
       $dumpfile("dump.vcd");
       $dumpvars(0);
     end

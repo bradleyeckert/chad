@@ -255,26 +255,26 @@ These were with out-of-the-box defaults. Consider them approximations.
 
 **Intel/Altera MAX 10, 10M04SCE144C8G**
 
-- 1568 LEs (38% of chip)
-- Slow 125C model: Fmax = 108 MHz
+- 1558 LEs (38% of chip)
+- Slow 125C model: Fmax = 109 MHz
 - Digikey price $8.92 (100pc)
 
 **Intel/Altera Cyclone 10 LP, 10CL006YE144C8G**
 
-- 1566 LEs (25% of chip)
-- Slow 85C model: Fmax = 98 MHz
+- 1567 LEs (25% of chip)
+- Slow 85C model: Fmax = 105 MHz
 - Digikey price $6.74 (60pc)
-- Faster part (C6G) is $10.77, has Fmax of 128 MHz.
+- Faster part (C6G) is $10.77, has Fmax of 130 MHz.
 
 **Lattice ICE5LP4K-SG48ITR**
 
-- 1563 LUT4s (40% of chip) using LSE synthesis
-- Fmax = 53 MHz
+- 1619 LUT4s (46% of chip) using LSE synthesis
+- Fmax = 55 MHz
 - Digikey price $4.40 (100pc)
 
 **Lattice LFE5U-12F-6BG256C**
 
-- 1563 LUT4s (13% of chip) using LSE synthesis
+- 1619 LUT4s (15% of chip) using LSE synthesis
 - Fmax = 60 MHz
 - Digikey price $5.50 (100pc)
 
