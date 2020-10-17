@@ -4,13 +4,17 @@
 `default_nettype none
 module spif
 #(
-  parameter CODE_SIZE = 10,   // log2 of # of 16-bit instruction words
-  parameter WIDTH = 18,       // word size of data memory
-  parameter DATA_SIZE = 10,   // log2 of # of cells in data memory
-  parameter BASEBLOCK = 0,    // which 64KB sector to start user flash at
-  parameter PRODUCT_ID0 = 1,  // product ID for ISP
-  parameter PRODUCT_ID1 = 2,
-  parameter UART_RATE_POR = 868
+  parameter CODE_SIZE = 10,             // log2 of # of 16-bit instruction words
+  parameter WIDTH = 18,                 // word size of data memory
+  parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
+  parameter BASEBLOCK = 0,              // first 64KB sector of user flash
+  parameter PRODUCT_ID0 = 0,            // product ID for ISP
+  parameter PRODUCT_ID1 = 1,
+  parameter UART_RATE_POR = 868,        // default UART baud rate = Fclk / this
+  parameter KEY0 = 32'h0,               // flash cipher key
+  parameter KEY1 = 32'h0,               // the ISP host will need the same key
+  parameter KEY2 = 32'h0,               // unless it's 0, which means no cipher
+  parameter KEY3 = 32'h0
 )(
   input  wire              clk,
   input  wire              arstn,       // async reset (active low)
@@ -44,6 +48,40 @@ module spif
   output reg  [3:0]        f_rate,      // Flash SCLK divisor
   input  wire [7:0]        f_din        // Flash received data
 );
+
+//==============================================================================
+// Key generation for gecko cipher
+// The cipher secures code and data in off-chip SPI flash to some degree.
+// Ideally, widekey would be programmed via fuses or OTP.
+// You can disable the cipher by setting KEY0, KEY1, KEY2, KEY3 = 0.
+// It won't be pruned, though. For that, instantiate a do-nothing module.
+//==============================================================================
+
+  wire [127:0] widekey = {KEY0, KEY1, KEY2, KEY3};
+  reg [6:0] key_index;
+  wire g_key = widekey[key_index];
+
+  always @(posedge clk or negedge arstn)
+    if (!arstn) begin
+      key_index <= 7'd120;
+    end else begin
+      if (key_index)
+        key_index <= key_index - 7'd1;
+    end
+
+  wire g_ready;                         // g_dout is ready
+  wire [7:0] g_dout;                    // gecko PRNG byte
+  reg g_next;                           // trigger next byte
+
+  gecko cipher (
+    .clk        (clk),
+    .rst_n      (arstn),
+    .clken      (1'b1),
+    .ready      (g_ready),
+    .next       (g_next),
+    .key        (g_key),
+    .dout	(g_dout)
+  );
 
 //==============================================================================
 // UART input FSM
@@ -196,7 +234,7 @@ module spif
 
   wire b_rxok = ISPfull & ~ISPack;
   wire b_txok = u_ready & ~u_wr;
-  wire f_ok = f_ready & ~f_wr;
+  wire f_ok = f_ready & ~f_wr & g_ready;
   reg init;                             // init memory
 
 // Boot mode FSM
@@ -207,7 +245,7 @@ module spif
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 3'd0;     bumpDest <= 1'b0;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 2'b00;
-      bytecount <= 2'd0;  codeWr <= 1'b0;
+      bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  // start in boot mode
       p_reset <= 1'b1;    u_wr <= 1'b0;      u_txbyte <= 0;
       init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
@@ -215,8 +253,9 @@ module spif
       codeWr <= 1'b0;
       dataWr <= 1'b0;
       bumpDest <= 1'b0;
+      g_next <= 1'b0;
       if (init) begin
-        codeWr <= 1'b1;
+        codeWr <= 1'b1;                 // clear RAMs
         dataWr <= 1'b1;
         bumpDest <= 1'b1;
         if (i_count) i_count <= i_count - 1;
@@ -238,7 +277,7 @@ module spif
           case (b_state)
           3'b000:
             begin
-              f_wr <= 1'b0; // ========== Interpret ISP bytes ==========
+              f_wr <= 1'b0;             // ========== Interpret ISP bytes
               f_who <= 1'b1;
               case (i_state)
               ISP_IDLE:
@@ -255,7 +294,7 @@ module spif
                         i_count <= 12'd3;
                       end
                       if (ISPbyte[2])
-                        b_state <= 3'd1;  // reboot from flash
+                        b_state <= 3'd1;// reboot from flash
                     end
                   2'b10:          	// send a run of bytes to flash
                     begin
@@ -273,13 +312,13 @@ module spif
               ISP_UPLOAD:
                 if (b_rxok) begin
                   ISPack <= 1'b1;
-                  f_wr <= 1'b1; 	        // UART --> flash
+                  f_wr <= 1'b1; 	// UART --> flash
                   if (i_count) i_count <= i_count - 12'd1;
                   else i_state <= ISP_IDLE;
                 end
               ISP_DNLOAD:
                 if (b_txok) begin
-                  u_wr <= 1'b1;           // flash --> UART
+                  u_wr <= 1'b1;         // flash --> UART
 	  	i_usel <= 2'b00;
                   f_wr <= 1'b1;
                   if (i_count) i_count <= i_count - 12'd1;
@@ -296,10 +335,10 @@ module spif
                 i_state <= ISP_IDLE;
               endcase
             end
-          3'b111: // ========== Interpret flash bytes ==========
+          3'b111:                       // ========== Interpret flash bytes
             begin
-              case (b_mode[2:1])          // what kind of byte is it?
-              2'b00:                      // 00x = command
+              case (b_mode[2:1])        // what kind of byte is it?
+              2'b00:                    // 00x = command
                 case (f_din[7:6])
                 2'b11:               	// blank = "end"
                   begin
@@ -307,7 +346,7 @@ module spif
                       f_wr <= 1'b0;
                       f_format <= 3'd0;	// raise CS#
                       p_reset  <= f_din[4];
-                      b_state  <= 3'd0; 	// reset FSM
+                      b_state  <= 3'd0; // reset FSM
                     end else
                       b_mode <= {1'b1, f_din[1:0]};
                   end
@@ -322,9 +361,9 @@ module spif
                     bytecount <= f_din[1:0];
                   end
                 endcase
-              2'b01:                      // 01x = write to memory
+              2'b01:                    // 01x = write to memory
                 begin
-                  b_data <= {b_data[WIDTH-9:0], f_din};
+                  b_data <= {b_data[WIDTH-9:0], f_din ^ g_dout};
                   if (bytecount)
                     bytecount <= bytecount - 2'd1;
                   else
@@ -333,17 +372,18 @@ module spif
                       codeWr <= ~b_mode[0];
                       dataWr <=  b_mode[0];
                       bumpDest <= 1'b1;
+                      g_next <= 1'b1;
                       if (b_count)  b_count <= b_count - 16'd1;
                       else          b_mode <= 3'd0;
                     end
                 end
-              2'b10:                      // 10x = set destination address
+              2'b10:                    // 10x = set destination address
                 if (b_mode[0]) begin
                   b_dest[15:8] <= f_din;   b_mode[0] <= 1'b0;
                 end else begin
                   b_dest[7:0] <= f_din;    b_mode <= 3'd0;
                 end
-              default:                    // 11x = set data length
+              default:                  // 11x = set data length
                 if (b_mode[0]) begin
                   b_count[15:8] <= f_din;  b_mode[0] <= 1'b0;
                 end else begin

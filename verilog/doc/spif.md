@@ -39,6 +39,7 @@ Allows room for FPGA bitstream if used.
 - PRODUCT_ID0: First product ID byte, user defined.
 - PRODUCT_ID1: Second product ID byte, user defined.
 - UART_RATE_POR: Default baud rate divisor for UART, Baud = Fclk / this.
+- KEY0, KEY1, KEY2, KEY3: Cipher key
 
 ## Ports
 
@@ -297,11 +298,35 @@ be spent spinning in a loop waiting for bytes to move through the SPI.
 
 ### Encryption
 
-The easiest method of encryption is to use a stream cipher like Grain-128a to
-decrypt the boot stream inside of `spif` as `b_data` is loaded.
-This is left for future implementation, but it should be easy.
-A new byte to XOR with the byte stream can be produced in eight cycles,
-concurrent with other activities. Only POR can reset the keystream.
-Along with the fact that random read of code space isn't supported,
-making the plaintext unavailable, the attack surface can be rather small.
+An SPI flash is easily read out using a clip-on probe and programming adapter.
+A flash die bonded out in an ASIC can be probed with some extra effort.
+Encrypting the application would protect it from prying eyes.
+Such paranoia seems justified if you look at the speed with which games and PC
+apps are cracked.
+Encrypting the SPI flash contents is useful because it protects against
+tampering and reverse engineering.
+It's an important part of any risk management plan.
 
+The easiest method of encryption is to use a stream cipher to
+decrypt the boot stream inside of `spif` as `b_data` is loaded.
+I went ahead and put this in, adding 200 LEs to the size. Not bad.
+There are some very compact stream ciphers. LIZARD is one of the smallest.
+This use case didn't need the sophisticated key initialization sequence of
+LIZARD, so I simplified it and named the module "gecko".
+
+Only a hard reset can reset the keystream.
+Along with the fact that random read of code space isn't supported by hardware,
+making the plaintext unavailable, the attack surface is rather small.
+The only way to put code into code RAM is to load it from the encrypted flash.
+So, it seems secure enough. 
+
+A fixed key has its downsides, which
+should be addressed if the design moves to ASIC.
+The key could be fuse-programmable, for example.
+Then the security burden moves to programming hardware, which you control.
+The typical strategy for key generation is to tie the key to the product serial
+number, also programmed, through a KDF (key derivation function) based on an
+irreversible and compute-intensive hash.
+
+You have the option of not using a key (setting it to 0), which makes the 
+keystream also 0 so that it doesn't decrypt anything.

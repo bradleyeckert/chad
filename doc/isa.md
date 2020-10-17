@@ -8,6 +8,12 @@ Some small tweaks to the J1 facilitate double precision math, looping,
 large address spaces, and room for user instructions.
 The result is the Chad ISA.
 
+J1-style CPUs handle branches very well. 
+Even though the memories are synchronous-read, jumps and calls cost only one
+clock cycle.
+Returns often cost nothing since a "return" bit can trigger a return in parallel
+with an ALU operation.
+
 ## Chad ISA summary
 
 ```
@@ -77,14 +83,14 @@ The `insn[3:2]` field of the ALU instruction is return stack control:
 
 - 00: No change
 - 01: `r+1` RP = RP + 1
-- 10: `r-2` RP = RP - 2
+- 10: `r-2` RP = RP - 2 (do not use)
 - 11: `r-1` RP = RP - 1
 
 The `insn[1:0]` field of the ALU instruction is data stack control:
 
 - 00: No change
 - 01: `d+1` SP = SP + 1
-- 10: `d-2` SP = SP - 2
+- 10: `d-2` SP = SP - 2 (do not use)
 - 11: `d-1` SP = SP - 1
 
 ### What's with the non-J1 ALU opcodes?
@@ -101,8 +107,6 @@ that aren't stack-friendly.
 - `C` T = 1 if carry else 0
 - `cT2` T = T >> 1, MSB = carry
 - `T2*c` T = (T << 1) + carry
-- `T+Nc` T = N + T + carry
-- `N-Tc` T = N - T - carry
 - `CO` Latch the carry result of this instruction
 
 **Loops** adds a decrement to the R -> T path:

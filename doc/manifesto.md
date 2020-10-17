@@ -58,7 +58,8 @@ you have to "go beyond".
 
 Intent matters. It's the seed. Once the seed sprouts and grows, it's going to
 remain the same tree. Forth was designed for exploration. Exploration of space,
-the solar system, the bottom of the ocean.
+the solar system, the bottom of the ocean. The Voyager spacecraft, currently
+beyond the solar system, has Forth on-board. 
 If you are an explorer, Forth is for you.
 
 Where did C come from?
