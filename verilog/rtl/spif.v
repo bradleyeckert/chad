@@ -50,7 +50,7 @@ module spif
 );
 
 //==============================================================================
-// Key generation for gecko cipher
+// Key generation for gecko.v cipher
 // The cipher secures code and data in off-chip SPI flash to some degree.
 // Ideally, widekey would be programmed via fuses or OTP.
 // You can disable the cipher by setting KEY0, KEY1, KEY2, KEY3 = 0.
@@ -93,6 +93,7 @@ module spif
   reg uartRXfull;                       // Indicate that UART is full
   reg ispActive;                        // Indicate that ISP mode is active
   reg ISPfull, ISPack;                  // Indicate ISP byte was received
+  reg iobusy;
 
   reg [3:0] r_state;                    // UART receive state
   localparam unlockbyte0  = 8'hA5;
@@ -170,15 +171,17 @@ module spif
         if (ISPack == 1'b1)
           ISPfull <= 1'b0;
         if (io_rd)
-          case (mem_addr[2:0])          // io read clears UART receive flag
-          3'b000: uartRXfull <= 1'b0;
-          endcase
+          if (!p_hold)
+            case (mem_addr[2:0])        // io read clears UART receive flag
+            3'b000: uartRXfull <= 1'b0;
+            endcase
         if (io_wr)
-          case (mem_addr[2:0])
-          3'b010: u_rate <= din[15:0];  // set UART baud rate
-          3'b100:                       // jam an ISP byte
-            {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
-          endcase
+          if (!p_hold)
+            case (mem_addr[2:0])
+            3'b010: u_rate <= din[15:0];// set UART baud rate
+            3'b100:                     // jam an ISP byte
+              {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
+            endcase
       end
 
   reg  [2:0] b_state;                   // boot FSM state
@@ -208,6 +211,17 @@ module spif
       default: u_dout <= BASEBLOCK[7:0];
       endcase
     else       u_dout <= u_txbyte;
+  end
+
+  always @* begin                       // insert i/o wait states
+    if (io_wr) begin
+      case (mem_addr[2:0])
+      3'b000:  iobusy = txbusy;         // UART output
+      3'b100:  iobusy = ISPfull;        // SPI flash byte-banging
+      default: iobusy = 1'b0;
+      endcase
+    end else
+      iobusy = 1'b0;
   end
 
 //==============================================================================
@@ -258,7 +272,7 @@ module spif
         codeWr <= 1'b1;                 // clear RAMs
         dataWr <= 1'b1;
         bumpDest <= 1'b1;
-        if (i_count) i_count <= i_count - 1;
+        if (i_count) i_count <= i_count - 12'd1;
         else init <= 1'b0;
       end else begin
         u_wr <= 1'b0;
@@ -298,7 +312,8 @@ module spif
                     end
                   2'b10:          	// send a run of bytes to flash
                     begin
-                      i_state <= ISP_UPLOAD;
+                      if (ISPbyte[2:0]) // upload if there is a format
+                        i_state <= ISP_UPLOAD;
                       f_format <= ISPbyte[2:0];
                     end
                   2'b11:          	// read a run of bytes from flash
@@ -319,7 +334,7 @@ module spif
               ISP_DNLOAD:
                 if (b_txok) begin
                   u_wr <= 1'b1;         // flash --> UART
-	  	i_usel <= 2'b00;
+          	i_usel <= 2'b00;
                   f_wr <= 1'b1;
                   if (i_count) i_count <= i_count - 12'd1;
                   else i_state <= ISP_IDLE;
@@ -327,7 +342,7 @@ module spif
               ISP_PING:
                 if (b_txok) begin
                   u_wr <= 1'b1;
-	  	i_usel <= i_count[1:0];
+          	i_usel <= i_count[1:0];
                   if (i_count) i_count <= i_count - 12'd1;
                   else i_state <= ISP_IDLE;
                 end
@@ -352,7 +367,7 @@ module spif
                   end
                 2'b10:               	// SCLK frequency
                   begin
-	  	  f_rate <= f_din[3:0];
+          	  f_rate <= f_din[3:0];
                   end
                 default:             	// data mode
                   begin
@@ -399,19 +414,20 @@ module spif
       if (bumpDest)
         b_dest <= b_dest + 16'd1;
       if (io_wr)
-        case (mem_addr[2:0])
-        3'b000: begin
-            u_wr <= 1'b1;               // write to UART
-            u_txbyte <= din[7:0];
-          end
-	3'b011: b_state <= 3'd6;        // interpret flash byte stream
-        endcase
+        if (!p_hold)
+          case (mem_addr[2:0])
+          3'b000: begin
+              u_wr <= 1'b1;             // write to UART
+              u_txbyte <= din[7:0];
+            end
+          3'b011: b_state <= 3'd6;      // interpret flash byte stream
+          endcase
     end
 
 // The Data and Code RAMs are accessed via DMA by the boot process.
 // The bootloader writes to either code or data RAM.
 
-  assign p_hold = codeWr | dataWr;
+  assign p_hold = codeWr | dataWr | iobusy;
   wire code_rd = ~p_hold;
   wire [CODE_SIZE-1:0] code_ia =
        (codeWr) ? b_dest[CODE_SIZE-1:0] : code_addr[CODE_SIZE-1:0];

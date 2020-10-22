@@ -2,7 +2,7 @@
 // License: This code is a gift to the divine.
 
 // This is expected to be wrapped by an I/O ring that steers bidirectional
-// signals and conditions the reset signal.
+// signals, conditions the reset signal, and supplies a clock.
 
 `default_nettype none
 module mcu
@@ -52,6 +52,7 @@ module mcu
 
   wire p_reset_n = ~p_reset;
 
+  // chad processor with 18-bit cells
   chad #(18) u0 (
     .clk      (clk      ),
     .resetq   (p_reset_n),
@@ -68,18 +69,25 @@ module mcu
     .insn     (insn     )
   );
 
+  wire io_spif = (mem_addr[6:3] == 0);
+  wire s_iord = io_spif & io_rd;
+  wire s_iowr = io_spif & io_wr;
+
+  wire [17:0] s_io_dout = io_dout; // spif is the only I/O device
+
   // spif is the SPI flash controller for the chad processor
+  // 2048 words of code, 1024 words of data
   spif #(11, 18, 10, 0, 3, 4, 50) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
-    .io_rd    (io_rd    ),
-    .io_wr    (io_wr    ),
+    .io_rd    (s_iord   ),
+    .io_wr    (s_iowr   ),
     .mem_rd   (mem_rd   ),
     .mem_wr   (mem_wr   ),
     .mem_addr (mem_addr ),
     .din      (din      ),
     .mem_dout (mem_dout ),
-    .io_dout  (io_dout  ),
+    .io_dout  (s_io_dout),
     .code_addr(code_addr),
     .insn     (insn     ),
     .p_hold   (p_hold   ),
@@ -118,7 +126,7 @@ module mcu
     .oe       (oe       )
   );
 
-  // Convert UART connection to a byte stream
+  // Convert 2-wire UART connection to a byte stream
   uart u3 (
     .clk      (clk     ),
     .arstn    (rst_n   ),

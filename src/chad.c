@@ -1056,12 +1056,12 @@ SV LoadFlash(void) {
     error = LoadFlashMem(tok);
 }
 
-SV SaveFlash(void) {
+SV SaveFlash(void) {                    // chad format ( pid -- )
     ParseFilename();
-    error = SaveFlashMem(tok);
+    error = SaveFlashMem(tok, Dpop());
 }
 
-SV SaveFlashHex(void) {
+SV SaveFlashHex(void) {                 // format for SPI flash Verilog model
     ParseFilename();
     error = SaveFlashMemHex(tok);
 }

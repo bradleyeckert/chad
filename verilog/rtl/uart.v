@@ -68,11 +68,11 @@ module uart
       end else ready <= 1'b1;
 // Receiver
       if (rxstate) begin
-        if (!rxstate[3:0])
+        if (rxstate[3:0] == 4'd1)
           case (rxstate[7:4])
-          4'b1010:
+          4'b1001:
             if (rxdi) rxstate <= 8'd0;  // false start
-          4'b0001:
+          4'b0000:
             if (rxdi) {dout, full} <= {rxreg, 1'b1};
             else      error <= 1'b1;    // '0' at the stop bit (or BREAK)
           default:
@@ -81,7 +81,7 @@ module uart
         rxstate <= rxstate - 8'd1;
       end else begin
         error <= error & ~rxdi;         // stop or mark ('1') clears error
-        if (startbit) rxstate <= 8'hA8; // will be sampled mid-bit
+        if (startbit) rxstate <= 8'h98; // will be sampled mid-bit
       end
     end
     if (rd) full <= 1'b0;               // reading clears full

@@ -5,7 +5,7 @@
 #define __FLASH_H__
 
 int LoadFlashMem(char *filename);
-int SaveFlashMem(char* filename);
+int SaveFlashMem(char* filename, uint32_t pid);
 int SaveFlashMemHex(char* filename);
 
 // Write byte to flash directly, used to build boot list

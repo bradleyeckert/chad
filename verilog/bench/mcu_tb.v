@@ -58,6 +58,19 @@ module mcu_tb();
 
   always #5 clk <= !clk;
 
+  // Send a byte: 1 start, 8 data, 1 stop
+  task UART_TX;
+    input [7:0] i_Data;
+    begin
+      rxd = 1'b0;
+      repeat (10) begin
+        #500
+        rxd = i_Data[0];
+        i_Data = {1'b1, i_Data[7:1]};
+      end
+    end
+  endtask // UART_TX
+
   // Main Testing:
   initial
     begin
@@ -65,7 +78,23 @@ module mcu_tb();
       rst_n <= 1'b1;
       @(posedge cs_n);
       $display("Finished booting");
-      #160000
+      repeat (15000) @(posedge clk);
+      // Demonstrate ISP by reading the 3-byte JDID (9F command).
+      // A more modern method of getting flash characteristics is with the
+      // SFDP (5A command), which fixes the mess created by the JDID scheme.
+      UART_TX(8'h12);           // activate ISP
+      UART_TX(8'hA5);
+      UART_TX(8'h5A);
+      UART_TX(8'h00);
+      UART_TX(8'h00);
+      UART_TX(8'h82);           // send to SPI flash
+      UART_TX(8'h9F);           // trigger ID read
+      UART_TX(8'h02);
+      UART_TX(8'hC2);           // read the 3 return bytes
+      UART_TX(8'h80);           // raise CS_N
+      UART_TX(8'h12);           // deactivate ISP
+      UART_TX(8'h00);
+      repeat (2000) @(posedge clk);
       $stop();
     end
 

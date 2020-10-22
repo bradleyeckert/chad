@@ -30,6 +30,18 @@ static void invertMem(uint8_t* m, int n) {
 	}
 }
 
+static uint32_t crc32b(uint8_t* message, int length) {
+	uint32_t crc = 0xFFFFFFFF;			// compute CRC32
+	while (length--) {
+		crc = crc ^ (*message++);		// Get next byte.
+		for (int j = 7; j >= 0; j--) {	// Do eight times.
+			uint32_t mask = -(signed)(crc & 1);
+			crc = (crc >> 1) ^ (0xEDB88320 & mask);
+		}
+	}
+	return ~crc;
+}
+
 int LoadFlashMem(char* filename) {      // load binary image
 	memset(mem, 0, FlashMemorySize);    // erase flash
 	FILE* fp;
@@ -39,13 +51,15 @@ int LoadFlashMem(char* filename) {      // load binary image
 	fp = fopen(filename, "rb");
 #endif
 	if (fp == NULL) return BAD_OPENFILE;
+	fread(mem, 1, 16, fp);				// skip boilerplate
 	int length = fread(mem, 1, FlashMemorySize, fp);
 	invertMem(mem, length);
 	fclose(fp);
 	return 0;
 }
 
-int SaveFlashMem(char* filename) {		// save binary image
+// save binary image
+int SaveFlashMem(char* filename, uint32_t pid) {
 	int i = FlashMemorySize;
 	while ((i) && (mem[--i] == 0)) {}   // trim
 	if (!i) return 0;                   // nothing to save
@@ -57,14 +71,19 @@ int SaveFlashMem(char* filename) {		// save binary image
 	fp = fopen(filename, "wb");
 #endif
 	if (fp == NULL) return BAD_CREATEFILE;
+	fwrite("chad", 1, 4, fp);			// boilerplate: "chad"
+	fwrite(&pid, 1, 4, fp);			    // product ID
+	fwrite(&i, 1, 4, fp);			    // length
 	invertMem(mem, i);
+	uint32_t crc = crc32b(mem, i);
+	fwrite(&crc, 1, 4, fp);			    // crc
 	fwrite(mem, 1, i, fp);
 	invertMem(mem, i);
 	fclose(fp);
 	return 0;
 };
 
-int SaveFlashMemHex(char* filename) {		// save binary image
+int SaveFlashMemHex(char* filename) {	// save hex image
 	int i = FlashMemorySize;
 	while ((i) && (mem[--i] == 0)) {}   // trim
 	if (!i) return 0;                   // nothing to save

@@ -1,0 +1,111 @@
+COMMERCIAL ;
+BLOCK RESETPATHS ;
+BLOCK ASYNCPATHS ;
+LOCATE COMP "clk_in" SITE "21" ;
+LOCATE COMP "rst_n" SITE "19" ;
+LOCATE COMP "uart_rx" SITE "110" ;
+LOCATE COMP "uart_tx" SITE "109" ;
+LOCATE COMP "led_0" SITE "46" ;
+LOCATE COMP "led_1" SITE "45" ;
+LOCATE COMP "led_2" SITE "44" ;
+LOCATE COMP "led_3" SITE "43" ;
+LOCATE COMP "led_4" SITE "40" ;
+LOCATE COMP "led_5" SITE "39" ;
+LOCATE COMP "led_6" SITE "38" ;
+LOCATE COMP "led_7" SITE "37" ;
+LOCATE COMP "spi_csn" SITE "11" ;
+LOCATE COMP "spi_miso" SITE "16" ;
+LOCATE COMP "spi_mosi" SITE "15" ;
+LOCATE COMP "spi_sclk" SITE "13" ;
+LOCATE COMP "wn" SITE "18" ;
+LOCATE COMP "holdn" SITE "17" ;
+#LOCATE COMP "sw_0" SITE "58" ;
+#LOCATE COMP "sw_1" SITE "57" ;
+#LOCATE COMP "sw_2" SITE "56" ;
+#LOCATE COMP "sw_3" SITE "55" ;
+LOCATE COMP "sw_4" SITE "54" ;
+LOCATE COMP "sw_5" SITE "53" ;
+LOCATE COMP "sw_6" SITE "52" ;
+LOCATE COMP "sw_7" SITE "50" ;
+IOBUF ALLPORTS IO_TYPE=LVCMOS33 ;
+IOBUF PORT "clk_in" IO_TYPE=LVCMOS33 PULLMODE=NONE ;
+#FREQUENCY NET "clk" 50.000000 MHz ;
+#INPUT_SETUP PORT "spi_miso" 5.000000 ns CLKNET "clk" ;
+#INPUT_SETUP PORT "uart_rx" 20.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "uart_tx" 20.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "spi_csn" 10.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "spi_mosi" 10.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "spi_sclk" 10.000000 ns CLKNET "clk" ;
+
+#LOCATE COMP "sram_addr_0" SITE "119" ;
+#LOCATE COMP "sram_addr_1" SITE "120" ;
+#LOCATE COMP "sram_addr_2" SITE "121" ;
+#LOCATE COMP "sram_addr_3" SITE "122" ;
+#LOCATE COMP "sram_addr_4" SITE "123" ;
+#LOCATE COMP "sram_addr_5" SITE "124" ;
+#LOCATE COMP "sram_addr_6" SITE "125" ;
+#LOCATE COMP "sram_addr_7" SITE "127" ;
+#LOCATE COMP "sram_addr_8" SITE "129" ;
+#LOCATE COMP "sram_addr_9" SITE "130" ;
+#LOCATE COMP "sram_addr_10" SITE "131" ;
+#LOCATE COMP "sram_addr_11" SITE "132" ;
+#LOCATE COMP "sram_addr_12" SITE "133" ;
+#LOCATE COMP "sram_addr_13" SITE "134" ;
+#LOCATE COMP "sram_addr_14" SITE "137" ;
+#LOCATE COMP "sram_addr_15" SITE "138" ;
+#LOCATE COMP "sram_addr_16" SITE "141" ;
+#LOCATE COMP "sram_cen" SITE "142" ;
+#LOCATE COMP "sram_data_0" SITE "1" ;
+#LOCATE COMP "sram_data_1" SITE "2" ;
+#LOCATE COMP "sram_data_2" SITE "5" ;
+#LOCATE COMP "sram_data_3" SITE "6" ;
+#LOCATE COMP "sram_data_4" SITE "7" ;
+#LOCATE COMP "sram_data_5" SITE "8" ;
+#LOCATE COMP "sram_data_6" SITE "9" ;
+#LOCATE COMP "sram_data_7" SITE "10" ;
+#LOCATE COMP "sram_oen" SITE "143" ;
+#LOCATE COMP "sram_wen" SITE "144" ;
+#INPUT_SETUP PORT "sram_data*" 5.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "sram_addr*" 15.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "sram_cen" 15.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "sram_oen" 15.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "sram_wen" 15.000000 ns CLKNET "clk" ;
+#CLOCK_TO_OUT PORT "sram_data*" 15.000000 ns CLKNET "clk" ;
+#DEFINE BUS BUS_SRAM 
+#	NET "sram_addr_c_0"
+#	NET "sram_addr_c_1"
+#	NET "sram_addr_c_2"
+#	NET "sram_addr_c_3"
+#	NET "sram_addr_c_4"
+#	NET "sram_addr_c_5"
+#	NET "sram_addr_c_6"
+#	NET "sram_addr_c_7"
+#	NET "sram_addr_c_8"
+#	NET "sram_addr_c_9"
+#	NET "sram_addr_c_10"
+#	NET "sram_addr_c_11"
+#	NET "sram_addr_c_12"
+#	NET "sram_addr_c_13"
+#	NET "sram_addr_c_14"
+#	NET "sram_addr_c_15"
+#	NET "sram_addr_c_16"
+#	NET "sram_data_out_0"
+#	NET "sram_data_out_1"
+#	NET "sram_data_out_2"
+#	NET "sram_data_out_3"
+#	NET "sram_data_out_4"
+#	NET "sram_data_out_5"
+#	NET "sram_data_out_6"
+#	NET "sram_data_out_7"
+#	NET "sram_cen_int"
+#	NET "sram_oen_int"
+#	NET "sram_wen_int";
+#DEFINE BUS BUS_SPI 
+#	NET "spi_sclk_c"
+#	NET "spi_csn_c"
+#	NET "spi_mosi_c";
+#MAXSKEW BUS "BUS_SRAM" 3.000000 ns ;
+#MAXSKEW BUS "BUS_SPI" 3.000000 ns ;
+
+BLOCK JTAGPATHS ;
+FREQUENCY PORT "clk_in" 50.000000 MHz ;

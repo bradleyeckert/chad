@@ -44,7 +44,7 @@ include ../ctea.f
 \ Try 25 fib, then stats
 
 make-boot               \ create a boot record in flash
-save-flash myapp.bin    \ save to a file you can boot from
+0 save-flash myapp.bin  \ save to a 'chad' file you can boot from
 save-flash-h myapp.txt  \ also save in hex for flash memory model
 
 \ You can now run the app with "boot myapp.bin".
