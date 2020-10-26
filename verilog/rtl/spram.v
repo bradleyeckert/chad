@@ -19,11 +19,13 @@ module spram
   always @ (posedge clk) begin
     if (we)
       mem[addr] <= din;
-    if (re)
+//  if (re)
       dout <= mem[addr];
   end
 
 endmodule
 
-// Could use "else if(re)" but then Quartus can't infer block RAM for Cyclone parts.
-// Cannot ignore (re) and read all the time, that hoses some reads.
+// Some FPGAs don't like (re).
+// If commented out, the `hold` signal in `spif` won't work correctly.
+// So, you won't be able to use DMA or hardware I/O hold-off.
+// Otherwise, firmware will still run.

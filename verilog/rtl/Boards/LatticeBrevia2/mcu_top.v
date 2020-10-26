@@ -3,7 +3,7 @@
 // This runs on the Brevia 2 board. FPGA: LFXP2-5E-6TN144C
 
 // Without changing the MCU, the UART baud rate is 1MBPS since Fclk = 50 MHz.
-// This is supported by the FTDI chip.
+// This is supported by the FTDI chip, port B.
 
 `default_nettype none
 module mcu_top
@@ -43,7 +43,7 @@ module mcu_top
     rst_n1 <= rst_n;
   end
 
-  assign led_0 = arst_n ^  ~sw_7;
+  assign led_0 = sw_7;
   assign led_1 = uart_rx ^ ~sw_6;
   assign led_2 = uart_tx ^ ~sw_5;
   assign led_3 = spi_csn ^ ~sw_4;

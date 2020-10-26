@@ -72,12 +72,13 @@ module mcu
   wire io_spif = (mem_addr[6:3] == 0);
   wire s_iord = io_spif & io_rd;
   wire s_iowr = io_spif & io_wr;
+  wire [17:0] s_io_dout;
 
-  wire [17:0] s_io_dout = io_dout; // spif is the only I/O device
+  assign io_dout = s_io_dout;           // spif is the only I/O device
 
   // spif is the SPI flash controller for the chad processor
   // 2048 words of code, 1024 words of data
-  spif #(11, 18, 10, 0, 3, 4, 50) u1 (
+  spif #(11, 18, 10, 0, 0, 0, 50) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),

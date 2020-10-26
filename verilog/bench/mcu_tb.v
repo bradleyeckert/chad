@@ -43,6 +43,7 @@ module mcu_tb();
   pullup(qd[2]);
   pullup(qd[1]);
   pullup(qd[0]);
+  pullup(cs_n);
 
   mcu u1 (
     .clk      (clk     ),
@@ -85,12 +86,23 @@ module mcu_tb();
       UART_TX(8'h12);           // activate ISP
       UART_TX(8'hA5);
       UART_TX(8'h5A);
+      UART_TX(8'h42);           // ping (4 bytes)
+      repeat (2000) @(posedge clk);
       UART_TX(8'h00);
       UART_TX(8'h00);
       UART_TX(8'h82);           // send to SPI flash
       UART_TX(8'h9F);           // trigger ID read
       UART_TX(8'h02);
       UART_TX(8'hC2);           // read the 3 return bytes
+      UART_TX(8'h80);           // raise CS_N
+      UART_TX(8'h82);           // send to SPI flash 1 byte
+      UART_TX(8'h05);           // RDSR
+      UART_TX(8'hC2);           // read 1 status byte
+      repeat (1000) @(posedge clk);
+      UART_TX(8'hC2);           // read 1 status byte
+      repeat (1000) @(posedge clk);
+      UART_TX(8'hC2);           // read 1 status byte
+      repeat (2000) @(posedge clk);
       UART_TX(8'h80);           // raise CS_N
       UART_TX(8'h12);           // deactivate ISP
       UART_TX(8'h00);

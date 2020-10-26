@@ -1,121 +1,36 @@
 #include <stdio.h>
 #include <stdint.h>
-#include <windows.h>
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
+#include "rs232.h"
 
-/* 
-Chad ISP utility
+/*
+Chad ISP utility, C99, tested on Windows. Should compile on Linux/Mac.
 
-The 'spif' interface is set up to allow hardware control through the UART stream.
+The spif interface allows hardware control through the UART stream.
 A host PC can control 'spif' through a serial port to:
   - Reset the target CPU
   - Load the SPI flash with new data
   - Reboot the target
 
 Command line parameters are:
-<filename> <portname> [baud]
+<filename> <port#> [baud]
 filename is a file path without embedded spaces.
-portname is the COM port name to test, such as "COM4".
+port# is the COM port number.
 baud is an optional baud rate.
+
+Serial communication uses https://gitlab.com/Teuniz/RS-232/ for cross-platform
+abstraction. Ports are numbered for this. Numbering starts at 0, so COM4 is 3.
 */
 
 #define DEFAULTBAUD 1000000L
+#define DEFAULTPORT 3
 #define MemorySize  (1024*1024)
 
-// Opens the specified serial port, configures its timeouts, and sets its
-// baud rate.  Returns a handle on success, or INVALID_HANDLE_VALUE on failure.
-HANDLE open_serial_port(const char* device, uint32_t baud_rate)
-{
-    HANDLE port = CreateFileA(device, GENERIC_READ | GENERIC_WRITE, 0, NULL,
-        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (port == INVALID_HANDLE_VALUE)
-    {
-        return INVALID_HANDLE_VALUE;
-    }
-
-    // Flush away any bytes previously read or written.
-    BOOL success = FlushFileBuffers(port);
-    if (!success)
-    {
-        printf("Failed to flush serial port\n");
-        CloseHandle(port);
-        return INVALID_HANDLE_VALUE;
-    }
-
-    // Configure read and write operations to time out after 100 ms.
-    COMMTIMEOUTS timeouts = { 0 };
-    timeouts.ReadIntervalTimeout = 0;
-    timeouts.ReadTotalTimeoutConstant = 100;
-    timeouts.ReadTotalTimeoutMultiplier = 0;
-    timeouts.WriteTotalTimeoutConstant = 100;
-    timeouts.WriteTotalTimeoutMultiplier = 0;
-
-    success = SetCommTimeouts(port, &timeouts);
-    if (!success)
-    {
-        printf("Failed to set serial timeouts\n");
-        CloseHandle(port);
-        return INVALID_HANDLE_VALUE;
-    }
-
-    DCB state;
-    state.DCBlength = sizeof(DCB);
-    success = GetCommState(port, &state);
-    if (!success)
-    {
-        printf("Failed to get serial settings\n");
-        CloseHandle(port);
-        return INVALID_HANDLE_VALUE;
-    }
-
-    state.BaudRate = baud_rate;
-
-    success = SetCommState(port, &state);
-    if (!success)
-    {
-        printf("Failed to set serial settings\n");
-        CloseHandle(port);
-        return INVALID_HANDLE_VALUE;
-    }
-
-    return port;
-}
-
-// Writes bytes to the serial port, returning 0 on success and -1 on failure.
-int write_port(HANDLE port, uint8_t* buffer, size_t size)
-{
-    DWORD written;
-    BOOL success = WriteFile(port, buffer, size, &written, NULL);
-    if (!success)
-    {
-        printf("Failed to write to port\n");
-        return -1;
-    }
-    if (written != size)
-    {
-        printf("Failed to write all bytes to port\n");
-        return -1;
-    }
-    return 0;
-}
-
-// Reads bytes from the serial port.
-// Returns after all the desired bytes have been read, or if there is a
-// timeout or other error.
-// Returns the number of bytes successfully read into the buffer, or -1 if
-// there was an error reading.
-SSIZE_T read_port(HANDLE port, uint8_t* buffer, size_t size)
-{
-    DWORD received;
-    BOOL success = ReadFile(port, buffer, size, &received, NULL);
-    if (!success)
-    {
-        printf("Failed to read from port\n");
-        return -1;
-    }
-    return received;
-}
-
-uint32_t crc32b(uint8_t* message, int length) {
+uint32_t crc32b(uint8_t* message, size_t length) {
     uint32_t crc = 0xFFFFFFFF;			// compute CRC32
     while (length--) {
         crc = crc ^ (*message++);		// Get next byte.
@@ -127,29 +42,179 @@ uint32_t crc32b(uint8_t* message, int length) {
     return ~crc;
 }
 
-HANDLE port;
-uint8_t mem[MemorySize];
+void ms(int msec) {                     // time delay
+#ifdef _WIN32
+    Sleep(msec);
+#else
+    usleep(msec * 1000);
+#endif
+}
 
+uint8_t mem[MemorySize];                // raw data to program
+uint8_t response[1024];                 // place to put UART read data
+int portnum = DEFAULTPORT;
+
+uint8_t ISP_enable[] = { 4, 0x12, 0xA5, 0x5A, 0x42 };
+uint8_t ISP_disable[] = { 2, 0x12, 0 };
+uint8_t ISP_RJID[] =  { 7, 0, 0, 0x82, 0x9F, 2, 0xC2, 0x080 };
+uint8_t ISP_RDSR[] =  { 6, 0, 0, 0x82, 0x05, 0xC2, 0x80};
+uint8_t ISP_WREN[] =  { 5, 0, 0, 0x82, 6, 0x80 };
+
+void Dump(uint8_t* p, int length) {
+    for (int i=0; i<length; i++)
+        printf("%02X ", *p++);
+    printf("\n");
+}
+
+void ISP_TX(uint8_t* cstr) {            // send counted string
+//    printf("ISP_TX ");  Dump(&cstr[1], cstr[0]);
+    RS232_SendBuf(portnum, &cstr[1], cstr[0]);
+}
+
+void PingOn(void) {
+    ISP_TX(ISP_enable);
+    ms(50); // Give RS232_PollComport time to receive the ping.
+}
+void GetRJID(void) {                    // get 3-byte RJID
+    ISP_TX(ISP_RJID);
+    ms(50);
+    if (RS232_PollComport(portnum, response, 3) != 3) {
+        memset(response, 0, 3);
+    }
+}
+
+int TestWIP(void) {                     // read status register
+    ISP_TX(ISP_RDSR);
+    int retry = 100;
+    while (retry--) {
+        ms(2);
+        if (RS232_PollComport(portnum, response, 1)) {
+            return response[0];
+        }
+    }
+    return -1;
+}
+
+void WaitWIP(void) {                    // wait for not busy
+    int timer = 30;
+    while (timer--) {
+        if ((TestWIP() & 1) == 0) return;
+    }
+    printf("Status read error\n");
+}
+
+// Encode an outgoing message that re-maps the special characters (0x10-0x13).
+// The sequence includes chip select assert/deassert.
+
+uint8_t pagebuf[512];
+uint8_t *pb;
+int pagelen;
+void AddToBuf(uint8_t c) {
+    if ((c & 0xFC) == 0x10) {
+        *pb++ = 0x10;
+        *pb++ = c & 3;
+        pagelen += 2;
+    } else {
+        *pb++ = c;
+        pagelen += 1;
+    }
+}
+void BeginSPI(void) {
+    pagelen = 3;
+    pb = &pagebuf[3];
+    AddToBuf(0x82);
+}
+void EndSPI(int n) {
+    AddToBuf(0x80);
+    uint8_t* p = pagebuf;
+    uint8_t hi = (n >> 6) & 0x3F;
+    uint8_t lo = n & 0x3F;
+    if ((lo & 0xFC) == 0x10) {
+        *p++ = hi;
+        *p++ = 0x10;
+        *p++ = lo & 3;
+    } else {
+        *p++ = 0;
+        *p++ = hi;
+        *p++ = lo;
+    }
+    RS232_SendBuf(portnum, pagebuf, pagelen);
+//    printf("EndSPI ");  Dump(pagebuf, pagelen);
+}
+
+// 00 00 03 82 20 ss s0 00 80
+void Erase4K(int sector) {
+    ISP_TX(ISP_WREN);
+    BeginSPI();
+    AddToBuf(0x20);
+    AddToBuf(sector >> 4);
+    AddToBuf(sector << 4);
+    AddToBuf(0);
+    EndSPI(3);
+    ms(50);         // typical erase time is about 50 ms
+    WaitWIP();      // it could be longer
+}
+
+// 00 uu uu 82 02 pp pp 00 xx xx xx xx ... 80
+void ProgramPage(int page) {
+    ISP_TX(ISP_WREN);
+    BeginSPI();
+    AddToBuf(0x02);
+    AddToBuf(page >> 8);
+    AddToBuf(page);
+    AddToBuf(0);
+    uint8_t* src = &mem[page << 8];
+    for (int i = 0; i < 256; i++)
+        AddToBuf(*src++);
+    EndSPI(259);
+    ms(5);
+//    WaitWIP();
+}
+
+// 00 00 03 82 0B pp pp 00 03 3F C2 80
+// return ior: 0 = okay, -1 = no response to read request, 1 = bad data
+int ReadPage(int page) {
+    BeginSPI();
+    AddToBuf(0x0B);
+    AddToBuf(page >> 8);
+    AddToBuf(page);
+    AddToBuf(0);
+    AddToBuf(0);            // dummy byte
+    AddToBuf(0x03);
+    AddToBuf(0x3F);
+    AddToBuf(0xC2);
+    EndSPI(4);
+    ms(20);
+    int x = RS232_PollComport(portnum, response, 256);
+    if (x == 256)
+         return 1 & memcmp(&mem[page<<8], response, 256);
+    return -1;
+}
 
 int main(int argc, char *argv[])
 {
-	int baudrate = DEFAULTBAUD;
-	if (argc < 3) {
-		printf("Usage: 'isp filename portname [baud]'\n\n");
+    int baudrate = DEFAULTBAUD;
+    if (argc < 2) {
+		printf("Usage: 'isp filename [port#] [baud]'\n\n");
 		return 1;
 	}
-#pragma warning(suppress : 4996)
 	FILE* inf = fopen(argv[1], "rb");
 	if (!inf) {
 		printf("Input file <%s> not found\n", argv[1]);
 		return 1;
 	}
-	if (argc > 3) {
-		char* p = argv[3];
-		baudrate = 0;
-		char c;
-		while ((c = *p++)) baudrate = baudrate * 10 + (c - '0');
-	}
+    if (argc > 3) {
+        char* p = argv[3];
+        baudrate = 0;
+        char c;
+        while ((c = *p++)) baudrate = baudrate * 10 + (c - '0');
+    }
+    if (argc > 2) {
+        char* p = argv[2];
+        portnum = 0;
+        char c;
+        while ((c = *p++)) portnum = portnum * 10 + (c - '0');
+    }
     char str[4];
     fread(str, 1, 4, inf);
     if (memcmp(str, "chad", 4)) {
@@ -162,28 +227,78 @@ int main(int argc, char *argv[])
     fread(&pid, 1, 4, inf);
     fread(&length, 1, 4, inf);
     fread(&crc, 1, 4, inf);
-    int oal = fread(mem, 1, MemorySize, inf);
+    size_t oal = fread(mem, 1, MemorySize, inf);
     fclose(inf);
     if ((length != oal) || (crc != crc32b(mem, oal))) {
         printf("Corrupted file (bad CRC)\n");
         return 2;
     }
 
-    port = open_serial_port(argv[2], baudrate);
-    if (port == INVALID_HANDLE_VALUE) {
-        printf("Couldn't open serial port %s at %d baud\n", argv[2], baudrate);
-        return 1;
+    if (RS232_OpenComport(portnum, baudrate, "8N1", 0)) {
+        printf("Can't open com port %d\n", portnum);
+        return 3;
     }
 
-/* 
+/*
 At this point, the file has been read-in and checked. The serial port is open.
 Now we want to ping the target to make sure it's there and to match it up with
 the pid number.
-
-As you can see, this is on the to-do list.
 */
+    PingOn();
+    if (RS232_PollComport(portnum, response, 4) != 4) {
+        printf("No ping\n");
+        return 4;
+    }
+/*
+The PING byte of ISP_enable (0x42) sends 4 bytes out the UART:
+BASEBLOCK    first 64KB sector of user flash
+PRODUCT_ID0  product ID
+PRODUCT_ID1
+SANITY       0xAA constant
+*/
+    if (response[3] != 0xAA) {
+        printf("Ping failure\n");
+        ISP_TX(ISP_disable);
+        return 5;
+    }
+/*
+Firmware has hardware dependencies requiring BASEBLOCK, PRODUCT_ID0, and
+PRODUCT_ID1 to match up.
+*/
+    if (memcmp(&pid, response, 3)) {
+        printf("Firmware does not match hardware\n");
+        printf("You need firmware type %06X\n", (pid & 0xFFFFFF));
+        ISP_TX(ISP_disable);
+        return 5;
+    }
+/*
+Yay! You're connected to the ISP, ready to access the SPI flash chip.
+Program length/4096 sectors
+*/
+    GetRJID();
+    printf("RJID = %d, %d, %d\n", response[0], response[1], response[2]);
 
-    printf("File=%s, port=%s, baud=%d\n", argv[1], argv[2], baudrate);
-    CloseHandle(port);
+    int sectors = (length + 4095) >> 12;
+    int errors = 0;
+
+    printf("Programming %d 4KB sectors", sectors);
+    for (int i=0; i < sectors; i++) {
+        printf("\nSector %d ", i);
+        Erase4K(i);
+        for (int j = 0; j < 16; j++) {
+            int page = (i << 4) + j;
+            ProgramPage(page);
+            if (ReadPage(page))
+                { printf("?"); errors++; }
+            else
+                { printf("."); }
+        }
+    }
+    printf("\n%d errors", errors);
+
+    ISP_TX(ISP_disable);
+
+    ms(50);
+    RS232_CloseComport(portnum);
 }
 

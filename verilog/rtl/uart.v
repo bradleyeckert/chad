@@ -10,7 +10,7 @@ module uart
   input wire            wr,        	// UART transmit strobe
   input wire  [7:0]     din,      	// UART transmit data
   output reg            full,      	// UART has received a byte
-  input wire            rd,        	// UART received strobe
+  input wire            rd,        	// UART received strobe (clears full)
   output reg  [7:0]     dout,        	// UART received data
   input wire  [15:0]    bitperiod,      // Clocks per serial bit
   input wire            rxd,            // Async input

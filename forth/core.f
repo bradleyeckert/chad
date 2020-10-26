@@ -218,9 +218,9 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 
 : u<     -c drop carry 0= 0= ;          \ 2.0700 u1 u2 -- flag
 : min    2dup- 0< if                    \ 2.0710 n1 n2 -- n3
-         swap drop exit then  drop ;
-: max    2dup- 0< if                    \ 2.0720 n1 n2 -- n3
          drop exit then  swap drop ;
+: max    2dup- 0< if                    \ 2.0720 n1 n2 -- n3
+         swap drop exit then  drop ;
 
 CODE depth                              \ 2.0730 -- +n
     status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu

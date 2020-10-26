@@ -2,3 +2,6 @@ COM ports on the PC
 
 The Lattice Brevia2 shows up as two USB serial ports: COM3 and COM4. The latter is SPIF.
 To see the COM ports on Windows, open Device Manager and click on Ports (COM & LPT).
+
+`isp.c` works but isn't polished. It was tested with Code::Blocks on Windows.
+Serial communications uses a cross-platform library that has a GPL license. Thanks, Teunis!

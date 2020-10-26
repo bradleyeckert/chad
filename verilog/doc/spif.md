@@ -39,7 +39,7 @@ Allows room for FPGA bitstream if used.
 - PRODUCT_ID0: First product ID byte, user defined.
 - PRODUCT_ID1: Second product ID byte, user defined.
 - UART_RATE_POR: Default baud rate divisor for UART, Baud = Fclk / this.
-- KEY0, KEY1, KEY2, KEY3: Cipher key
+- KEY0, KEY1, KEY2, KEY3: SPI flash cipher key
 
 ## Ports
 
@@ -166,17 +166,49 @@ Some example ISP sequences are:
 
 Page programming occurs as follows:
 
-- Program a 256-byte page sending 520 chars out the serial port.
+- Program a 256-byte page sending 260 chars out the serial port.
 - Poll the WIP flag via the UART, falls normally 2.5ms after programming.
-- The OS (Windows etc.) inserts another 1 ms (a USB frame) of delay.
-- Read back 256 bytes (512 chars) for verification.
+- The OS (Windows etc.) inserts another 0 or 1 ms (a USB frame) of delay.
+- Read back 256 bytes (260 chars) for verification.
 
-A baud rate of 2M BPS would give a program and verify time of 35ms per KB,
-or 35 seconds per MB.
+Suppose a 256-byte program-verify sequence has 5.2ms of data transfer time
+and 3.0ms of turnaround delay at 1M BPS.
 That can be supported by a USB-FS bridge chip like the $0.33 CH330N.
 Raising the baud rate wouldn't speed up programming much due to the delays.
 Production programming of flash (if you're using much of it) would be
 better done by a motherboard flasher like the Dediprog SF100.
+
+Since serial ports are typically USB-UART interface chips, buffer sizes come
+into play when the baud rate is somewhat high.
+For example, a USB-FS chip like FT2232D (on the Lattice Brevia 2 board) has
+a 384-byte output buffer and 256-byte input buffer.
+The host PC reads from the input buffer every 1 ms, so continuous input data
+is limited to a baud rate of 2.56 MBPS. The Brevia2 demo operates at 1M BPS.
+
+The CH330N has a RTS pin that the UART interface could monitor to hold off
+transmission. In the case of ISP, the occasional USB glitch can be tolerated
+since pages can be re-programmed in case of bad verification.
+
+### Ping data
+
+A 'ping' command (0x42) sends 5 bytes out the UART:
+- BASEBLOCK, first 64KB sector of user flash
+- PRODUCT_ID0, product ID\[7:0]
+- PRODUCT_ID1, product ID\[15:8]
+- 0xAA, sanity check
+- RESERVED, ignore this and treat it as a spare slot for future use
+
+The "Product ID" (or `pid`) is used to manage ISP.
+If you build products with `chad`, you can pick your own `pid` bytes.
+I charge you nothing, unlike rent-seeking bodies like USB-IF and IEEE.
+Yup, numbers as free as air.
+If you want to reserve your PRODUCT_ID1 to avoid collision with other adopters
+of `chad`, add it to this list and do a pull request:
+
+### Reserved PRODUCT_ID1 values
+
+- 0, Demonstration models for `chad`
+- 1 to 3, Reserved for Brad Eckert's commercial projects
 
 ## Boot Loader
 

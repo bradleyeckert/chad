@@ -109,3 +109,28 @@ The flow state is a practice.
 Programming is a very good practice.
 Why not use a language that's built for it? 
 Like Forth?
+
+## Why Forth
+
+You can find plenty of web sites listing the technical reasons.
+Forth is a very productive computer language, in the right hands.
+It can produce very bad results when in the wrong hands.
+If you are a moron, don't use Forth.
+If you love programming and are reasonably bright, consider Forth.
+It forces you to think in a more holistic way about problems.
+
+FORTH Inc's experience with its Forth classes was that students
+typically learned Forth in a week and became productive in a month.
+The staffing experiences of companies using Open Firmware,
+when it was a thing, didn't bear that out.
+Being productive isn't the same as writing good code.
+It takes a much longer time to master Forth.
+The 10,000-hour rule probably applies here.
+That's a serious investment.
+What are you investing in?
+Who will hire a Forth expert?
+You are investing in you.
+Your mind, your way of looking at the world, your sanity.
+
+A language that requires discipline to use is a tool for creating
+disciplined people. That's what companies need, not code monkeys.

@@ -112,7 +112,7 @@ module spif
         uartRXfull <= 1'b0;     u_rd <= 1'b0;
         ISPfull <= 1'b0;   ispActive <= 1'b0;
         uartRXbyte <= 8'h00;  u_rate <= UART_RATE_POR[15:0];
-        ISPbyte <= 8'h00;     r_state <= UART_RX_IDLE;
+        ISPbyte <= 8'h00;    r_state <= UART_RX_IDLE;
       end
     else
       begin
@@ -200,17 +200,20 @@ module spif
     endcase
   end
 
-  reg [1:0] i_usel;
+  reg [2:0] i_usel;
   reg [7:0] u_txbyte;                   // manual UART output
   always @* begin                       // UART output mux
     if (ispActive)
-      case (i_usel)
-      2'b00:   u_dout <= f_din;
-      2'b01:   u_dout <= PRODUCT_ID1[7:0];
-      2'b10:   u_dout <= PRODUCT_ID0[7:0];
-      default: u_dout <= BASEBLOCK[7:0];
-      endcase
-    else       u_dout <= u_txbyte;
+      if (i_usel[2])
+        u_dout <= f_din;
+      else
+        case (i_usel[1:0])
+        2'b00: u_dout <= 8'hAA;         // sanity check
+        2'b01: u_dout <= PRODUCT_ID1[7:0];
+        2'b10: u_dout <= PRODUCT_ID0[7:0];
+        2'b11: u_dout <= BASEBLOCK[7:0];
+        endcase
+    else  u_dout <= u_txbyte;
   end
 
   always @* begin                       // insert i/o wait states
@@ -255,13 +258,14 @@ module spif
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
       f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
-      b_dest <= 16'd0;    f_rate <= 4'h7;    i_state <= ISP_IDLE;
+      b_dest <= 16'd0;    f_rate <= 4'h7;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
-      b_mode <= 3'd0;     bumpDest <= 1'b0;
-      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 2'b00;
+      b_mode <= 3'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
+      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd4;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  // start in boot mode
-      p_reset <= 1'b1;    u_wr <= 1'b0;      u_txbyte <= 0;
+      p_reset <= 1'b1;    u_wr <= 1'b0;
+      u_txbyte <= 8'h5B;  // power-up output character
       init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
     end else begin
       codeWr <= 1'b0;
@@ -320,7 +324,7 @@ module spif
                     begin
                       i_state <= ISP_DNLOAD;
                       f_format <= ISPbyte[2:0];
-                      f_wr <= 1'b1;
+                      f_wr <= 1'b1;     // start a transfer by sending 0xC2
                     end
                   endcase
                 end
@@ -334,15 +338,17 @@ module spif
               ISP_DNLOAD:
                 if (b_txok) begin
                   u_wr <= 1'b1;         // flash --> UART
-          	i_usel <= 2'b00;
-                  f_wr <= 1'b1;
-                  if (i_count) i_count <= i_count - 12'd1;
+          	  i_usel <= 3'd4;
+                  if (i_count) begin
+                    i_count <= i_count - 12'd1;
+                    f_wr <= 1'b1;
+                  end
                   else i_state <= ISP_IDLE;
                 end
               ISP_PING:
                 if (b_txok) begin
                   u_wr <= 1'b1;
-          	i_usel <= i_count[1:0];
+          	  i_usel <= i_count[2:0];
                   if (i_count) i_count <= i_count - 12'd1;
                   else i_state <= ISP_IDLE;
                 end
@@ -418,6 +424,7 @@ module spif
           case (mem_addr[2:0])
           3'b000: begin
               u_wr <= 1'b1;             // write to UART
+       	      i_usel <= 3'd4;
               u_txbyte <= din[7:0];
             end
           3'b011: b_state <= 3'd6;      // interpret flash byte stream
