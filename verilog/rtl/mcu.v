@@ -79,6 +79,7 @@ module mcu
   // spif is the SPI flash controller for the chad processor
   // 2048 words of code, 1024 words of data
   spif #(11, 18, 10, 0, 0, 0, 50) u1 (
+  // spif #(11, 18, 10, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),

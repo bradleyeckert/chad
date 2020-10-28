@@ -99,8 +99,8 @@ We have web browsers now.
 ## Status
 
 The "myapp" demo boots and runs in both `chad` and a Verilog simulator.
-An ISP utility loads the boot file into an FPGA, which boots from SPI flash
-and runs in the FPGA. You might call that "silicon proven".
+An ISP utility loads the boot file into an FPGA with SPI flash chip attached.
+The FPGA boots and runs. You might call that "silicon proven".
 
 `chad` boots and runs an app from simulated flash memory. 
 A minimal SoC (MCU) in Verilog demonstrates synthesis results and

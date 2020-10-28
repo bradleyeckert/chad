@@ -1,14 +1,8 @@
 // A trimmed version of the LIZARD stream cipher
 // refer to https://eprint.iacr.org/2016/926.pdf
+// The key length is 56 bits for export control reasons.
 
-// The 121-bit key would go through the following steps in a real LIZARD implementation:
-// 1. Key loading
-// 2. Grain-like mixing
-// 3. Second key addition
-// 4. Final diffusion
-// The output is not accessible, making a time-memory-data (TMD) tradeoff attack tougher.
-// Some initializations steps are skipped.
-
+// Key loading is weaker than with a LIZARD implementation, so you need random keys.
 // The key is loaded immediately after reset. Use clken to sync with the key data.
 // If the key is all zeros, dout will stay at 8'd0 which disables decryption.
 // This is not a problem: loading a 0 key just makes decryption not work.
@@ -16,18 +10,20 @@
 `default_nettype none
 
 module gecko
-(
+#(
+  parameter KEY_LENGTH = 56
+)(
   input wire clk,
-  input wire rst_n,     // async reset, active low
-  input wire clken,     // clock enable
-  output reg ready,     // byte is ready
-  input wire key,       // 121-bit randomized key
-  input wire next,      // trigger next byte
-  output reg [7:0] dout // PRNG output
+  input wire rst_n,             // async reset, active low
+  input wire clken,             // clock enable
+  output reg ready,             // byte is ready
+  input wire key,               // 56-bit randomized key
+  input wire next,              // trigger next byte
+  output reg [7:0] dout         // PRNG output
 );
 
-  reg [30:0] s;         // NFSR1
-  reg [89:0] b;         // NFSR2
+  reg [30:0] s;                 // NFSR1
+  reg [89:0] b;                 // NFSR2
 
   wire x = s[0] ^ s[2] ^ s[5] ^ s[6] ^ s[15] ^ s[17] ^ s[18] ^ s[20] ^ s[25]  // x is next s[30]
          ^ (s[8] & s[18]) ^ (s[8] & s[20]) ^ (s[12] & s[21]) ^ (s[14] & s[19]) ^ (s[17] & s[21]) ^ (s[20] & s[22])
@@ -54,49 +50,51 @@ module gecko
   localparam DIFFUSE = 4'b0100;
   localparam RUN     = 4'b1000;
   reg [6:0] count;
+  wire inkey = (count > (120 - KEY_LENGTH)) ? key : b[120 - KEY_LENGTH];
+  wire foo =   (count > (120 - KEY_LENGTH)) ? 1'b0 : 1'b1;
 
   always @(posedge clk or negedge rst_n)
     if (!rst_n) begin
       state <= LOAD;
       ready <= 1'b0;  dout <= 8'd0;
-      count <= 7'd120;
+      count <= 7'd121;
     end else if (clken) begin
       case (state)
-      LOAD:             // load the 128-bit key into s and b
+      LOAD:                     // load the key into s and b
         begin
-          s <= {key, s[30:1]};
+          s <= {inkey, s[30:1]};
           b <= {s[0], b[89:1]};
           if (count)
-            count <= count - 7'd1;
+            count <= count - 1'b1;
           else begin
             count <= 7'd127;
             state <= DIFFUSE;
           end
         end
-      DIFFUSE:          // diffuse the key using 128 iterations
+      DIFFUSE:                  // diffuse the key using 128 iterations
         begin
           s <= {x ^ a, s[30:1]};
           b <= {y ^ a, b[89:1]};
           if (count)
-            count <= count - 7'd1;
+            count <= count - 1'b1;
           else begin
             state <= RUN;
             count <= 7'd7;
           end
         end
-      RUN:              // one pseudorandom bit per clock
+      RUN:                      // one pseudorandom bit per clock
         begin
           s <= {x, s[30:1]};
           b <= {y, b[89:1]};
           dout <= {dout[6:0], a};
           if (count)
-            count <= count - 7'd1;
+            count <= count - 1'b1;
           else begin
             state <= WAIT;
             ready <= 1'b1;
           end
         end
-      WAIT:             // wait for the next byte trigger
+      WAIT:                     // wait for the next byte trigger
         if (next) begin
           count <= 7'd7;
           ready <= 1'b0;
