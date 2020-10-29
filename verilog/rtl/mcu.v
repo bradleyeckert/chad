@@ -1,4 +1,4 @@
-// Minimal MCU based on J1-type CPU                             10/2/2020 BNE
+// Minimal MCU based on J1-type CPU                             10/29/2020 BNE
 // License: This code is a gift to the divine.
 
 // This is expected to be wrapped by an I/O ring that steers bidirectional
@@ -6,7 +6,9 @@
 
 `default_nettype none
 module mcu
-(
+#(
+  parameter WIDTH = 18
+)(
   input wire          clk,
   input wire          rst_n,
 // 6-wire connection to SPI flash chip
@@ -26,9 +28,9 @@ module mcu
   wire                mem_rd;           // Data memory read enable        i
   wire                mem_wr;           // Data memory write enable       i
   wire [14:0]         mem_addr;         // Data memory & I/O address      i
-  wire [17:0]         din;              // Data memory & I/O in (from N)  i
-  wire [17:0]         mem_dout;         // Data memory out                o
-  wire [17:0]         io_dout;          // I/O data out                   o
+  wire [WIDTH-1:0]    din;              // Data memory & I/O in (from N)  i
+  wire [WIDTH-1:0]    mem_dout;         // Data memory out                o
+  wire [WIDTH-1:0]    io_dout;          // I/O data out                   o
   wire [14:0]         code_addr;        // Code memory address            i
   wire [15:0]         insn;             // Code memory data               o
   wire                p_hold;           // Processor hold                 o
@@ -52,8 +54,8 @@ module mcu
 
   wire p_reset_n = ~p_reset;
 
-  // chad processor with 18-bit cells
-  chad #(18) u0 (
+  // chad processor
+  chad #(WIDTH) u0 (
     .clk      (clk      ),
     .resetq   (p_reset_n),
     .hold     (p_hold   ),
@@ -72,14 +74,14 @@ module mcu
   wire io_spif = (mem_addr[6:3] == 0);
   wire s_iord = io_spif & io_rd;
   wire s_iowr = io_spif & io_wr;
-  wire [17:0] s_io_dout;
+  wire [WIDTH-1:0] s_io_dout;
 
   assign io_dout = s_io_dout;           // spif is the only I/O device
 
   // spif is the SPI flash controller for the chad processor
   // 2048 words of code, 1024 words of data
-  spif #(11, 18, 10, 0, 0, 0, 50) u1 (
-  // spif #(11, 18, 10, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
+  spif #(11, WIDTH, 10, 0, 0, 0, 50) u1 (
+  // spif #(11, WIDTH, 10, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),

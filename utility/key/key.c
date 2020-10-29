@@ -43,33 +43,6 @@ void shift_s(uint8_t s30, uint8_t b89) {
     b[89] = b89;
 }
 
-/*
-void HexDigit(uint8_t* p, int bits) {   // hex digit primitive
-    int n = 0;
-    for (int i = 0; i < bits; i++) {
-        n = n << 1;
-        if (*p--) n++;
-    }
-    if (n > 9) n += 7;
-    printf("%c", n + '0');
-}
-void HexDigits(uint8_t* p, int digits) {
-    for (int i = 0; i < digits; i++) {
-        HexDigit(p, 4);
-        p -= 4;
-    }
-}
-void Dump(void) {                       // dump s and b in hex
-    printf("s = ");
-    HexDigit(&s[30], 3);
-    HexDigits(&s[27], 7);
-    printf(", b = ");
-    HexDigit(&b[89], 2);
-    HexDigits(&b[87], 22);
-    printf("\n");
-}
-*/
-
 void loadkey(uint64_t key) {            // load the key
     for (int i = 0; i < 122; i++) {
         uint8_t k;

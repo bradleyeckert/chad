@@ -181,7 +181,7 @@ module chad
           if (islex) lex <= insn[WIDTH-12:0];
           else lex <= 0;
         else
-          if (islex) lex <= {lex[WIDTH-1:WIDTH-11], insn[10:0]};
+          if (islex) lex <= {lex[WIDTH-23:0], insn[10:0]};
           else lex <= 0;
       end
     end

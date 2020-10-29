@@ -279,38 +279,6 @@ That probably won't happen in this architecture, the way `chad` is set up.
 
 ![MCU Image](mcu.png)
 
-### Synthesis results
-
-A demo MCU with UART, SPI flash interface, 18-bit cells, 16-deep stacks, and the
-`chad` processor produced these synthesis results for sub-$10 FPGAs.
-Note that Fmax varies with synthesis tool settings.
-These were with out-of-the-box defaults. Consider them approximations.
-
-**Intel/Altera MAX 10, 10M04SCE144C8G**
-
-- 1558 LEs (38% of chip)
-- Slow 125C model: Fmax = 109 MHz
-- Digikey price $8.92 (100pc)
-
-**Intel/Altera Cyclone 10 LP, 10CL006YE144C8G**
-
-- 1567 LEs (25% of chip)
-- Slow 85C model: Fmax = 105 MHz
-- Digikey price $6.74 (60pc)
-- Faster part (C6G) is $10.77, has Fmax of 130 MHz.
-
-**Lattice ICE5LP4K-SG48ITR**
-
-- 1619 LUT4s (46% of chip) using LSE synthesis
-- Fmax = 55 MHz
-- Digikey price $4.40 (100pc)
-
-**Lattice LFE5U-12F-6BG256C**
-
-- 1619 LUT4s (15% of chip) using LSE synthesis
-- Fmax = 60 MHz
-- Digikey price $5.50 (100pc)
-
 ## Why spif?
 
 The `spif` hardware itself takes 217 LEs, so putting SPI flash and the UART
@@ -362,3 +330,15 @@ irreversible and compute-intensive hash.
 You have the option of not using a key (setting it to 0), which makes the 
 keystream also 0 so that it doesn't decrypt anything.
 Just keep the SPI flash contents in plaintext.
+
+### Synthesis results
+
+A demo MCU with UART, SPI flash interface, 16-deep stacks, and the
+`chad` processor produced these synthesis results for small FPGAs.
+Note that Fmax varies with synthesis tool settings.
+These were with out-of-the-box defaults. Consider them approximations.
+
+| FPGA part#      | Vendor  | 16-bit | 18-bit | 24-bit | 32-bit | Fmax|
+|-----------------|:-------:|-------:|-------:|-------:|-------:|----:|
+| 10M04SCE144C8G  | Intel   | 1731   | 1842   | 2169   | 3544   | 105 |
+| LFXP2-5E-TN144C | Lattice | 1503   | 1614   | 1876   | 2254   |  90 |
