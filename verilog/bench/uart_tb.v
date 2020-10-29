@@ -1,4 +1,4 @@
-// UART testbench                                       9/29/2020 BNE
+// UART testbench                                       10/28/2020 BNE
 
 `timescale 1ns/10ps
 
@@ -27,7 +27,7 @@ module uart_tb();
     .full	(full),
     .rd	        (rd),
     .dout	(dout),
-    .bitperiod  (16'd868),
+    .bitperiod  (16'd16),       // maximum baud rate
     .rxd        (rxd),
     .txd        (txd)
   );
@@ -43,8 +43,8 @@ module uart_tb();
       @(posedge ready);
       @(posedge clk);  rd <= 1'b1;  o_Data <= dout;
       @(posedge clk);  rd <= 1'b0;
-      if (o_Data != i_Data)
-        $display("UART loopback mismatch");
+//    if (o_Data != i_Data)
+//      $display("UART loopback mismatch");
     end
   endtask // UART_WRITE_BYTE
 
@@ -58,7 +58,10 @@ module uart_tb();
       UART_WRITE_BYTE(8'h12);
       UART_WRITE_BYTE(8'h34);
       UART_WRITE_BYTE(8'h56);
+      repeat (100) @(posedge clk);
       UART_WRITE_BYTE(8'h78);
+      UART_WRITE_BYTE(8'h9A);
+      repeat (200) @(posedge clk);
       $stop();
     end
 

@@ -33,7 +33,7 @@ module mcu
   wire [15:0]         insn;             // Code memory data               o
   wire                p_hold;           // Processor hold                 o
   wire                p_reset;          // Processor reset                o
-  //  UART interface
+  // UART interface
   wire                u_ready;          // Ready for next byte to send    i
   wire                u_wr;             // UART transmit strobe           o
   wire [7:0]          u_din;            // UART transmit data             o
@@ -41,7 +41,7 @@ module mcu
   wire                u_rd;             // UART received strobe           o
   wire [7:0]          u_dout;           // UART received data             i
   wire [15:0]         u_rate;           // UART baud rate divisor         o
-  //  Flash Memory interface
+  // Flash Memory interface
   wire                f_ready;          // Ready for next byte to send    i
   wire                f_wr;             // Flash transmit strobe          o
   wire                f_who;            // Who is requesting the transfer?o

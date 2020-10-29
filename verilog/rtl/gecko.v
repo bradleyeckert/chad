@@ -6,6 +6,7 @@
 // The key is loaded immediately after reset. Use clken to sync with the key data.
 // If the key is all zeros, dout will stay at 8'd0 which disables decryption.
 // This is not a problem: loading a 0 key just makes decryption not work.
+// Matching utility "key.c" uses the same algorithm in C.
 
 `default_nettype none
 
@@ -51,7 +52,6 @@ module gecko
   localparam RUN     = 4'b1000;
   reg [6:0] count;
   wire inkey = (count > (120 - KEY_LENGTH)) ? key : b[120 - KEY_LENGTH];
-  wire foo =   (count > (120 - KEY_LENGTH)) ? 1'b0 : 1'b1;
 
   always @(posedge clk or negedge rst_n)
     if (!rst_n) begin
@@ -64,8 +64,8 @@ module gecko
         begin
           s <= {inkey, s[30:1]};
           b <= {s[0], b[89:1]};
-          if (count)
-            count <= count - 1'b1;
+          if (count)            // after KEY_LENGTH bits, the key is looped
+            count <= count - 1'b1; // to fill out the internal state
           else begin
             count <= 7'd127;
             state <= DIFFUSE;

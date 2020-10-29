@@ -30,8 +30,9 @@ endmodule
 // So, you won't be able to use DMA or hardware I/O hold-off.
 // Otherwise, firmware will still run.
 
-// The Lattice XP2 is one of these. The EBR doesn't have a read-enable.
-// It does, but you have to instantiate the RAM. You can still use Lattice.
+// Lattice XP2 (Brevia2), Diamond ISE: Firmware runs but there is a complaint
+// about synthesis of EBR. So, I don't know if (re) is being ignored.
+// BRAM could be instantiated to avoid the messages.
 
 // Lattice iCE5LP4K: iCEcube2 warns of simulation mismatch but synthesises EBR.
 

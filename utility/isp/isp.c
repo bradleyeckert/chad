@@ -245,18 +245,18 @@ Now we want to ping the target to make sure it's there and to match it up with
 the pid number.
 */
     PingOn();
-    if (RS232_PollComport(portnum, response, 4) != 4) {
+    if (RS232_PollComport(portnum, response, 5) != 5) {
         printf("No ping\n");
         return 4;
     }
 /*
-The PING byte of ISP_enable (0x42) sends 4 bytes out the UART:
+The PING byte of ISP_enable (0x42) sends 5 bytes out the UART:
 BASEBLOCK    first 64KB sector of user flash
-PRODUCT_ID0  product ID
-PRODUCT_ID1
+KEY_ID       key ID, 8-bit
+PRODUCT_ID   product ID, 16-bit little-endian
 SANITY       0xAA constant
 */
-    if (response[3] != 0xAA) {
+    if (response[4] != 0xAA) {
         printf("Ping failure\n");
         ISP_TX(ISP_disable);
         return 5;
@@ -265,7 +265,7 @@ SANITY       0xAA constant
 Firmware has hardware dependencies requiring BASEBLOCK, PRODUCT_ID0, and
 PRODUCT_ID1 to match up.
 */
-    if (memcmp(&pid, response, 3)) {
+    if (memcmp(&pid, response, 4)) {
         printf("Firmware does not match hardware\n");
         printf("You need firmware type %06X\n", (pid & 0xFFFFFF));
         ISP_TX(ISP_disable);

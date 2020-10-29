@@ -1,4 +1,4 @@
-// Serial Flash Controller for Chad                  		10/27/2020 BNE
+// Serial Flash Controller for Chad                  		10/28/2020 BNE
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -8,8 +8,8 @@ module spif
   parameter WIDTH = 18,                 // word size of data memory
   parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
   parameter BASEBLOCK = 0,              // first 64KB sector of user flash
-  parameter PRODUCT_ID0 = 0,            // product ID for ISP
-  parameter PRODUCT_ID1 = 1,
+  parameter PRODUCT_ID0 = 0,            // 8-bit key ID for ISP
+  parameter PRODUCT_ID1 = 1,            // 16-bit product ID for ISP
   parameter UART_RATE_POR = 868,        // default UART baud rate = Fclk / this
   parameter KEY0 = 32'h0,               // flash cipher key, 0 means no cipher
   parameter KEY1 = 32'h0,               // the ISP host will need the same key
@@ -169,15 +169,14 @@ module spif
   reg [7:0] u_txbyte;                   // manual UART output
   always @* begin                       // UART output mux
     if (ispActive)
-      if (i_usel[2])
-        u_dout <= f_din;
-      else
-        case (i_usel[1:0])
-        2'b00: u_dout <= 8'hAA;         // sanity check
-        2'b01: u_dout <= PRODUCT_ID1[7:0];
-        2'b10: u_dout <= PRODUCT_ID0[7:0];
-        2'b11: u_dout <= BASEBLOCK[7:0];
-        endcase
+      case (i_usel[2:0])
+      3'b000:  u_dout <= 8'hAA;         // sanity check
+      3'b001:  u_dout <= PRODUCT_ID1[15:8];
+      3'b010:  u_dout <= PRODUCT_ID1[7:0];
+      3'b011:  u_dout <= PRODUCT_ID0[7:0];
+      3'b100:  u_dout <= BASEBLOCK[7:0];
+      default: u_dout <= f_din;
+      endcase
     else  u_dout <= u_txbyte;
   end
 
@@ -271,7 +270,7 @@ module spif
       b_dest <= 16'd0;    f_rate <= 4'h7;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 3'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
-      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd4;
+      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd5;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
@@ -352,7 +351,7 @@ module spif
               ISP_DNLOAD:
                 if (b_txok) begin
                   u_wr <= 1'b1;         // flash --> UART
-          	  i_usel <= 3'd4;
+          	  i_usel <= 3'd5;
                   if (i_count) begin
                     i_count <= i_count - 12'd1;
                     f_wr <= 1'b1;
@@ -438,7 +437,7 @@ module spif
           case (mem_addr[2:0])
           3'b000: begin
               u_wr <= 1'b1;             // write to UART
-       	      i_usel <= 3'd4;
+       	      i_usel <= 3'd5;
               u_txbyte <= din[7:0];
             end
           3'b011: b_state <= 3'd6;      // interpret flash byte stream

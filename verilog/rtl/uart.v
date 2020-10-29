@@ -1,4 +1,4 @@
-// Unbuffered UART with FIFO-compatible interface               10/12/2020
+// Unbuffered UART with FIFO-compatible interface               10/28/2020
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -6,7 +6,7 @@ module uart
 (
   input wire            clk,
   input wire            arstn,          // async reset (active low)
-  output reg            ready,     	// Ready for next byte to send
+  output wire           ready,     	// Ready for next byte to send
   input wire            wr,        	// UART transmit strobe
   input wire  [7:0]     din,      	// UART transmit data
   output reg            full,      	// UART has received a byte
@@ -37,26 +37,30 @@ module uart
   end else begin
     tick <= 1'b0;
     if (baudint)
-      baudint <= baudint - 12'd1;
+      baudint <= baudint - 1'b1;
     else begin
       tick <= 1'b1;
       if (bitperiod[3:0] > baudfrac)    // fractional divider:
            baudint <= bitperiod[15:4];  // stretch by Frac/16 clocks
-      else baudint <= bitperiod[15:4] - 12'd1;
-      baudfrac <= baudfrac + 4'd1;      // 16 ticks/bit
+      else baudint <= bitperiod[15:4] - 1'b1;
+      baudfrac <= baudfrac + 1'b1;      // 16 ticks/bit
     end
   end
 
   reg tnext, error;
   wire startbit = ~rxdi & ~error;
+  reg [7:0] inreg;                      // pending transmit byte
+  reg pending;
+
+  assign ready = ~pending;
 
 // UART
   reg [7:0] txstate, rxstate, txreg, rxreg;
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    txstate <= 8'd0;  txreg <= 8'd0;  tnext <= 1'b1;
-    rxstate <= 8'd0;  rxreg <= 8'd0;  error <= 1'b0;
-    dout <=    8'd0;  txd <= 1'b1;    ready <= 1'b1;  full <= 1'b0;
+    txstate <= 8'd0;  txreg <= 8'd0;  tnext <= 1'b1;  txd <= 1'b1;
+    rxstate <= 8'd0;  rxreg <= 8'd0;  error <= 1'b0;  pending <= 1'b0;
+    dout <=    8'd0;  inreg <= 8'd0;  full <= 1'b0;
   end else begin
     if (tick) begin
 // Transmitter
@@ -64,8 +68,13 @@ module uart
       if (txstate) begin
         if (!txstate[3:0])
           {txreg, tnext} <= {1'b1, txreg[7:0]};
-        txstate <= txstate - 8'd1;
-      end else ready <= 1'b1;
+        txstate <= txstate - 1'b1;
+      end else begin
+        if (pending) begin
+          pending <= 1'b0;   txreg <= inreg;
+          txstate <= 8'h9F;  tnext <= 1'b0;   // n,8,1
+        end
+      end
 // Receiver
       if (rxstate) begin
         if (rxstate[3:0] == 4'd1)
@@ -78,16 +87,18 @@ module uart
           default:
             rxreg <= {rxdi, rxreg[7:1]};
           endcase
-        rxstate <= rxstate - 8'd1;
+        rxstate <= rxstate - 1'b1;
       end else begin
         error <= error & ~rxdi;         // stop or mark ('1') clears error
         if (startbit) rxstate <= 8'h98; // will be sampled mid-bit
       end
     end
     if (rd) full <= 1'b0;               // reading clears full
-    if (wr) begin                       // retrigger transmission
-      txreg <= din;      tnext <= 1'b0;
-      txstate <= 8'hAF;  ready <= 1'b0; // n,8,1
-    end
+// Transmit input register gives firmware an entire character period to respond
+// to ready with the next byte to elimnate character spacing.
+    if (wr)
+      if (!pending) begin               // retrigger transmission
+        inreg <= din;  pending <= 1'b1;
+      end
   end
 endmodule

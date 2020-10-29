@@ -340,17 +340,16 @@ tampering and reverse engineering.
 It's an important part of any risk management plan.
 
 The easiest method of encryption is to use a stream cipher to
-decrypt the boot stream inside of `spif` as `b_data` is loaded.
+decrypt the boot stream inside of `spif` as SPI flash data is loaded.
 I went ahead and put this in, adding 200 LEs to the size. Not bad.
 There are some very compact stream ciphers. LIZARD is one of the smallest.
 This use case didn't need the sophisticated key initialization sequence of
 LIZARD, so I simplified it and named the module "gecko".
 
-Only a hard reset can reset the keystream.
 Along with the fact that random read of code space isn't supported by hardware,
-making the plaintext unavailable, the attack surface is rather small.
-The only way to put code into code RAM is to load it from the encrypted flash.
-So, it seems secure enough. 
+making the plaintext unavailable, attacks will likely have to be brute-force.
+A 56-bit key is used so that publication of source code isn't a problem.
+A large network of FPGAs could crack it if it's used as-is.
 
 A fixed key has its downsides, which
 should be addressed if the design moves to ASIC.
@@ -362,3 +361,4 @@ irreversible and compute-intensive hash.
 
 You have the option of not using a key (setting it to 0), which makes the 
 keystream also 0 so that it doesn't decrypt anything.
+Just keep the SPI flash contents in plaintext.
