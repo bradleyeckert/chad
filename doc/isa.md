@@ -32,7 +32,7 @@ with an ALU operation.
     lex = (lex<<11) | n;  Any other instruction clears lex.
 11101nnn nnnnnnnn = reserved for user's coprocessor
 1111nnnR nnnnnnnn = unsigned literal (imm)
-    T = (lex<<13) | n
+    T = (lex<<11) | n
     R = return
 ```
 
@@ -99,7 +99,6 @@ The `insn[1:0]` field of the ALU instruction is data stack control:
 that aren't stack-friendly.
 
 - `W` T = W
-- `T&W` T = W & T
 - `CO` Write T to W
 
 **Double precision math:**
@@ -108,6 +107,11 @@ that aren't stack-friendly.
 - `cT2` T = T >> 1, MSB = carry
 - `T2*c` T = (T << 1) + carry
 - `CO` Latch the carry result of this instruction
+
+You might think a carry-in add or subtract instructions would be nice to have.
+It's easy enough to gate a carry into the adder. The problem with this is that
+the instruction decoding that feeds in the carry adds significant delay,
+which slows down the processor. Oops.
 
 **Loops** adds a decrement to the R -> T path:
 
@@ -134,6 +138,9 @@ overlapped. In an ASIC, memories would be single-port to save die area.
 To handle read-only lookup tables, code can jump into a list of literals
 that have their `RET` bits set.
 
+Literal instructions have 11 data bits, or 69% of a 16-bit instruction.
+Tables of literals have an overhead of 31% to 50% depending on the data size.
+
 **Missing `T|N`**
 
 Most code that uses `or` can use `+` instead.
@@ -157,7 +164,7 @@ To handle byte packing and unpacking,
 
 The J1 ISA is set up so that execution of blank code space jumps to 0 which
 does a cold boot. Kinda cool.
-I noticed that rather late, but `nop` has the same effect.
+I noticed this rather late, but `nop` has the same effect.
 The PC wraps back around to 0 when it walks off the end of code space.
 I programmed my first computer using a pencil and paper for the assembler
 and a DIP switch and a pushbutton to program a UV EPROM.
@@ -196,6 +203,9 @@ These are the proposed `copid` codes:
 
 - 0: No coprocessor exists
 - 1: Hardware multiply and divide
+
+Extensions should copy RISC V conventions as much as possible to leverage
+existing hardware designs.
 
 ### Hardware multiply and divide (TBD)
 

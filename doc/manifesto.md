@@ -83,6 +83,19 @@ But here's the thing about planetary consciousness shifts.
 You have to roll with the tide.
 Stop coding for war machines.
 
+I have to admit, I really like C. It has its problems, but it's very good.
+It makes so much business sense to do serious applications in C.
+But here's the problem: intentionality. 
+What was the intention of the library authors?
+You don't know where their minds were at.
+Leveraging libraries willy nilly is a form of intentional promiscuity.
+You don't want some dirty little piece of code polluting your project
+because it has real effects.
+There is a real ghost in the machine due to the way mind and matter interact.
+So many consumer products are psychically an unholy mess.
+Notice how your smartphone messes with your head.
+Let's do better.
+
 Tiny cores scale up. Need more power? Put in more cores.
 Create a pool usage model like GPUs use.
 A modern CPU could have thousands of `chad` cores,

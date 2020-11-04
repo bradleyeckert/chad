@@ -380,6 +380,48 @@ SV Literal (cell x) {
     toCode (lit | (x & 0xff) | (x & 0x700) << 1);
 }
 
+// Floating point number representation uses double numbers, which can be 32
+// to 64 bits. Usually it's somewhere in between. The MSB is the sign, the
+// exponent has a programmable number of bits, and the mantissa is the rest.
+
+static int FPexpbits = 8;
+
+uint64_t pack754_64(double f) {
+    uint64_t* pfloatingToIntValue;
+    pfloatingToIntValue = (uint64_t * )&f;
+    return (*pfloatingToIntValue);
+}
+
+static uint64_t FPtoDouble(double x) {
+    uint64_t r = 0;
+    int manbits = 2 * CELLBITS - 1 - FPexpbits;
+    int manshift = 52 - manbits;
+    if (x < 0) {
+        x = -x;                         // insert the sign bit
+        r += ((uint64_t)1 << (2 * CELLBITS - 1));
+    }
+    int64_t exponent = pack754_64(x) >> (52 + 11 - FPexpbits);
+    r += exponent << manbits;
+    uint64_t mantissa = (pack754_64(x) & 0xFFFFFFFFFFFFF) >> manshift;
+    return r + mantissa;
+}
+
+SV LiteralFP(double x) {
+    uint64_t i = FPtoDouble(x);
+    uint32_t hi = (i >> CELLBITS) & CELLMASK;
+    uint32_t lo = i & CELLMASK;
+    Literal(lo);
+    Literal(hi);
+}
+
+SV DpushFP(double x) {
+    uint64_t i = FPtoDouble(x);
+    uint32_t hi = (i >> CELLBITS)& CELLMASK;
+    uint32_t lo = i & CELLMASK;
+    Dpush(lo);
+    Dpush(hi);
+}
+
 SV CompCall (cell xt) {
     if (xt & 0x01FFE000)
         toCode(litx | (xt >> 13));       // accommodate 25-bit address space
@@ -1253,6 +1295,7 @@ SV Semicolon (void) { EndDefinition();  sane(); }
 SV Verbosity (void) { verbose = Dpop(); }
 SV Aligned   (void) { Dpush(aligned(Dpop())); }
 SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
+SV SetFPexpbits(void) { FPexpbits = Dpop(); }
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
     char* src = &buf[Data[toin]];
@@ -1580,11 +1623,12 @@ SV LoadKeywords(void) {
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0085 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
-    AddKeyword("load-flash",  "1.0135 <filename> --", LoadFlash,     noCompile);
-    AddKeyword("save-flash-h","1.0136 <filename> --", SaveFlashHex,  noCompile);
-    AddKeyword("save-flash",  "1.0136 <filename> --", SaveFlash,     noCompile);
+    AddKeyword("load-flash",  "1.0134 <filename> --", LoadFlash,     noCompile);
+    AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
+    AddKeyword("save-flash",  "1.0136 pid <filename> --", SaveFlash, noCompile);
     AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);
     AddKeyword("boot",        "1.0138 <filename> --", Boot,          noCompile);
+    AddKeyword("set-expbits", "1.0139 n --",          SetFPexpbits,  noCompile);
     AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
@@ -1825,22 +1869,31 @@ int chad(char * line, int maxlength) {
                     int i = 0;   int radix = Data[base];   char c = 0;
                     if (radix == 0)
                         error = DIV_BY_ZERO;
-                    int64_t x = 0;  int cp = -1;  int neg = 0;
-                    switch (tok[0]) {   // leading digit
+// Here we break with ANS Forth: '.' means floating point. So I'm shameless.
+// There can be up to 18 decimal digits in x before it overflows.
+// Floating point literals use the data stack.
+                    if (strchr(tok, '.')) {
+                        char* eptr;
+                        double x = strtod(tok, &eptr);
+                        if ((errno == ERANGE) || (errno == EINVAL)) 
+                            goto bogus;
+                        if (Data[state])
+                            LiteralFP(x);
+                        else
+                            DpushFP(x);
+                    } else {
+                        int64_t x = 0;  int neg = 0;
+                        switch (tok[0]) {   // leading digit
                         case '-': i++;  neg = -1;    break;
                         case '+': i++;               break;
                         case '$': i++;  radix = 16;  break;
                         case '#': i++;  radix = 10;  break;
                         case '&': i++;  radix = 8;   break;
                         case '%': i++;  radix = 2;   break;
-                        case '\0': {goto bogus;}
+                        case '\0': { goto bogus; }
                         default: break;
-                    }
-                    while ((c = tok[i++])) {
-                        switch (c) {
-                        case '.':       // string position starts at 1
-                            cp = i;  break;
-                        default:
+                        }
+                        while ((c = tok[i++])) {
                             c = c - '0';
                             if (c & 0x80) goto bogus;
                             if (c > 9) {
@@ -1848,32 +1901,18 @@ int chad(char * line, int maxlength) {
                                 if (c < 10) goto bogus;
                             }
                             if (c > 41) c -= 32; // lower to upper
-                            if (c >= radix) {
+                            if (c >= radix) 
 bogus:                          error = UNRECOGNIZED;
-                            }
                             x = x * radix + c;
                         }
-                    }
-                    if (neg) x = -x;
-                    if (!error) {
-                        if (cp < 0) {
+                        if (neg) x = -x;
+                        if (!error) {
                             x &= CELLMASK;
                             if (Data[state]) {
                                 Literal((cell)x);
                             }
                             else {
                                 Dpush((cell)(x));
-                            }
-                        }
-                        else {
-                            i = (x >> CELLBITS) & CELLMASK;
-                            x &= CELLMASK;
-                            if (Data[state]) {
-                                Literal((cell)x);
-                                Literal((cell)i);
-                            } else {
-                                Dpush((cell)(x));
-                                Dpush((cell)(i));
                             }
                         }
                     }

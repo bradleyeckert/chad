@@ -49,6 +49,9 @@ itself in such a way that the binaries can be output for inclusion in a SOC.
 You can add code to Chad's simulation to mimic your SOC so that the PC is
 the development environment.
 
+More importantly, you aren't dependent on other people for long-term support.
+The system can be understood and maintained by one person due to simplicity.
+
 Since Chad's simulation of the CPU is its specification, which is under 200
 lines of C, the processor is also called Chad.
 You can specify the cell size as any width between 16 and 32 bits

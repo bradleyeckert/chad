@@ -82,6 +82,18 @@ myvoc +order definitions
 previous definitions
 ```
 
+## Floating point numbers
+
+Numbers with a decimal are treated as floating point numbers.
+
+IEEE754-like numbers are packed into a double cell on the data stack.
+If cells are 16-bit, the format matches 32-bit IEEE754 floats.
+The sign, exponent, and mantissa are packed into a double cell.
+LSBs are stripped from exponent and mantissa to fit.
+You can shrink the exponent to get more mantissa bits.
+
+- `set-expbits` *( n -- )* Sets the number of bits in the exponent. Default = 8.
+
 ## Lookup tables in code space
 
 - `|bits|` *( n -- )* Sets the number of bits your lookup table will need.

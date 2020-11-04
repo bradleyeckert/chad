@@ -46,13 +46,18 @@ So, we don't do it.
 =1.0060: cell ( -- n )
  Number of bytes in a cell.
  Used for addressing cells when address units are in bytes.
-=1.0070: dp ( -- addr )
+=1.0070: >in ( -- addr )
+ An index to the next byte in the input buffer.
+=1.0071: #tib ( -- addr )
+ The number of bytes currently in the input buffer.
+=1.0072: 'tib ( -- addr )
+ Points to the input buffer.
+=1.0073: dp ( -- addr )
  A variable pointing to the next free byte in data space.
-=1.0075: tib ( -- addr )
- The text input buffer, populated by `chad` before evaluating it.
- `tib` is placed at the very top of data memory.
-=1.0076: |tib| ( -- addr )
- Size in bytes of the text input buffer.
+=1.0074: base ( -- addr )
+ The radix for numeric conversion.
+=1.0075: state ( -- addr )
+ Interpreter state: 0 = interpret, 1 = compile.
 =1.0080: stats ( -- )
  Prints simulator statistics.
 =1.0085: locate ( <name> -- )
@@ -92,6 +97,26 @@ H</ul>
  Loads the data space from a binary file.
 =1.0130: save-data ( <filename> -- )
  Saves the data space to a binary file.
+=1.0134: load-flash ( <filename> -- )
+ Load flash memory from a binary file, skipping over the 16-byte boilerplate.
+=1.0135: save-flash-h ( <filename> -- )
+ Saves a boot format file in hex format, without boilerplate, for HDL simulation.
+=1.0136: save-flash ( n <filename> -- )
+ Saves a boot format file. It's a 16-byte boilerplate followed by flash data.
+ pid = product id: 
+ bytes 0 to 3 are {bootsector, keyID, productID[15:8], productID[7:0]}.
+ Bootsector = 0 if SPI flash doesn't hold the FPGA bitstream.
+ keyID = 0 if the saved boot data is in plaintext format.
+=1.0137: make-boot ( -- )
+ Create a boot data structure in flash memory.
+=1.0138: boot ( <filename> -- )
+ Load a boot file into flash, interpret the boot data to load memory, and run
+ the processor at address 0.
+=1.0139: set-expbits ( x -- )
+ Sets the number of bits used for the exponent of floating point numbers.
+ Default = 8.
+ The format is similar to IEEE754 but with the LSBs of the exponent and mantissa
+ fields stripped off to fit the packed {sign, exp, man} in a double cell.
 =1.0140: equ ( x <name> -- )
  A synonym of constant that's guaranteed to not use any target resources
  for its definition. It creates a word that pushes x onto the stack.
@@ -114,6 +139,8 @@ H</ul>
  In that mode, invoking the simulator produces a log output listing.
  Make sure you use `0 verbosity` after getting the log because it's easy
  to trigger a lot more data than you want.
+=1.0235: cold ( -- )
+ Reset the processor and run it.
 =1.0240: words ( -- )
  List the definition names in the first word list of the search order.
 =1.0250: bye ( -- )

@@ -62,7 +62,7 @@ module mcu_top
   assign holdn    = (oe[3]) ? qdo[3] : 1'bZ;
 
   // MCU
-  mcu #(18) small_mcu (
+  mcu #(24) small_mcu (
     .clk      (clk     ),
     .rst_n    (arst_n  ),
     .sclk     (spi_sclk),
