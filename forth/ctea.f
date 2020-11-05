@@ -17,29 +17,29 @@ $179B9 equ CTdelta
 18 equ CTrounds \ about 110 cycles per round
 
 : CTshift  ( v -- v v' sum sum )
-    dup 2* 2* 2* 2*  over 2/ 2/ 2/ 2/ 2/  xor  \ could be custom instruction
-	over +	hld @  dup
+   dup 2* 2* 2* 2*  over 2/ 2/ 2/ 2/ 2/  xor  \ could be custom instruction
+   over +  hld @  dup
 ;
 : CTcalcA  CTshift [ ;
 : CTdokey  3 and cells CTkey + @  +  xor  rot swap ;
 : CTcalcB  CTshift  swapb 2/ 2/ 2/  CTdokey ;
 
 : encipher  ( v0 v1 -- v0' v1' )
-    0 hld !
-    CTrounds for
-		CTcalcA +
-		CTdelta hld +!
-		CTcalcB +
-	next
-	swap
+   0 hld !
+   CTrounds for
+      CTcalcA +
+      CTdelta hld +!
+      CTcalcB +
+   next
+   swap
 ;
 : decipher  ( v0 v1 -- v0' v1' )
-    [ CTdelta CTrounds * ] literal hld !
-    CTrounds for
-	    CTcalcB -
-		[ CTdelta negate ] literal  hld +!
-	    CTcalcA -
-	next
+   [ CTdelta CTrounds * ] literal hld !
+   CTrounds for
+      CTcalcB -
+      [ CTdelta negate ] literal  hld +!
+      CTcalcA -
+   next
 ;
 
 there swap - . .( instructions used by ctea) cr

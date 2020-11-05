@@ -27,6 +27,7 @@ static uint64_t GetMicroseconds() {
 #include <string.h>
 #include <inttypes.h>
 #include <ctype.h>
+#include <math.h>
 #include "chaddefs.h"
 #include "iomap.h"
 #include "config.h"
@@ -380,51 +381,69 @@ SV Literal (cell x) {
     toCode (lit | (x & 0xff) | (x & 0x700) << 1);
 }
 
+#ifdef HASFLOATS
+
 // Floating point number representation uses double numbers, which can be 32
 // to 64 bits. Usually it's somewhere in between. The MSB is the sign, the
 // exponent has a programmable number of bits, and the mantissa is the rest.
 
 static int FPexpbits = 8;
 
+SV fdot(void) {                         // ( d -- )
+    uint64_t d = (uint64_t)Dpop() << CELLBITS;   d += Dpop();
+    int manbits = 2 * CELLBITS - 1 - FPexpbits;
+    if (d & ((uint64_t)1 << (2 * CELLBITS - 1)))  printf("-");
+    d &= ~((uint64_t)-1 << (2 * CELLBITS - 1));  // strip off sign
+    if (d == 0) {                       // either +0 or -0
+        printf("0. ");  return;
+    }
+    int64_t exp = (d >> manbits) - ((uint64_t)1 << (FPexpbits - 1));
+    d &= ~((uint64_t)-1 << manbits);
+    d += (uint64_t)1 << manbits;
+    int digits = (int)(2.0 * logf((float)manbits) / logf(2.0));
+    printf("%.*g ", digits, (double)d * pow(2.0, (double)(exp - manbits)));
+}
+
 uint64_t pack754_64(double f) {
     uint64_t* pfloatingToIntValue;
-    pfloatingToIntValue = (uint64_t * )&f;
+    pfloatingToIntValue = (uint64_t*)&f;
     return (*pfloatingToIntValue);
 }
 
 static uint64_t FPtoDouble(double x) {
     uint64_t r = 0;
+    if (x == 0) return r;
+    if (x < 0) r += ((uint64_t)1 << (2 * CELLBITS - 1));
+    uint64_t i = pack754_64(fabs(x));
     int manbits = 2 * CELLBITS - 1 - FPexpbits;
-    int manshift = 52 - manbits;
-    if (x < 0) {
-        x = -x;                         // insert the sign bit
-        r += ((uint64_t)1 << (2 * CELLBITS - 1));
-    }
-    int64_t exponent = pack754_64(x) >> (52 + 11 - FPexpbits);
-    r += exponent << manbits;
-    uint64_t mantissa = (pack754_64(x) & 0xFFFFFFFFFFFFF) >> manshift;
-    return r + mantissa;
+    uint64_t exp = (i >> 52) + ((uint64_t)1 << (FPexpbits - 1)) - 1023;
+    r += exp << manbits;
+    return r + ((i & 0xFFFFFFFFFFFFF) >> (52 - manbits));
 }
 
 SV LiteralFP(double x) {
     uint64_t i = FPtoDouble(x);
     uint32_t hi = (i >> CELLBITS) & CELLMASK;
-    uint32_t lo = i & CELLMASK;
-    Literal(lo);
-    Literal(hi);
+    Literal((uint32_t)i & CELLMASK);  Literal(hi);
 }
 
 SV DpushFP(double x) {
     uint64_t i = FPtoDouble(x);
     uint32_t hi = (i >> CELLBITS)& CELLMASK;
-    uint32_t lo = i & CELLMASK;
-    Dpush(lo);
-    Dpush(hi);
+    Dpush((uint32_t)i & CELLMASK);  Dpush(hi);
 }
 
+SI isfloat(char* s) {
+    if (Data[base] != 10) return 0;     // FP is only valid for base 10
+    if (strchr(s, 'E')) return 1;       // must have exponent
+    if (strchr(s, 'e')) return 1;
+    return 0;
+}
+#endif
+
 SV CompCall (cell xt) {
-    if (xt & 0x01FFE000)
-        toCode(litx | (xt >> 13));       // accommodate 25-bit address space
+    if (xt & 0xFFE000)
+        toCode(litx | (xt >> 13));      // accommodate 24-bit address space
     toCode (call | (xt & 0x1fff));
 }
 
@@ -973,11 +992,11 @@ SV Stats(void) {
 }
 
 SV dotESS (void) {                      // ( ... -- ... )
-    PrintDataStack();                       // .s
+    PrintDataStack();                   // .s
     printf("<-Top\n");
 }
 
-SV dot (void) {                         // ( n -- )
+SV dot(void) {                          // ( n -- )
     Cdot(Dpop());                       // .
 }
 
@@ -1295,7 +1314,9 @@ SV Semicolon (void) { EndDefinition();  sane(); }
 SV Verbosity (void) { verbose = Dpop(); }
 SV Aligned   (void) { Dpush(aligned(Dpop())); }
 SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
+#ifdef HASFLOATS
 SV SetFPexpbits(void) { FPexpbits = Dpop(); }
+#endif
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
     char* src = &buf[Data[toin]];
@@ -1628,7 +1649,6 @@ SV LoadKeywords(void) {
     AddKeyword("save-flash",  "1.0136 pid <filename> --", SaveFlash, noCompile);
     AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);
     AddKeyword("boot",        "1.0138 <filename> --", Boot,          noCompile);
-    AddKeyword("set-expbits", "1.0139 n --",          SetFPexpbits,  noCompile);
     AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
@@ -1644,6 +1664,10 @@ SV LoadKeywords(void) {
     AddKeyword("[undefined]", "1.0290 <name> -- flag", BrackUndefined, noCompile);
     AddKeyword("[defined]",   "1.0300 <name> -- flag", BrackDefined, noCompile);
     AddKeyword(".",           "1.0400 n --",          dot,           noCompile);
+#ifdef HASFLOATS
+    AddKeyword("f.",          "1.0410 d --",          fdot,          noCompile);
+    AddKeyword("set-expbits", "1.0415 n --",          SetFPexpbits,  noCompile);
+#endif
     AddKeyword("forth",       "1.0420 --",            ForthLex,      noCompile);
     AddKeyword("assembler",   "1.0430 --",            AsmLex,        noCompile);
     AddKeyword("definitions", "1.0440 --",            Definitions,   noCompile);
@@ -1834,7 +1858,6 @@ SV CopyBuffer(void) {                   // copy buf to tib region in Data
     }
 }
 
-
 //##############################################################################
 // Text Interpreter
 // Processes a line at a time from either stdin or a file.
@@ -1869,20 +1892,20 @@ int chad(char * line, int maxlength) {
                     int i = 0;   int radix = Data[base];   char c = 0;
                     if (radix == 0)
                         error = DIV_BY_ZERO;
-// Here we break with ANS Forth: '.' means floating point. So I'm shameless.
-// There can be up to 18 decimal digits in x before it overflows.
-// Floating point literals use the data stack.
-                    if (strchr(tok, '.')) {
+#ifdef HASFLOATS
+                    if (isfloat(tok)) {
                         char* eptr;
-                        double x = strtod(tok, &eptr);
+                        double y = strtod(tok, &eptr);
                         if ((errno == ERANGE) || (errno == EINVAL)) 
                             goto bogus;
                         if (Data[state])
-                            LiteralFP(x);
+                            LiteralFP(y);
                         else
-                            DpushFP(x);
-                    } else {
-                        int64_t x = 0;  int neg = 0;
+                            DpushFP(y);
+                    } else 
+#endif
+                    {
+                        int64_t x = 0;  int neg = 0;  int decimal = -1;
                         switch (tok[0]) {   // leading digit
                         case '-': i++;  neg = -1;    break;
                         case '+': i++;               break;
@@ -1894,25 +1917,41 @@ int chad(char * line, int maxlength) {
                         default: break;
                         }
                         while ((c = tok[i++])) {
-                            c = c - '0';
-                            if (c & 0x80) goto bogus;
-                            if (c > 9) {
-                                c -= 7;
-                                if (c < 10) goto bogus;
+                            switch (c) {
+                            case '.':  decimal = i;  break;
+                            default:
+                                c = c - '0';
+                                if (c & 0x80) goto bogus;
+                                if (c > 9) {
+                                    c -= 7;
+                                    if (c < 10) goto bogus;
+                                }
+                                if (c > 41) c -= 32; // lower to upper
+                                if (c >= radix)
+                                    bogus:          error = UNRECOGNIZED;
+                                x = x * radix + c;
                             }
-                            if (c > 41) c -= 32; // lower to upper
-                            if (c >= radix) 
-bogus:                          error = UNRECOGNIZED;
-                            x = x * radix + c;
                         }
                         if (neg) x = -x;
                         if (!error) {
-                            x &= CELLMASK;
-                            if (Data[state]) {
-                                Literal((cell)x);
+                            if (decimal < 0) {
+                                x &= CELLMASK;
+                                if (Data[state]) {
+                                    Literal((cell)x);
+                                }
+                                else {
+                                    Dpush((cell)(x));
+                                }
                             }
                             else {
-                                Dpush((cell)(x));
+                                if (Data[state]) {
+                                    Literal((cell)(x & CELLMASK));
+                                    Literal((cell)(x >> CELLBITS) & CELLMASK);
+                                }
+                                else {
+                                    Dpush((cell)(x & CELLMASK));
+                                    Dpush((cell)(x >> CELLBITS)& CELLMASK);
+                                }
                             }
                         }
                     }

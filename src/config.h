@@ -1,6 +1,6 @@
 //===============================================================================
 // config.h
-// Basic configuration and function prototype for chad.c
+// Basic configuration for chad.c
 //===============================================================================
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
@@ -15,6 +15,7 @@
 #define CodeAlignment    1      /* Alignment for new definitions            */
 
 #define MoreInstrumentation     /* Simulator has more instrumentation       */
+//#define HASFLOATS             /* Dotted numbers are floating point        */
 
 #define LineBufferSize 128      /* Size of line buffer                      */
 #define MaxLineLength   80      /* Max TIB size                             */

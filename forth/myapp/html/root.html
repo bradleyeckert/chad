@@ -878,6 +878,9 @@ the terminating <tok>[else]</tok> or <tok>[then]</tok> is parsed, an error messa
 </p>
 <a name="1.0235"></a>
 <h3><ref>1.0235:</ref> <chad>cold</chad> <com><i>( -- )</i></com></h3>
+
+<p>Reset the processor and run it.
+</p>
 <a name="1.0230"></a>
 <h3><ref>1.0230:</ref> <chad>sstep</chad> <com><i>( xt len -- )</i></com></h3>
 
@@ -919,18 +922,36 @@ The stack is printed between <tok>\</tok> and <tok>ok&gt;</tok>.
 <p>A synonym of constant that&apos;s guaranteed to not use any target resources
 for its definition. It creates a word that pushes x onto the stack.
 </p>
-<a name="1.0139"></a>
-<h3><ref>1.0139:</ref> <chad>set-expbits</chad> <com><i>( n -- )</i></com></h3>
 <a name="1.0138"></a>
 <h3><ref>1.0138:</ref> <chad>boot</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+
+<p>Load a boot file into flash, interpret the boot data to load memory, and run
+the processor at address 0.
+</p>
 <a name="1.0137"></a>
 <h3><ref>1.0137:</ref> <chad>make-boot</chad> <com><i>( -- )</i></com></h3>
+
+<p>Create a boot data structure in flash memory.
+</p>
 <a name="1.0136"></a>
-<h3><ref>1.0136:</ref> <chad>save-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
-<a name="1.0136"></a>
-<h3><ref>1.0136:</ref> <chad>save-flash-h</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+<h3><ref>1.0136:</ref> <chad>save-flash</chad> <com><i>( pid &lt;filename&gt; -- )</i></com></h3>
+
+<p>Saves a boot format file. It&apos;s a 16-byte boilerplate followed by flash data.
+pid = product id: 
+bytes 0 to 3 are {bootsector, keyID, productID[15:8], productID[7:0]}.
+Bootsector = 0 if SPI flash doesn&apos;t hold the FPGA bitstream.
+keyID = 0 if the saved boot data is in plaintext format.
+</p>
 <a name="1.0135"></a>
-<h3><ref>1.0135:</ref> <chad>load-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+<h3><ref>1.0135:</ref> <chad>save-flash-h</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+
+<p>Saves a boot format file in hex format, without boilerplate, for HDL simulation.
+</p>
+<a name="1.0134"></a>
+<h3><ref>1.0134:</ref> <chad>load-flash</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+
+<p>Load flash memory from a binary file, skipping over the 16-byte boilerplate.
+</p>
 <a name="1.0090"></a>
 <h3><ref>1.0090:</ref> <chad>verbosity</chad> <com><i>( flags -- )</i></com></h3>
 
@@ -966,21 +987,32 @@ If the file can&apos;t be opened, display the line number.
 <a name="1.0075"></a>
 <h3><ref>1.0075:</ref> <chad>state</chad> <com><i>( -- addr )</i></com></h3>
 
-<p>The text input buffer, populated by <tok>chad</tok> before evaluating it.
-<tok>tib</tok> is placed at the very top of data memory.
+<p>Interpreter state: 0 = interpret, 1 = compile.
 </p>
 <a name="1.0074"></a>
 <h3><ref>1.0074:</ref> <chad>base</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>The radix for numeric conversion.
+</p>
 <a name="1.0073"></a>
 <h3><ref>1.0073:</ref> <chad>dp</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>A variable pointing to the next free byte in data space.
+</p>
 <a name="1.0072"></a>
 <h3><ref>1.0072:</ref> <chad>&apos;tib</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>Points to the input buffer.
+</p>
 <a name="1.0071"></a>
 <h3><ref>1.0071:</ref> <chad>#tib</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>The number of bytes currently in the input buffer.
+</p>
 <a name="1.0070"></a>
 <h3><ref>1.0070:</ref> <chad>&gt;in</chad> <com><i>( -- addr )</i></com></h3>
 
-<p>A variable pointing to the next free byte in data space.
+<p>An index to the next byte in the input buffer.
 </p>
 <a name="1.0060"></a>
 <h3><ref>1.0060:</ref> <chad>cell</chad> <com><i>( -- n )</i></com></h3>

@@ -84,15 +84,18 @@ previous definitions
 
 ## Floating point numbers
 
-Numbers with a decimal are treated as floating point numbers.
+Are a compile option: See `HASFLOATS` in `config.h`.
+If `HASFLOATS` is defined, numbers are treated as floating point if `base` = 10
+and the number contains an `e` or `E`.
 
 IEEE754-like numbers are packed into a double cell on the data stack.
 If cells are 16-bit, the format matches 32-bit IEEE754 floats.
 The sign, exponent, and mantissa are packed into a double cell.
-LSBs are stripped from exponent and mantissa to fit.
-You can shrink the exponent to get more mantissa bits.
+The exponent and mantissa are resized.
+You can change the exponent size to trade dynamic range for precision.
 
 - `set-expbits` *( n -- )* Sets the number of bits in the exponent. Default = 8.
+- `f.` *( d -- )* Prints the number represented by *d*.
 
 ## Lookup tables in code space
 

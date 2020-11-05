@@ -17,6 +17,24 @@
 <hr>
 <!-- No reference for fib -->
 <!-- No reference for myapp -->
+<!-- No reference for ratio -->
+<!-- No reference for ratio/ -->
+<!-- No reference for /ratio -->
+<!-- No reference for exhausted? -->
+<!-- No reference for dfrac -->
+<!-- No reference for maxden -->
+<!-- No reference for expected -->
+<!-- No reference for ratio_bd -->
+<!-- No reference for ratio_ac -->
+<!-- No reference for du/mod -->
+<!-- No reference for normalize-divisor -->
+<!-- No reference for t- -->
+<!-- No reference for t+ -->
+<!-- No reference for tum/ -->
+<!-- No reference for tum* -->
+<!-- No reference for d* -->
+<!-- No reference for -borrow -->
+<!-- No reference for +carry -->
 <!-- No reference for decipher -->
 <!-- No reference for encipher -->
 <!-- No reference for CTcalcB -->
@@ -256,9 +274,60 @@ The actions in a table are:
 
 <p>8-bit UART output buffer.
 </p>
-<!-- No reference for 2+! -->
-<!-- No reference for 2! -->
-<!-- No reference for 2@ -->
+<a name="2.1190"></a>
+<h3><ref>2.1190:</ref> <a href="../../coreext.f">2swap</a> <com><i>( abcd -- cdab )</i></com></h3>
+
+<p>Exchange the top two cell pairs.
+</p>
+<a name="2.1180"></a>
+<h3><ref>2.1180:</ref> <a href="../../coreext.f">du&lt;</a> <com><i>( ud1 ud2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if ud1 is less than ud2.
+</p>
+<a name="2.1170"></a>
+<h3><ref>2.1170:</ref> <a href="../../coreext.f">d=</a> <com><i>( d1 d2 -- flag )</i></com></h3>
+
+<p>flag is true if and only if d1 is bit-for-bit the same as d2.
+</p>
+<a name="2.1160"></a>
+<h3><ref>2.1160:</ref> <a href="../../coreext.f">d2/</a> <com><i>( d1 -- d2 )</i></com></h3>
+
+<p>d2 is the result of shifting d1 one bit toward the least-significant bit,
+leaving the most significant bit unchanged.
+</p>
+<a name="2.1150"></a>
+<h3><ref>2.1150:</ref> <a href="../../coreext.f">d2*</a> <com><i>( d1 -- d2 )</i></com></h3>
+
+<p>d2 is the result of shifting d1 one bit toward the most-significant bit,
+filling the vacated least-significant bit with zero.
+</p>
+<a name="2.1140"></a>
+<h3><ref>2.1140:</ref> <a href="../../coreext.f">d-</a> <com><i>( d1 d2 -- d3 )</i></com></h3>
+
+<p>Subtract d2 from d1, giving the difference d3.
+</p>
+<a name="2.1130"></a>
+<h3><ref>2.1130:</ref> <a href="../../coreext.f">d+</a> <com><i>( d1 d2 -- d3 )</i></com></h3>
+
+<p>Add d2 to d1, giving the sum d3.
+</p>
+<a name="2.1240"></a>
+<h3><ref>2.1240:</ref> <a href="../../coreext.f">2+!</a> <com><i>( n a-addr )</i></com></h3>
+
+<p>Add a cell <tok>n</tok> to a double-cell variable and carry into the upper part.
+</p>
+<a name="2.1230"></a>
+<h3><ref>2.1230:</ref> <a href="../../coreext.f">2!</a> <com><i>( x1 x2 a-addr -- )</i></com></h3>
+
+<p>Store the cell pair x1 x2 at a-addr, with x2 at a-addr and x1 at the next
+consecutive cell. It is equivalent to the sequence <tok>swap over ! cell+ !</tok>.
+</p>
+<a name="2.1220"></a>
+<h3><ref>2.1220:</ref> <a href="../../coreext.f">2@</a> <com><i>( a-addr -- x1 x2 )</i></com></h3>
+
+<p>Fetch the cell pair x1 x2 stored at a-addr. x2 is stored at a-addr and x1 at
+the next consecutive cell. It is equivalent to the sequence <tok>dup cell+ @ swap @</tok>.
+</p>
 <a name="2.1120"></a>
 <h3><ref>2.1120:</ref> <a href="../../coreext.f">rshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
 
@@ -276,9 +345,21 @@ An ambiguous condition exists if u is greater than or equal to
 the number of bits in a cell.
 </p>
 <a name="2.1210"></a>
-<h3><ref>2.1210:</ref> <a href="../../coreext.f">xcount</a> <com><i>( a u1 -- a+cell u2 )</i></com></h3>
+<h3><ref>2.1210:</ref> <a href="../../coreext.f">xcount</a> <com><i>( a -- a+cell u )</i></com></h3>
+
+<p>Return the character string specification for the counted string stored at <tok>a</tok>.
+<tok>a+cell</tok> is the address of the first character after <tok>a</tok>.
+<tok>u</tok> is the contents of the cell at <tok>a</tok>,
+which is the length in characters of the string at <tok>a+1</tok>.
+</p>
 <a name="2.1200"></a>
 <h3><ref>2.1200:</ref> <a href="../../coreext.f">count</a> <com><i>( a -- a+1 c )</i></com></h3>
+
+<p>Return the character string specification for the counted string stored at <tok>a</tok>.
+<tok>a+1</tok> is the address of the first character after <tok>a</tok>.
+<tok>u</tok> is the contents of the character at <tok>a</tok>,
+which is the length in characters of the string at <tok>a+1</tok>.
+</p>
 <a name="2.1100"></a>
 <h3><ref>2.1100:</ref> <a href="../../coreext.f">third</a> <com><i>( x1 x2 x3 -- x1 x2 x3 x1 )</i></com></h3>
 
@@ -612,7 +693,7 @@ Most code can get by with <tok>+</tok> instead, if speed matters.
 
 <p>A subroutine that does nothing. This is very useful in Forth.
 For &quot;lazy interrupts&quot;, it can be inserted where needed to improve
-interrupt latency. 
+interrupt latency.
 </p>
 <a name="2.0020"></a>
 <h3><ref>2.0020:</ref> <a href="../../core.f">exception</a> <com><i>( n -- )</i></com></h3>

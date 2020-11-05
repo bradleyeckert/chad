@@ -112,11 +112,6 @@ H</ul>
 =1.0138: boot ( <filename> -- )
  Load a boot file into flash, interpret the boot data to load memory, and run
  the processor at address 0.
-=1.0139: set-expbits ( x -- )
- Sets the number of bits used for the exponent of floating point numbers.
- Default = 8.
- The format is similar to IEEE754 but with the LSBs of the exponent and mantissa
- fields stripped off to fit the packed {sign, exp, man} in a double cell.
 =1.0140: equ ( x <name> -- )
  A synonym of constant that's guaranteed to not use any target resources
  for its definition. It creates a word that pushes x onto the stack.
@@ -176,13 +171,15 @@ H<ul>
 --131072 to 131071 for 18-bit cells
 --2147483648 to 2147483647 for 32-bit cells
 H</ul>
-=1.0410: d. ( d -- )
- Display signed `d` using the current `base`. The range of `d` is:
-H<ul>
---2147483648 to 2147483647 for 16-bit cells
---17179869184 to 17179869183 for 18-bit cells
---9223372036854775808 to 9223372036854775807 for 32-bit cells
-H</ul>
+=1.0410: f. ( d -- )
+ Display the floating point number (a double) from the data stack.
+ `set-expbits` can be used to change the number of bits in the exponent
+ to trade precision for dynamic range.
+=1.0415: set-expbits ( x -- )
+ Sets the number of bits used for the exponent of floating point numbers.
+ Default = 8.
+ The format is similar to IEEE754 but with the exponent and mantissa
+ resized to fit the packed {sign, exp, man} in a double cell.
 =1.0420: forth ( -- )
  Replace the top of the search order with the `forth-wordlist` wid.
  You can see the search order at any time by typing `order`.

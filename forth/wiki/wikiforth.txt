@@ -31,7 +31,7 @@
 =2.0100: noop ( -- )
  A subroutine that does nothing. This is very useful in Forth.
  For "lazy interrupts", it can be inserted where needed to improve
- interrupt latency. 
+ interrupt latency.
 =2.0110: io@ ( addr -- n )
  Fetch from an input device.
 =2.0120: io! ( n addr -- )
@@ -136,7 +136,7 @@
  Note: A program shall not directly alter the contents of `state`.
 =2.0541: >in ( -- a-addr )
  An index into the `tib` input buffer.
-=2.0542: tibs ( -- a-addr ) 
+=2.0542: tibs ( -- a-addr )
  The number of characters in the input buffer.
 =2.0550: allot ( n -- )
  If `n` is greater than zero, reserve n address units of data space.
@@ -207,6 +207,41 @@ H</ul>
  Put zeroes into the least significant bits vacated by the shift.
  An ambiguous condition exists if u is greater than or equal to
  the number of bits in a cell.
+
+=2.1130: d+    ( d1 d2 -- d3 )
+ Add d2 to d1, giving the sum d3.
+=2.1140: d-    ( d1 d2 -- d3 )
+ Subtract d2 from d1, giving the difference d3.
+=2.1150: d2*   ( d1 -- d2 )
+ d2 is the result of shifting d1 one bit toward the most-significant bit,
+ filling the vacated least-significant bit with zero.
+=2.1160: d2/   ( d1 -- d2 )
+ d2 is the result of shifting d1 one bit toward the least-significant bit,
+ leaving the most significant bit unchanged.
+=2.1170: d=    ( d1 d2 -- flag )
+ flag is true if and only if d1 is bit-for-bit the same as d2.
+=2.1180: du<   ( ud1 ud2 -- flag )
+ flag is true if and only if ud1 is less than ud2.
+=2.1190: 2swap ( abcd -- cdab )
+ Exchange the top two cell pairs.
+=2.1200: count ( a -- a+1 u )
+ Return the character string specification for the counted string stored at `a`.
+ `a+1` is the address of the first character after `a`.
+ `u` is the contents of the character at `a`,
+ which is the length in characters of the string at `a+1`.
+=2.1210: xcount ( a -- a+cell u )
+ Return the character string specification for the counted string stored at `a`.
+ `a+cell` is the address of the first character after `a`.
+ `u` is the contents of the cell at `a`,
+ which is the length in characters of the string at `a+1`.
+=2.1220: 2@ ( a-addr -- x1 x2 )
+ Fetch the cell pair x1 x2 stored at a-addr. x2 is stored at a-addr and x1 at
+ the next consecutive cell. It is equivalent to the sequence `dup cell+ @ swap @`.
+=2.1230: 2! ( x1 x2 a-addr -- )
+ Store the cell pair x1 x2 at a-addr, with x2 at a-addr and x1 at the next
+ consecutive cell. It is equivalent to the sequence `swap over ! cell+ !`.
+=2.1240: 2+! ( n a-addr -- )
+ Add a cell `n` to a double-cell variable and carry into the upper part.
 =2.2000: 'TXbuf ( -- ioa )
  8-bit UART output buffer.
 =2.2010: 'TXbusy ( -- ioa )
@@ -325,27 +360,4 @@ H</ul>
  Remove `u`. Rotate `u+1` items on the top of the stack.
  An ambiguous condition exists if there are less than u+2 items
  on the stack before `roll` is executed.
-=2.4000: sector ( -- a-addr )
- Variable for the current flash sector number.
-=2.4010: fp ( -- a-addr )
- Variable for a 16-bit index into the 64 KB sector.
-=2.4020: flash-wp ( sector key -- )
- Set the first writable 64KB flash sector.
- Ignored if `key` doesn't match flwp_en.
-=2.4021: flwp_en ( -- n )
- The `key` to enable flash-wp. Usage is `flwp_en flash-wp`.
-=2.4030: write[ ( fa -- )
- Set `fp` = `fa`.
- If `addr` is at a 4KB boundary, erase the sector.
- Start a page write at address `sector<<16+addr`. 
-=2.4040: >f ( c -- )
- Append a byte to flash and bump `fp`.
-=2.4050: ]write ( -- )
- End the page program command.
-=2.4060: read[ ( fa -- )
- Start reading flash at address `sector<<16+addr`.
-=2.4070: f> ( -- c )
- Read the next byte from flash.
-=2.4080: ]read ( -- )
- End the read command.
 =
