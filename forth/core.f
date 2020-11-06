@@ -131,10 +131,31 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
     drop
 ;
 
+CODE cop_options                        \ 2.0760 -- n
+    drop 1 cop                          \ get hardware option bits
+    COP T->N d+1  RET alu
+;CODE
+
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
 \ RET ends the scope of carry and W so that ISRs may trash them.
 \ Latency is the maximum time between returns.
+
+cop_options 1 and [if]                  \ hardware multiply?
+CODE um*                                \ 2.0410 u1 u2 -- ud
+    drop 8 cop                          \ trigger multiply
+    N d-1 alu   N d-1 alu               \ 2drop
+    begin
+        cop  COP T->N d+1 alu           \ get busy flag
+    while
+        drop ' noop scall               \ spin while it's busy
+    repeat
+    drop 3 cop
+    COP T->N d+1 alu
+    drop 2 cop
+    COP T->N d+1 RET alu
+;CODE
+[else]
 
 \ Multiplication using shift-and-add, 160 to 256 cycles at 16-bit.
 \ Latency = 17
@@ -148,6 +169,24 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
     for (um*) (um*) next
     >r nip r> swap
 ;
+[then]
+
+cop_options 2 and [if]                  \ hardware divide?
+CODE um/mod                             \ 2.0420 ud u -- ur uq
+    N CO d-1 alu                        \ divisor to W
+    drop 9 cop                          \ trigger divide
+    N d-1 alu   N d-1 alu               \ 2drop
+    begin
+        cop  COP T->N d+1 alu           \ get busy flag
+    while
+        drop ' noop scall               \ spin while it's busy
+    repeat
+    drop 5 cop
+    COP T->N d+1 alu
+    drop 4 cop
+    COP T->N d+1 RET alu
+;CODE
+[else]
 
 \ Long division takes about 340 cycles at 16-bit.
 \ Latency = 25
@@ -172,6 +211,7 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
     next
     drop swap 2*c invert                \ finish quotient
 ;
+[then]
 
 : *     um* drop ;                      \ 2.0430 n1 n2 -- n3
 : dnegate                               \ 2.0440 d -- -d

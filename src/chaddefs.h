@@ -7,8 +7,11 @@
 #define __CHADDEFS_H__
 
 #include "config.h"
+//#include <stdlib.h>
 
 void ErrorMessage (int error, char *s); // defined in errors.c
+uint32_t coproc_c(int sel, int bits, uint64_t cycles,
+                  uint32_t a, uint32_t b, uint32_t c);
 
 #define ALL_ONES  ((unsigned)(~0))
 #if (CELLBITS == 32)

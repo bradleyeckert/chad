@@ -177,6 +177,7 @@ SV Rpush(cell v)                        // push to the return stack
 // MoreInstrumentation slows down the code by 40%.
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
+CELL copresult;
 
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
@@ -200,6 +201,7 @@ SI CPUsim(int single) {
 #endif
         _pc = pc + 1;
         cell _lex = 0;
+        cell s = Dstack[SP];
         if (insn & 0x8000) {
             int target = (lex << 13) | (insn & 0x1fff);
             switch (insn >> 13) { // 4 to 7
@@ -232,7 +234,11 @@ SI CPUsim(int single) {
 #endif
                     }
                 } else {
-                    _lex = (lex << 11) | (insn & 0x7FF);            /*   litx */
+                    if (insn & 0x800)                               /* coproc */
+                        copresult = coproc_c(insn & 0x7FF, CELLBITS,
+                            cycles, t & CELLMASK, s & CELLMASK, w & CELLMASK);
+                    else 
+                        _lex = (lex << 11) | (insn & 0x7FF);        /*   litx */
                 }
             }
         } else { // ALU
@@ -246,13 +252,12 @@ SI CPUsim(int single) {
                     latency = time;
 #endif
             }
-            cell s = Dstack[SP];
             cell _c = t & 1;
             cell temp;
             sum_t sum;
             switch ((insn >> 9) & 0x1F) {
             case 0x00: _t = t;                               break; /*      T */
-            case 0x10: _t = 0;                               break; /*    COP */
+            case 0x10: _t = copresult;                       break; /*    COP */
             case 0x01: _t = (t & MSB) ? -1 : 0;              break; /*    T<0 */
             case 0x11: _t = cy;                              break; /*      C */
             case 0x02: temp = (t & MSB);
@@ -903,9 +908,15 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
         int target = IR & 0x1FFF;
         switch ((IR>>12) & 7) {
         case 6: 
-            target = IR & 0x7FF;
-            HexToDA(target);  _lex = (lex << 11) + target;
-            appendDA("litx");  break;
+            target = IR & 0x7FF;  HexToDA(target);
+            if (IR & 0x800) {
+                appendDA("cop");
+            }
+            else {
+                _lex = (lex << 11) + target;
+                appendDA("litx");
+            }
+            break;
         case 7:
             target = (IR & 0xFF) | (IR & 0xE00) >> 1;
             appendDA(itos((lex << 11) + target, Data[base], 0, 0));
@@ -926,7 +937,7 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
             switch ((IR >> 12) & 3) {
             case 0: diss(id, "T\0T0<\0T2/\0T2*\0N\0T^N\0T&N\0mask"); break;
             case 1: diss(id, "T+N\0N-T\0T0=\0N>>T\0N<<T\0R\0[T]\0status"); break;
-            case 2: diss(id, "---\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
+            case 2: diss(id, "COP\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
             default: diss(id, "T+Nc\0N-Tc\0---\0---\0---\0R-1\0io[T]\0---");
             }
             diss((IR >> 4) & 7, "\0T->N\0T->R\0N->[T]\0_MEMRD_\0N->io[T]\0_IORD_\0CO");
@@ -1721,7 +1732,8 @@ SV LoadKeywords(void) {
     AddKeyword("|bits|",      "1.1360 n --",       SetTableBitWidth, noCompile);
     AddKeyword("|",           "1.1370 x --",          TableEntry,    noCompile);
     AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
-    // primitives can compile and execute
+    // Primitives can compile and execute
+    // They are basically 16-bit fixed codes
     AddALUinst("nop",     "1.2000 --",   0);
     AddALUinst("invert",  "1.2010 x -- ~x",           com);
     AddALUinst("2*",      "1.2020 n -- n*2",          shl1  | co);

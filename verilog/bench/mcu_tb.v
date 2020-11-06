@@ -45,7 +45,7 @@ module mcu_tb();
   pullup(qd[0]);
   pullup(cs_n);
 
-  mcu #(16) u1 (
+  mcu #(24) u1 (
     .clk      (clk     ),
     .rst_n    (rst_n   ),
     .rxd      (rxd     ),

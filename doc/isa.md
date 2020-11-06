@@ -204,23 +204,36 @@ These are the proposed `copid` codes:
 - 0: No coprocessor exists
 - 1: Hardware multiply and divide
 
-Extensions should copy RISC V conventions as much as possible to leverage
-existing hardware designs.
+The `coproc` coprocessor ports, excluding clock and reset, are:
 
-### Hardware multiply and divide (TBD)
+- `sel`, 11-bit operation and/or register select
+- `go`, trigger strobe ('1' when COP instruction)
+- `y`, coprocessor output
+- `a`, top of data stack
+- `b`, 2nd item on data stack
+
+The `C` simulation uses `coproc.h` and `coproc.c` to define the coprocessor
+function `chad_coproc`. The "busy" status will always read 0.
+
+### Hardware multiply and divide
 
 There are many ways to implement a multiplier: iterative, pipelined, or full.
 The software doesn't care. It just needs to test for completion.
 Once an operation is triggered, reading `COP` gives a 0 when the coprocessor
-is busy. Once finished, you can read result registers into `COP`.
+is busy. Once finished, you can read the result from `COP`.
 
-- 0xE800 = Read ID = 1
-- 0xE801 = Read upper multiplication product
-- 0xE802 = Read lower multiplication product
-- 0xE803 = Read division quotient
-- 0xE804 = Read division remainder
-- 0xE808 = Trigger multiplication of T and N
+- 0xE800 = Read status: 1 = busy, 0 = ready
+- 0xE801 = Read coprocessor boilerplate, 3 = have multiply and divide
+- 0xE802 = Read upper multiplication product
+- 0xE803 = Read lower multiplication product
+- 0xE804 = Read division quotient
+- 0xE805 = Read division remainder
+- 0xE808 = Trigger unsigned multiplication of T and N
 - 0xE809 = Trigger division of T:N by W
+
+On a MAX10, a 24-bit processor needed about 300 LEs to add iterative hardware
+multiply and divide. Since the FPGA's hard multipliers are not used,
+the coprocessor won't slow down the processor if it's in an ASIC.
 
 ### SDRAM (TBD)
 

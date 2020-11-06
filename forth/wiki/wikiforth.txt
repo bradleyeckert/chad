@@ -161,6 +161,14 @@
  Jump forward by `2*n` instructions in code.
 =2.0750: exec1: ( n -- )
  Jump forward by `n` instructions in code.
+=2.0760: cop_options ( -- n )
+ Get option flags from the coprocessor, 0 = none.
+#
+H<ul>
+-bit 0: Hardware multiplier (um*) is included.
+-bit 1: Hardware divider (um/mod) is included.
+-bit 8: Overflow flag from last divide operation. Next good divide clears it.
+H</ul>
 =2.1000: false ( -- false )
  Return a `false` flag.
 =2.1010: true ( -- true )

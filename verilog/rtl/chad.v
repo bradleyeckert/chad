@@ -31,6 +31,7 @@ module chad
   wire [WIDTH-1:0] rstkD;               // R stack write value
   reg  reboot;
   wire [14:0] pc_plus_1 = pc + 15'd1;
+  reg  [WIDTH-1:0] wreg;
 
   assign mem_addr = (WIDTH == 32) ? st0[16:2] : st0[15:1];
   assign code_addr = pcN;
@@ -42,6 +43,12 @@ module chad
     .rd(st1), .we(dstkW), .wd(st0), .delta(dspI));
   stack #(WIDTH, DEPTH) rstack (.clk(clk), .hold(hold),
     .rd(rst0), .we(rstkW), .wd(rstkD), .delta(rspI));
+
+  // Coprocessor
+  wire [WIDTH-1:0] cop;
+  wire copgo = (insn[15:11] == 5'b11101);
+  coproc #(WIDTH) coprocessor (.clk(clk), .arstn(resetq), .sel(insn[10:0]),
+    .go(copgo), .y(cop), .a(st0), .b(st1), .c(wreg));
 
 // 0xpppppR xwwwrrss = ALU instruction
 //     x = unused
@@ -61,8 +68,8 @@ module chad
 //     T = (lex<<13) | n
 //     R = return
 
-  reg [WIDTH-1:0] wreg;
   reg [WIDTH-12:0] lex;
+  wire [WIDTH-1:0] longlex = {lex, insn[10:0]};
   reg carry, co;
 
   wire [WIDTH:0] sum  = st1 + st0;	// N + T
@@ -97,7 +104,7 @@ module chad
       endcase
     else // ALU operations, insn[14] not currently used
       case (insn[12:9])
-      4'b0000: st0N = (insn[13]) ? {WIDTH{1'b0}} : st0; // T, COP
+      4'b0000: st0N = (insn[13]) ? cop : st0;           // T, COP
       4'b0001: st0N = (insn[13]) ? carry : {WIDTH{st0[WIDTH-1]}}; // 0<, C
       4'b0010: st0N = {msbin, st0[WIDTH-1:1]};		// T2/, cT2/
       4'b0011: st0N = {st0[WIDTH-2:0], lsbin};		// T2*, T2*c
@@ -177,12 +184,8 @@ module chad
         rsp <= rsp + {rspI[1], rspI[1], rspI[1], rspI};
         if (func_co)
           { carry, wreg } <= { co, st0 };
-        if (WIDTH < 23)
-          if (islex) lex <= insn[WIDTH-12:0];
-          else lex <= 0;
-        else
-          if (islex) lex <= {lex[WIDTH-23:0], insn[10:0]};
-          else lex <= 0;
+        if (islex) lex <= longlex[WIDTH-12:0];
+        else lex <= 0;
       end
     end
   end

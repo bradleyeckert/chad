@@ -11,6 +11,9 @@
 \ for two-cell dividend and two-cell divisor.
 
 there
+: d+c  ( d1 d2 -- d3 carry )            \ double add with carry out
+   >r swap >r +c  carry r> +  r> +c carry
+;
 : +carry  ( a b -- a+b carry )  +c carry ;          \ 0 tuck d+
 : -borrow ( a b -- a-b borrow ) -c carry negate ;   \ 0 tuck d-
 
@@ -18,21 +21,21 @@ there
    >r swap >r  2dup um* 2swap
    r> * swap r> * + +
 ;
+
 : tum* ( n . mpr -- t . . ) 2>r  r@ um*  0 2r>  um* d+ ;
 : tum/ ( t . . dvr -- n . ) dup >r um/mod r> swap >r um/mod nip r> ;
 
-: t+ ( t1 . . t2 . . -- t3 . . )
+: t+  ( t1 . . t2 . . -- t3 . . )
    >r rot >r  >r swap >r +carry  0 r> r> +carry d+ r> r> + +
 ;
-: t- ( t1 . . t2 . . -- t3 . . )
+: t-  ( t1 . . t2 . . -- t3 . . )
    >r rot >r  >r swap >r -borrow  s>d r> r> -borrow d+ r> r> - +
 ;
 
-: normalize-divisor ( divr . -- divr' . shift )
-    0 >r  begin
-       dup 0< 0= while
-       d2*  r> 1+ >r
-    repeat  r> ;
+: normalize-divisor  ( divr . -- divr' . shift )
+   0 >r  begin  dup 0< 0=  while
+      d2*  r> 1+ >r
+   repeat  r> ;
 
 : du/mod ( divd . divr . -- rem . quot . )
    ?dup 0= if  ( there is a leading zero "digit" in divisor. )
@@ -52,19 +55,19 @@ there
 ;
 
 \ Ratio search, based on the Farey sequence, by Brad Eckert
-
+\
 \ Given an unsigned double number `frac` between 0 and 1 scaled to
 \ 2^(2*cellsize) = 1, find two integers that fit into a specified bit
 \ width and most closely approximate `frac` using unsigned integer
 \ division.
-
+\
 \ For vast majority of cases, a very accurate fraction can be found.
 \ Less than 0.1% of the time, there is significant error.
 \ If you can work around these cases, it's a good way to get very
 \ precise scale factors.
 
-2variable ratio_ac                      \ a c
-2variable ratio_bd                      \ b d
+2variable ratio_x1                      \ a c
+2variable ratio_x2                      \ b d
 2variable expected                      \ unsigned 0 to 1
 variable maxden                         \ maximum allowed denominator
 
@@ -72,16 +75,16 @@ variable maxden                         \ maximum allowed denominator
    >r >r 0 dup r> r> tum/
 ;
 : exhausted?  ( -- flag )               \ finished with search?
-   ratio_bd 2@  maxden @ u<  swap maxden @ u<  and 0=
+   ratio_x2 2@  maxden @ u<  swap maxden @ u<  and 0=
 ;
 : /ratio  ( maxden -- )                 \ initialize
    maxden !
-   0 1 ratio_ac 2!
-   1 1 ratio_bd 2!
+   0 1 ratio_x1 2!
+   1 1 ratio_x2 2!
 ;
 : ratio/  ( flag -- n d )
    0=  cell and                         \ true returns c d
-   dup>r ratio_ac + @  ratio_bd r> + @  \ false returns a b
+   dup>r ratio_x1 + @  ratio_x2 r> + @  \ false returns a b
 ;
 
 \ Find the (num, den) pair that best satisfies frac = num / den.
@@ -91,24 +94,36 @@ variable maxden                         \ maximum allowed denominator
 : ratio  ( d_frac maxden -- num den )
    /ratio  expected 2!
    begin
-      ratio_ac 2@ +  ratio_bd 2@ +  2dup dfrac    \ a+c b+d d_actual
+      ratio_x1 2@ +  ratio_x2 2@ +  2dup dfrac    \ a+c b+d d_actual
       2dup expected 2@ d= if            \ exact match
          2drop  dup
          maxden @ u< if exit then       \ a+c b+d
-         2drop  ratio_bd 2@ u< ratio/  exit
+         2drop  ratio_x2 2@ u< ratio/  exit
       then
       expected 2@ du<  cell and
-      dup>r ratio_bd + !  r> ratio_ac + !
+      dup>r ratio_x2 + !  r> ratio_x1 + !
    exhausted? until
-   ratio_bd @ maxden @ u<  ratio/
+   ratio_x2 @ maxden @ u<  ratio/
 ;
 
 \ For 24-bit cells and 20-bit results, you can usually get to within
 \ 0.01 PPB on the approximation of d_frac. The error of the compound
 \ number (a + b/c) would be less by a factor of a.
-
+\
 \ Examples on a 24-bit machine:
 \ 100000000005000. 1048575 ratio swap . .  \ dfrac = 323978 / 911917
 \ 100000000005500. 1048575 ratio swap . .  \ dfrac = 194159 / 546509
+\
+\ `ud*` supports scaling of d_frac at this precision.
+
+\ Unsigned double * double -> quad product
+: ud*  ( ud1 ud2 -- uq )
+   over >r  ratio_x2 2!
+   over >r  ratio_x1 2!  r> r>  um*
+   ratio_x1 @  dup>r
+   ratio_x2 @  dup>r  um*               \ d_low d_hi | H1 H2
+   r> [ ratio_x1 cell + ] literal @ um*
+   r> [ ratio_x2 cell + ] literal @ um*  d+c  t+
+;
 
 there swap - . .( instructions used by bignum) cr

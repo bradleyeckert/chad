@@ -17,6 +17,7 @@
 <hr>
 <!-- No reference for fib -->
 <!-- No reference for myapp -->
+<!-- No reference for ud* -->
 <!-- No reference for ratio -->
 <!-- No reference for ratio/ -->
 <!-- No reference for /ratio -->
@@ -24,8 +25,8 @@
 <!-- No reference for dfrac -->
 <!-- No reference for maxden -->
 <!-- No reference for expected -->
-<!-- No reference for ratio_bd -->
-<!-- No reference for ratio_ac -->
+<!-- No reference for ratio_x2 -->
+<!-- No reference for ratio_x1 -->
 <!-- No reference for du/mod -->
 <!-- No reference for normalize-divisor -->
 <!-- No reference for t- -->
@@ -35,6 +36,7 @@
 <!-- No reference for d* -->
 <!-- No reference for -borrow -->
 <!-- No reference for +carry -->
+<!-- No reference for d+c -->
 <!-- No reference for decipher -->
 <!-- No reference for encipher -->
 <!-- No reference for CTcalcB -->
@@ -552,14 +554,19 @@ All values and arithmetic are unsigned.
 An ambiguous condition exists if u1 is zero or if the quotient
 lies outside the range of a single-cell unsigned integer.
 </p>
-<!-- No reference for (um/mod) -->
 <a name="2.0410"></a>
 <h3><ref>2.0410:</ref> <a href="../../core.f">um*</a> <com><i>( u1 u2 -- ud )</i></com></h3>
 
 <p>Multiply u1 by u2, giving the unsigned double-cell product ud.
 All values and arithmetic are unsigned.
 </p>
-<!-- No reference for (um*) -->
+<a name="2.0760"></a>
+<h3><ref>2.0760:</ref> <a href="../../core.f">cop_options</a> <com><i>( -- n )</i></com></h3>
+
+<p>Get option flags from the coprocessor, 0 = none.
+</p>
+<ul>
+<li>bit 0: Hardware multiplier (um*) is included.</li><li>bit 1: Hardware divider (um/mod) is included.</li><li>bit 8: Overflow flag from last divide operation. Next good divide clears it.</li></ul>
 <a name="2.0405"></a>
 <h3><ref>2.0405:</ref> <a href="../../core.f">times</a> <com><i>( n xt -- )</i></com></h3>
 
