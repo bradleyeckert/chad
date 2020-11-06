@@ -179,7 +179,7 @@ static void JamISP(uint8_t c) {
 }
 
 
-
+////////////////////////////////////////////////////////////////////////////////
 // Host words start at I/O address 8000h.
 
 // The `_IORD_` field in an ALU instruction strobes io_rd.
@@ -201,6 +201,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 3: return SPIresult;           // SPI result
     case 4: return 0;                   // Jam status, not busy
     case 5: return 0;                   // DMA status, not busy
+    case 6: return (uint32_t)chadCycles();
     case 0x8000: return header_data;
     default: chadError(BAD_IOADDR);
     }

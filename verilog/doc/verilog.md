@@ -11,8 +11,7 @@ I stuck with VHDL for a good long time. Why would I switch to Verilog?
 In 2020, I finally tried Verilog.
 I decided I wasn't going to use a language developed by the
 Department of Defense.
-A language made by grunts for grunts has a certain roguish charm,
-but my ideas about life changed.
+You shouldn't use tech that was intended for building weapons.
 
 Using Verilog is a lot like using VHDL, since I prefer RTL coding.
 But how does it handle? As it turns out, nicer than expected.
@@ -28,8 +27,9 @@ But how does it handle? As it turns out, nicer than expected.
 ## What I like about VHDL
 
 - Enumerated states. Okay, SV has that too. I like to see FSM state named in the simulation waveform.
-- In simulation it's easier to not think about the differences between registers and wires. But that's a style thing.
+- In simulation, it's easier to not think about the differences between registers and wires.
 - Stricter typing.
+- Catches more bugs at compile time.
 
 ## My Verilog style 
 

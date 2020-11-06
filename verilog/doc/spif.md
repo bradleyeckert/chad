@@ -248,6 +248,7 @@ Read:
 - 3: SPI flash result byte
 - 4: Jam status: 1 = busy
 - 5: Boot transfer status: 1 = loading memory from flash
+- 6: Raw clock cycle count
 
 Write:
 

@@ -48,6 +48,16 @@ module spif
   input  wire [7:0]        f_din        // Flash received data
 );
 
+// Free-running cycles counter readable by the CPU. Rolls over at Fclk*2^-WIDTH
+// Hz: 100 MHz, 18-bit -> 1.5 kHz. Software must poll at 3 kHz to extend count.
+
+  reg [WIDTH-1:0] cycles;
+  always @(posedge clk or negedge arstn)
+    if (!arstn)
+      cycles <= 1'b0;
+    else
+      cycles <= cycles + 1'b0;
+
 //==============================================================================
 // UART input FSM
 // Received data goes to uartRXbyte and uartRXfull.
@@ -161,6 +171,7 @@ module spif
     3'b011:    io_dout = f_din;         // flash SPI result
     3'b100:    io_dout = ISPfull;       // jammed byte is still pending
     3'b101:    io_dout = booting;       // still reading flash?
+    3'b111:    io_dout = cycles;        // free-running counter
     default:   io_dout = 1'b0;
     endcase
   end
