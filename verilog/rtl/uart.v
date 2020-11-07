@@ -1,4 +1,4 @@
-// Unbuffered UART with FIFO-compatible interface               10/28/2020
+// Unbuffered UART with FIFO-compatible interface               11/6/2020 BNE
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -13,18 +13,9 @@ module uart
   input wire            rd,        	// UART received strobe (clears full)
   output reg  [7:0]     dout,        	// UART received data
   input wire  [15:0]    bitperiod,      // Clocks per serial bit
-  input wire            rxd,            // Async input
+  input wire            rxd,            // Must be externally synchronized
   output reg            txd
 );
-
-// Synchronize RXD with 3-flop CDC
-  reg rxdi, rxda, rxdb;
-  always @(posedge clk or negedge arstn)
-  if (!arstn) begin
-    rxdi <= 1'b1;  rxda <= 1'b1;  rxdb <= 1'b1;
-  end else begin
-    rxdi <= rxdb;  rxdb <= rxda;  rxda <= rxd;
-  end
 
 // Baud rate is BPS = clk/bitperiod. Example: 100M/868 = 115200 BPS.
   reg [11:0] baudint;
@@ -48,7 +39,7 @@ module uart
   end
 
   reg tnext, error;
-  wire startbit = ~rxdi & ~error;
+  wire startbit = ~rxd & ~error;
   reg [7:0] inreg;                      // pending transmit byte
   reg pending;
 
@@ -80,16 +71,16 @@ module uart
         if (rxstate[3:0] == 4'd1)
           case (rxstate[7:4])
           4'b1001:
-            if (rxdi) rxstate <= 8'd0;  // false start
+            if (rxd) rxstate <= 8'd0;   // false start
           4'b0000:
-            if (rxdi) {dout, full} <= {rxreg, 1'b1};
+            if (rxd) {dout, full} <= {rxreg, 1'b1};
             else      error <= 1'b1;    // '0' at the stop bit (or BREAK)
           default:
-            rxreg <= {rxdi, rxreg[7:1]};
+            rxreg <= {rxd, rxreg[7:1]};
           endcase
         rxstate <= rxstate - 1'b1;
       end else begin
-        error <= error & ~rxdi;         // stop or mark ('1') clears error
+        error <= error & ~rxd;          // stop or mark ('1') clears error
         if (startbit) rxstate <= 8'h98; // will be sampled mid-bit
       end
     end

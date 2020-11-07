@@ -1,4 +1,4 @@
-// Serial Flash Controller for Chad                  		10/28/2020 BNE
+// Serial Flash Controller for Chad                  		11/6/2020 BNE
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -52,11 +52,12 @@ module spif
 // Hz: 100 MHz, 18-bit -> 1.5 kHz. Software must poll at 3 kHz to extend count.
 
   reg [WIDTH-1:0] cycles;
-  always @(posedge clk or negedge arstn)
+  always @(posedge clk or negedge arstn) begin
     if (!arstn)
-      cycles <= 1'b0;
+      cycles <= 'b0;
     else
-      cycles <= cycles + 1'b0;
+      cycles <= cycles + 1'b1;
+  end
 
 //==============================================================================
 // UART input FSM

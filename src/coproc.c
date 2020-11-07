@@ -6,7 +6,7 @@
 // bit 0: hardware unsigned multiplier exists
 // bit 1: hardware unsigned divider exists
 
-static uint64_t mtime, dtime, product;
+static uint64_t mtime, dtime, stime, product, shifted;
 static uint32_t quot, rem, overflow;
 
 uint32_t coproc_c(
@@ -22,7 +22,7 @@ uint32_t coproc_c(
 		mask = mask >> (32 - bits);
 	switch (sel) {
 	case 0:
-		return (cycles < mtime) | (cycles < dtime);
+		return (cycles < mtime) | (cycles < dtime) | (cycles < stime);
 	case 1:
 		return overflow | OPTIONS;
 	case 2:
@@ -33,7 +33,11 @@ uint32_t coproc_c(
 		return quot;
 	case 5:
 		return rem;
-	case 8: 
+	case 6:
+		return mask & (shifted >> bits);
+	case 7:
+		return mask & shifted;
+	case 8:
 		mtime = cycles + bits + 1;
 		product = (uint64_t)tos * (uint64_t)nos;
 		return 0;
@@ -52,6 +56,15 @@ uint32_t coproc_c(
 			overflow = 0;
 		}
 		return 0;
+	case 10:
+		dtime = cycles + bits + 1;
+		ud = ((uint64_t)tos << bits) | nos;
+		if (sel & 0x40)
+			shifted = ud << w;
+		else if (sel & 0x80)
+			shifted = (signed)ud >> w;
+		else
+			shifted = ud >> w;
 	default: return 0;
 	}
 }

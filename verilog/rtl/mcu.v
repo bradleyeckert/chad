@@ -80,7 +80,7 @@ module mcu
 
   // spif is the SPI flash controller for the chad processor
   // 2048 words of code, 1024 words of data
-  spif #(11, WIDTH, 10, 0, 0, 0, 50) u1 (
+  spif #(11, WIDTH, 11, 0, 0, 0, 50) u1 (
   // spif #(11, WIDTH, 10, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
@@ -130,6 +130,11 @@ module mcu
     .oe       (oe       )
   );
 
+  wire rxd_s;
+
+  // synchronize UART input
+  cdc rxd_cdc (.clk(clk), .a(rxd), .y(rxd_s));
+
   // Convert 2-wire UART connection to a byte stream
   uart u3 (
     .clk      (clk     ),
@@ -141,7 +146,7 @@ module mcu
     .rd       (u_rd    ),
     .dout     (u_din   ),
     .bitperiod(u_rate  ),
-    .rxd      (rxd     ),
+    .rxd      (rxd_s   ),
     .txd      (txd     )
   );
 
