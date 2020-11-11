@@ -23,6 +23,15 @@ include ../bignum.f
 
 \ A very simple app would output some numbers and then hang.
 
+variable tally
+
+: myisr  ( -- )
+   tally @ 1 +
+   tally !
+;
+
+' myisr resolves irqdemo
+
 : myapp  ( -- )
 \    42 512 io!
 \    512 io@ emit

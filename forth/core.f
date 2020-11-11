@@ -8,6 +8,7 @@
 
 0 torg
 later cold                              \ 2.0010 -- \ boots here
+later irqdemo
 later exception                         \ 2.0020 n --
 
 : noop  nop ;                           \ 2.0100 --

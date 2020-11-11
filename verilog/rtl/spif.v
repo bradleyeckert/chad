@@ -52,7 +52,9 @@ module spif
   input wire  [31:0]       dat_i,       // data in
   output wire              we_o,        // 1 = write, 0 = read
   output wire              stb_o,       // strobe
-  input wire               ack_i        // acknowledge
+  input wire               ack_i,       // acknowledge
+// Interrupt request strobes
+  output wire              cyclev       // cycle count overflow
 );
 
 // Wishbone bus master
@@ -64,7 +66,7 @@ module spif
   wire wbbusy = stb_o & ~ack_i;         // waiting for wishbone bus
   reg [31:0] wbxo;
 
-  assign dat_o = (WIDTH == 32) ? din : {wbxo, din};
+  assign dat_o = (WIDTH == 32) ? din : {wbxo, din}; // let it truncate
 
   reg [31:0] wbxi;
   always @(posedge clk or negedge arstn) begin
@@ -82,9 +84,10 @@ module spif
   reg [WIDTH-1:0] cycles;
   always @(posedge clk or negedge arstn) begin
     if (!arstn)
-      cycles <= 'b0;
+      {cyclev, cycles} <= 0;
     else
       cycles <= cycles + 1'b1;
+      if (cycles == 0) cyclev <= 1'b1;
   end
 
 //==============================================================================
@@ -310,15 +313,15 @@ module spif
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
       f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
-      b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= '0;
-      b_count <= 16'd0;   b_data <= '0;      ISPack <= 1'b0;
+      b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= 0;
+      b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 3'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd5;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
       u_txbyte <= 8'h5B;  // power-up output character
-      init <= 1'b1;       i_count <= (1 << CODE_SIZE) - '1;
+      init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
     end else begin
       codeWr <= 1'b0;                   // strobes
       dataWr <= 1'b0;

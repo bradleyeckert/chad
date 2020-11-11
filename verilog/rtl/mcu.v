@@ -53,8 +53,12 @@ module mcu
   wire [7:0]          f_din;            // Flash received data            i
 
   wire p_reset_n = ~p_reset;
+  reg                 irq;              // Interrupt request              i
+  wire [3:0]          ivec;             // Interrupt vector for irq       i
+  wire                iack;             // Interrupt acknowledge          o
 
-  // chad processor
+
+// chad processor
   chad #(WIDTH) u0 (
     .clk      (clk      ),
     .resetq   (p_reset_n),
@@ -68,8 +72,31 @@ module mcu
     .mem_din  (mem_dout ),
     .io_din   (io_dout  ),
     .code_addr(code_addr),
-    .insn     (insn     )
+    .insn     (insn     ),
+    .irq      (irq      ),
+    .ivec     (ivec     ),
+    .iack     (iack     )
   );
+
+// Interrupts
+
+  assign ivec = 4'd1;
+  reg [7:0] testcount;
+
+// Request interrupt 1 every 256 clock cycles for a test
+  always @(negedge p_reset_n or posedge clk)
+  begin
+    if (!p_reset_n) begin
+      testcount <= 8'hC0;
+      irq <= 1'b0;
+    end else begin
+      testcount <= testcount + 1'b1;
+      if (testcount == 0)
+        irq <= 1'b1;
+      else
+        if (iack) irq <= 1'b0;
+    end
+  end
 
 // Wishbone master
   wire [14:0] adr_o;

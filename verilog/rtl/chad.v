@@ -1,4 +1,4 @@
-// Chad processor                                               10/13/2020 BNE
+// Chad processor                                               11/11/2020 BNE
 // License: This code is a gift to the divine.
 
 module chad
@@ -18,7 +18,10 @@ module chad
   input  wire [WIDTH-1:0] mem_din,      // Data memory in
   input  wire [WIDTH-1:0] io_din,       // I/O data in
   output wire [14:0] code_addr,         // Code memory address
-  input  wire [15:0] insn               // Code memory data
+  input  wire [15:0] insn,              // Code memory data
+  input  wire irq,                      // Interrupt request
+  input  wire [3:0] ivec,               // Interrupt vector that goes with irq
+  output wire iack                      // Interrupt acknowledge
 );
 
   reg  [4:0] dsp, rsp;                  // Stack depth tracking
@@ -31,7 +34,8 @@ module chad
   wire [WIDTH-1:0] rstkD;               // R stack write value
   reg  reboot;
   wire [14:0] pc_plus_1 = pc + 15'd1;
-  reg  [WIDTH-1:0] wreg;
+  reg  [WIDTH-1:0] wreg;                // W and carry registers
+  reg  carry, co;
 
   assign mem_addr = (WIDTH == 32) ? st0[16:2] : st0[15:1];
   assign code_addr = pcN;
@@ -50,27 +54,8 @@ module chad
   coproc #(WIDTH) coprocessor (.clk(clk), .arstn(resetq), .sel(insn[10:0]),
     .go(copgo), .y(cop), .a(st0), .b(st1), .c(wreg));
 
-// 0xpppppR xwwwrrss = ALU instruction
-//     x = unused
-//     p = 5-bit ALU operation select
-//     R = return
-//     w = strobe select
-//     r = return stack displacement
-//     s = data stack displacement
-// 100nnnnn nnnnnnnn = jump
-//     PC = (lex<<13) | n
-// 101nnnnn nnnnnnnn = conditional jump
-// 110nnnnn nnnnnnnn = call, same as jump but pushes PC.
-// 11100nnn nnnnnnnn = literal extension
-//     lex = (lex<<11) | n;  Any other instruction clears lex.
-// 11101nnn nnnnnnnn = reserved for user's coprocessor
-// 1111nnnR nnnnnnnn = unsigned literal (imm)
-//     T = (lex<<13) | n
-//     R = return
-
   reg [WIDTH-12:0] lex;
   wire [WIDTH-1:0] longlex = {lex, insn[10:0]};
-  reg carry, co;
 
   wire [WIDTH:0] sum  = st1 + st0;	// N + T
   wire [WIDTH:0] diff = st1 - st0;	// N - T
@@ -140,31 +125,37 @@ module chad
   assign io_rd =  !reboot & func_ior;
 
   assign rstkD = (insn[15]) ? {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0} : st0;
+  assign iack = irq & insn[8]           // return is executing
+              & ((insn[15:12] == 4'b1111) | ~insn[15] & ~func_T_R);
 
   always @*
   begin
-    casez ({insn[15:12]})
-    4'b0???: {dstkW, dspI} = {func_T_N,  insn[1:0]};
-    4'b101?: {dstkW, dspI} = {1'b0,      2'b11};        // if
-    4'b1111: {dstkW, dspI} = {1'b1,      2'b01};        // imm
-    default: {dstkW, dspI} = {1'b0,      2'b00};
+    casez ({insn[15:12]})               // adjust data stack pointer
+    4'b0???: {dstkW, dspI} = {func_T_N, insn[1:0]};
+    4'b101?: {dstkW, dspI} = {1'b0,     2'b11};         // if
+    4'b1111: {dstkW, dspI} = {1'b1,     2'b01};         // imm
+    default: {dstkW, dspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({insn[15:12], insn[8]})
-    5'b0???_?: {rstkW, rspI} = {func_T_R,  insn[3:2]};
-    5'b110?_?: {rstkW, rspI} = {1'b1,      2'b01};      // call
-    5'b1111_1: {rstkW, rspI} = {1'b0,      2'b11};      // lit+ret
-    default:   {rstkW, rspI} = {1'b0,      2'b00};
+    casez ({insn[15:12], insn[8], iack}) // adjust return stack pointer
+    6'b0???_?_0: {rstkW, rspI} = {func_T_R, insn[3:2]};
+    6'b0???_?_1: {rstkW, rspI} = {1'b0,     2'b00};
+    6'b110?_?_?: {rstkW, rspI} = {1'b1,     2'b01};     // call
+    6'b1111_1_0: {rstkW, rspI} = {1'b0,     2'b11};     // lit+ret
+    6'b1111_1_1: {rstkW, rspI} = {1'b0,     2'b00};
+    default:     {rstkW, rspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({reboot, insn[15:12], insn[8], |st0})
-    7'b1_????_?_?: pcN = 0;
-    7'b0_100?_?_?, // jump, call, if
-    7'b0_110?_?_?,
-    7'b0_101?_?_0: pcN = {2'd0, insn[12:0]};
-    7'b0_1111_1_?, // lit+ret
-    7'b0_0???_1_?: pcN = rst0[15:1];
-    default:       pcN = pc_plus_1;
+    casez ({reboot, insn[15:12], insn[8], iack, |st0})
+    8'b1_????_?_?_?: pcN = 0;
+    8'b0_100?_?_?_?, // jump, call, if
+    8'b0_110?_?_?_?,
+    8'b0_101?_?_?_0: pcN = {2'd0, insn[12:0]};
+    8'b0_1111_1_0_?, // lit+ret
+    8'b0_0???_1_0_?: pcN = rst0[15:1];
+    8'b0_1111_1_1_?,
+    8'b0_0???_1_1_?: pcN = ivec;
+    default:         pcN = pc_plus_1;
     endcase
   end
 
