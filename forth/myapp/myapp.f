@@ -24,6 +24,8 @@ include ../bignum.f
 \ A very simple app would output some numbers and then hang.
 
 : myapp  ( -- )
+\    42 512 io!
+\    512 io@ emit
     cr
     10 for r@ . next
     begin noop again

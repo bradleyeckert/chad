@@ -1,4 +1,4 @@
-\ Double Number Arithmetic by Wil Baden
+\ Double Number Arithmetic by Wil Baden, tweaked by Brad Eckert
 \
 \ TUM* TUM/ triple Unsigned Mixed Multiply and Divide.
 \

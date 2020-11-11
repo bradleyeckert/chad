@@ -25,7 +25,7 @@ module spif
   input  wire [14:0]       mem_addr,    // Data memory address
   input  wire [WIDTH-1:0]  din,         // Data memory & I/O in (from N)
   output wire [WIDTH-1:0]  mem_dout,    // Data memory out
-  output reg  [WIDTH-1:0]  io_dout,     // I/O data out
+  output wire [WIDTH-1:0]  io_dout,     // I/O data out
   input  wire [14:0]       code_addr,   // Code memory address
   output wire [15:0]       insn,        // Code memory data
   output wire              p_hold,      // Processor hold
@@ -45,8 +45,36 @@ module spif
   output reg  [7:0]        f_dout,      // Flash transmit data
   output reg  [2:0]        f_format,    // Flash format
   output reg  [3:0]        f_rate,      // Flash SCLK divisor
-  input  wire [7:0]        f_din        // Flash received data
+  input  wire [7:0]        f_din,       // Flash received data
+// Wishbone master
+  output wire [14:0]       adr_o,       // address
+  output wire [31:0]       dat_o,       // data out
+  input wire  [31:0]       dat_i,       // data in
+  output wire              we_o,        // 1 = write, 0 = read
+  output wire              stb_o,       // strobe
+  input wire               ack_i        // acknowledge
 );
+
+// Wishbone bus master
+
+  wire internal = (mem_addr[14:4] == 0);// anything above 0x000F is Wishbone
+  assign adr_o = mem_addr;
+  assign stb_o = (io_wr | io_rd) & ~internal ;
+  assign we_o = io_wr;
+  wire wbbusy = stb_o & ~ack_i;         // waiting for wishbone bus
+  reg [31:0] wbxo;
+
+  assign dat_o = (WIDTH == 32) ? din : {wbxo, din};
+
+  reg [31:0] wbxi;
+  always @(posedge clk or negedge arstn) begin
+    if (!arstn)
+      wbxi <= 'b0;
+    else
+      if ((!internal) && (io_rd) && (stb_o) && (ack_i))
+        if (WIDTH != 32)
+          wbxi <= dat_i[31:WIDTH];
+  end
 
 // Free-running cycles counter readable by the CPU. Rolls over at Fclk*2^-WIDTH
 // Hz: 100 MHz, 18-bit -> 1.5 kHz. Software must poll at 3 kHz to extend count.
@@ -163,19 +191,22 @@ module spif
   reg  [2:0] b_state;                   // boot FSM state
   wire booting = (b_state) ? 1'b1 : 1'b0;
   wire txbusy = ~u_ready;
+  reg [WIDTH-1:0] spif_dout;
 
   always @* begin                       // i/o read mux
     case (mem_addr[2:0])                // Verilog zero-extends smaller vectors
-    3'b000:    io_dout = uartRXbyte;    // char
-    3'b001:    io_dout = uartRXfull;    // char is in the buffer
-    3'b010:    io_dout = txbusy;        // EMIT is busy?
-    3'b011:    io_dout = f_din;         // flash SPI result
-    3'b100:    io_dout = ISPfull;       // jammed byte is still pending
-    3'b101:    io_dout = booting;       // still reading flash?
-    3'b111:    io_dout = cycles;        // free-running counter
-    default:   io_dout = 1'b0;
+    3'b000:  spif_dout = uartRXbyte;    // char
+    3'b001:  spif_dout = uartRXfull;    // char is in the buffer
+    3'b010:  spif_dout = txbusy;        // EMIT is busy?
+    3'b011:  spif_dout = f_din;         // flash SPI result
+    3'b100:  spif_dout = ISPfull;       // jammed byte is still pending
+    3'b101:  spif_dout = booting;       // still reading flash?
+    3'b110:  spif_dout = cycles;        // free-running counter
+    3'b111:  spif_dout = wbxi;          // Wishbone bus extra input bits
     endcase
   end
+
+  assign io_dout = (internal) ? spif_dout : dat_i[WIDTH-1:0];
 
   reg [2:0] i_usel;                     // UART output select for ISP
   reg [7:0] u_txbyte;                   // manual UART output
@@ -279,15 +310,15 @@ module spif
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
       f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
-      b_dest <= 16'd0;    f_rate <= 4'h7;
-      b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
+      b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= '0;
+      b_count <= 16'd0;   b_data <= '0;      ISPack <= 1'b0;
       b_mode <= 3'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd5;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
       u_txbyte <= 8'h5B;  // power-up output character
-      init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
+      init <= 1'b1;       i_count <= (1 << CODE_SIZE) - '1;
     end else begin
       codeWr <= 1'b0;                   // strobes
       dataWr <= 1'b0;
@@ -446,20 +477,24 @@ module spif
         b_dest <= b_dest + 16'd1;
       if (io_wr)
         if (!p_hold)
-          case (mem_addr[2:0])
-          3'b000: begin
-              u_wr <= 1'b1;             // write to UART
-       	      i_usel <= 3'd5;
-              u_txbyte <= din[7:0];
-            end
-          3'b011: b_state <= 3'd6;      // interpret flash byte stream
-          endcase
+          if (internal)
+            case (mem_addr[2:0])
+            3'b000: begin
+                u_wr <= 1'b1;             // write to UART
+       	        i_usel <= 3'd5;
+                u_txbyte <= din[7:0];
+              end
+            3'b011: b_state <= 3'd6;      // interpret flash byte stream
+            3'b111:
+              if (WIDTH != 32) wbxo <= din[31-WIDTH:0];
+            endcase
     end
 
 // The Data and Code RAMs are accessed via DMA by the boot process.
 // The bootloader writes to either code or data RAM.
+// p_hold inhibits reads to keep the read streams in sync with their addresses.
 
-  assign p_hold = codeWr | dataWr | iobusy;
+  assign p_hold = codeWr | dataWr | iobusy | wbbusy;
   wire code_rd = ~p_hold;
   wire [CODE_SIZE-1:0] code_ia =
        (codeWr) ? b_dest[CODE_SIZE-1:0] : code_addr[CODE_SIZE-1:0];

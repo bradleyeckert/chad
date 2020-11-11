@@ -9,17 +9,17 @@ module mcu
 #(
   parameter WIDTH = 18
 )(
-  input wire          clk,
-  input wire          rst_n,
+  input wire               clk,
+  input wire               rst_n,
 // 6-wire connection to SPI flash chip
-  output wire         sclk,             // Freq = Fclk / (2 * (prescale + 1))
-  output wire         cs_n,
-  input wire   [3:0]  qdi,
-  output wire  [3:0]  qdo,
-  output wire  [3:0]  oe,               // output enable for qdo
+  output wire              sclk,
+  output wire              cs_n,
+  input wire   [3:0]       qdi,
+  output wire  [3:0]       qdo,
+  output wire  [3:0]       oe,          // output enable for qdo
 // UART connection
-  input wire          rxd,              // Async input
-  output wire         txd
+  input wire               rxd,         // Async input
+  output wire              txd
 );
 
   // Processor interface (J1, chad, etc)
@@ -71,6 +71,11 @@ module mcu
     .insn     (insn     )
   );
 
+// Wishbone master
+  wire [14:0] adr_o;
+  wire [31:0] dat_o, dat_i;
+  wire we_o, stb_o, ack_i;
+
   wire io_spif = (mem_addr[6:3] == 0);
   wire s_iord = io_spif & io_rd;
   wire s_iowr = io_spif & io_wr;
@@ -78,10 +83,10 @@ module mcu
 
   assign io_dout = s_io_dout;           // spif is the only I/O device
 
-  // spif is the SPI flash controller for the chad processor
-  // 2048 words of code, 1024 words of data
+// spif is the SPI flash controller for the chad processor
+// 2048 words of code, 2048 words of data
   spif #(11, WIDTH, 11, 0, 0, 0, 50) u1 (
-  // spif #(11, WIDTH, 10, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
+  // spif #(11, WIDTH, 11, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
@@ -109,10 +114,16 @@ module mcu
     .f_dout   (f_dout   ),
     .f_format (f_format ),
     .f_rate   (f_rate   ),
-    .f_din    (f_din    )
+    .f_din    (f_din    ),
+    .adr_o    (adr_o    ),
+    .dat_o    (dat_o    ),
+    .dat_i    (dat_i    ),
+    .we_o     (we_o     ),
+    .stb_o    (stb_o    ),
+    .ack_i    (ack_i    )
   );
 
-  // Convert SPI flash connection to a byte stream
+// Convert SPI flash connection to a byte stream
   sflash u2 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
@@ -132,10 +143,10 @@ module mcu
 
   wire rxd_s;
 
-  // synchronize UART input
+// synchronize UART input
   cdc rxd_cdc (.clk(clk), .a(rxd), .y(rxd_s));
 
-  // Convert 2-wire UART connection to a byte stream
+// Convert 2-wire UART connection to a byte stream
   uart u3 (
     .clk      (clk     ),
     .arstn    (rst_n   ),
@@ -149,5 +160,23 @@ module mcu
     .rxd      (rxd_s   ),
     .txd      (txd     )
   );
+
+// Put your Wishbone peripherals here.
+// For testing, we loop back stb_o to ack_i.
+
+  reg [31:0] wbreg;
+  reg stb_od;
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n)
+      wbreg <= 'b0;
+    else begin
+      if ((stb_o) && (we_o))
+        wbreg <= dat_o;
+      stb_od <= stb_o; // delayed stb
+    end
+  end
+
+  assign dat_i = wbreg;
+  assign ack_i = stb_od;
 
 endmodule

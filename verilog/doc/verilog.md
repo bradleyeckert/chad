@@ -23,6 +23,7 @@ But how does it handle? As it turns out, nicer than expected.
 - The syntax is much more concise.
 - Case sensitivity.
 - File operations are much easier.
+- Vectors may have a width of 1.
 
 ## What I like about VHDL
 

@@ -249,6 +249,7 @@ Read:
 - 4: Jam status: 1 = busy
 - 5: Boot transfer status: 1 = loading memory from flash
 - 6: Raw clock cycle count
+- 7: Upper bits of a 32-bit Wishbone Bus read if cells are less than 32-bit 
 
 Write:
 
@@ -256,6 +257,7 @@ Write:
 - 2: Set UART baud rate = sysclk / N
 - 3: Trigger the flash boot interpreter
 - 4: Jam an ISP byte (see UART ISP protocol)
+- 7: Set the upper bits of the next 32-bit Wishbone Bus write
 
 ### Jamming ISP bytes
 
@@ -265,6 +267,16 @@ execute flash commands. You can set up the DMA registers, start the command,
 and trigger a DMA memory load.
 
 Make sure to poll io\[4] to wait until the jammed command has been processed.
+
+### Wishbone Bus Master
+
+The I/O space starting at address 16 (byte address 32 or 64) is mapped to a
+Wishbone Bus Master.
+To handle 32-bit data when the processor cell size is less than that, a couple of
+registers handle the extra bits.
+
+There are no byte lanes in the bus, so `sel_o` is assumed high. 
+Since `cyc_o` is always the same as `stb_o`, it is not duplicated.
 
 ## Sample MCU
 
@@ -276,7 +288,7 @@ The UART then has free reign over the SPI flash for programming it.
 Any synthesis tool will infer the RAMs, although some will
 warn you about possible simulation mismatch. Such problems occur if you try to
 read back a word that was written to the same address in the previous cycle.
-That probably won't happen in this architecture, the way `chad` is set up.
+That won't happen in this architecture, the way `chad` is set up.
 
 ![MCU Image](mcu.png)
 
@@ -338,6 +350,7 @@ A demo MCU with UART, SPI flash interface, 16-deep stacks, and the
 `chad` processor produced these synthesis results for small FPGAs.
 Note that Fmax varies with synthesis tool settings.
 These were with out-of-the-box defaults. Consider them approximations.
+Also, the numbers don't keep up with feature creep.
 
 | FPGA part#      | Vendor  | 16-bit | 18-bit | 24-bit | 32-bit | Fmax|
 |-----------------|:-------:|-------:|-------:|-------:|-------:|----:|
