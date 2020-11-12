@@ -54,7 +54,7 @@ module spif
   output wire              stb_o,       // strobe
   input wire               ack_i,       // acknowledge
 // Interrupt request strobes
-  output wire              cyclev       // cycle count overflow
+  output reg               cyclev       // cycle count overflow
 );
 
 // Wishbone bus master

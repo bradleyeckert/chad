@@ -125,8 +125,8 @@ module chad
   assign io_rd =  !reboot & func_ior;
 
   assign rstkD = (insn[15]) ? {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0} : st0;
-  assign iack = irq & insn[8]           // return is executing
-              & ((insn[15:12] == 4'b1111) | ~insn[15] & ~func_T_R);
+  wire ack = irq & insn[8] & ((insn[15:12] == 4'b1111) | ~insn[15] & ~func_T_R);
+  assign iack = ack & ~hold;
 
   always @*
   begin
@@ -137,7 +137,7 @@ module chad
     default: {dstkW, dspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({insn[15:12], insn[8], iack}) // adjust return stack pointer
+    casez ({insn[15:12], insn[8], ack}) // adjust return stack pointer
     6'b0???_?_0: {rstkW, rspI} = {func_T_R, insn[3:2]};
     6'b0???_?_1: {rstkW, rspI} = {1'b0,     2'b00};
     6'b110?_?_?: {rstkW, rspI} = {1'b1,     2'b01};     // call
@@ -146,7 +146,7 @@ module chad
     default:     {rstkW, rspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({reboot, insn[15:12], insn[8], iack, |st0})
+    casez ({reboot, insn[15:12], insn[8], ack, |st0})
     8'b1_????_?_?_?: pcN = 0;
     8'b0_100?_?_?_?, // jump, call, if
     8'b0_110?_?_?_?,
