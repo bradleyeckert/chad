@@ -28,7 +28,7 @@ module imultu
     busy <= 1'b0;
   end else begin
     if (busy) begin
-      acc <= (adding) ? {sum} : {next};
+      acc <= (adding) ? sum : next;
       if (count) count <= count - 1'b1;
       else busy <= 1'b0;
     end else begin

@@ -79,15 +79,15 @@ module spif
   end
 
 // Free-running cycles counter readable by the CPU. Rolls over at Fclk*2^-WIDTH
-// Hz: 100 MHz, 18-bit -> 1.5 kHz. Software must poll at 3 kHz to extend count.
+// Hz: 100 MHz, 18-bit -> 1.5 kHz. ISR[1] services the overflow.
 
   reg [WIDTH-1:0] cycles;
+//  reg [7:0] cycles; // shorten counter to demonstrate interrupts faster
   always @(posedge clk or negedge arstn) begin
     if (!arstn)
       {cyclev, cycles} <= 0;
     else
-      cycles <= cycles + 1'b1;
-      if (cycles == 0) cyclev <= 1'b1;
+      {cyclev, cycles} <= cycles + 1'b1;
   end
 
 //==============================================================================

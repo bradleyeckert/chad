@@ -53,13 +53,13 @@ module mcu
   wire [7:0]          f_din;            // Flash received data            i
 
   wire p_reset_n = ~p_reset;
-  reg                 irq;              // Interrupt request              i
+  wire                irq;              // Interrupt request              i
   wire [3:0]          ivec;             // Interrupt vector for irq       i
   wire                iack;             // Interrupt acknowledge          o
 
 
 // chad processor
-  chad #(WIDTH) u0 (
+  chad #(WIDTH) CPU (
     .clk      (clk      ),
     .resetq   (p_reset_n),
     .hold     (p_hold   ),
@@ -80,21 +80,20 @@ module mcu
 
 // Interrupts
 
-  assign ivec = 4'd1;
-  reg [7:0] testcount;
+  wire cyclev;                          // raw cycle counter overflow
+  reg [15:0] ipending;                  // up to 15 interrupts available
 
-// Request interrupt 1 every 256 clock cycles for a test
+  prio_enc #(4) pe (.a(ipending), .y(ivec));
+  assign irq = (ivec != 0);
+
+// Handle interrupt request strobes, edges, etc.
   always @(negedge p_reset_n or posedge clk)
   begin
     if (!p_reset_n) begin
-      testcount <= 8'hC0;
-      irq <= 1'b0;
+      ipending <= 0;
     end else begin
-      testcount <= testcount + 1'b1;
-      if (testcount == 0)
-        irq <= 1'b1;
-      else
-        if (iack) irq <= 1'b0;
+      ipending[1] <= ipending[1] | cyclev;
+      if (iack)   ipending[ivec] <= 1'b0;
     end
   end
 
@@ -112,7 +111,7 @@ module mcu
 
 // spif is the SPI flash controller for the chad processor
 // 2048 words of code, 2048 words of data
-  spif #(11, WIDTH, 11, 0, 0, 0, 50) u1 (
+  spif #(11, WIDTH, 11, 0, 0, 0, 50) bridge (
   // spif #(11, WIDTH, 11, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
@@ -147,11 +146,12 @@ module mcu
     .dat_i    (dat_i    ),
     .we_o     (we_o     ),
     .stb_o    (stb_o    ),
-    .ack_i    (ack_i    )
+    .ack_i    (ack_i    ),
+    .cyclev   (cyclev   )
   );
 
 // Convert SPI flash connection to a byte stream
-  sflash u2 (
+  sflash SPIflash (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .ready    (f_ready  ),
@@ -174,7 +174,7 @@ module mcu
   cdc rxd_cdc (.clk(clk), .a(rxd), .y(rxd_s));
 
 // Convert 2-wire UART connection to a byte stream
-  uart u3 (
+  uart UART (
     .clk      (clk     ),
     .arstn    (rst_n   ),
     .ready    (u_ready ),
