@@ -13,7 +13,7 @@ prio_enc #(4) pe0 (.a(a), .y(y));
 initial
 begin
     $dumpfile("bench.vcd");
-    $dumpvars(0,priority_tb);
+    $dumpvars(0,prio_enc_tb);
     repeat (1<<WIDTH) begin
         #10;
         $display("a=%x, y=%x, on=%d", a, y, on);

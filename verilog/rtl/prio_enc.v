@@ -1,6 +1,5 @@
 // Parameterizable priority encoder
 // see https://github.com/yugr/primogen/blob/master/src/prio_enc.v
-// same logic as https://opencores.org/projects/priority_encoder
 
 // `y` = bit number of the highest `a` bit, 0 if none.
 
@@ -10,8 +9,12 @@ module prio_enc #(
   parameter WIDTH = 4
 )(
   input wire [(1<<WIDTH)-1:0] a,
-  output wire [WIDTH - 1:0] y
+  output reg [WIDTH - 1:0] y
 );
+
+// May give slightly different synthesis results depending on ALTERNATE.
+
+`ifdef ALTERNATE
 
 localparam M = 1 << WIDTH;
 wire [WIDTH*M - 1:0] ors;
@@ -27,5 +30,24 @@ generate
     end
   end
 endgenerate
+
+`else
+
+integer i, w;
+reg [(1<<WIDTH) - 1:0] part;
+
+always @* begin
+  y = 0;
+  part = a;
+  for (i = WIDTH - 1; i >= 0; i = i - 1) begin
+    w = 1 << i;
+    if (|(part >> w))
+      y[i] = 1;
+    // Hopefully synthesizer understands that 'part' is shrinking...
+    part = y[i] ? part >> w : part & ((1'd1 << w) - 1'd1);
+  end
+end
+
+`endif
 
 endmodule
