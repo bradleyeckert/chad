@@ -30,3 +30,10 @@ You could think of return instructions as an analog of Forth’s PAUSE.
 The maximum interrupt latency is easy enough to measure in HDL simulation.
 A timer could track the maximum time between rising `irq` and `iack`.
 Since Forth executes `return` quite often, it's usually pretty low.
+
+## mcu.v interrupt assignments
+
+- 1 = Raw cycle count overflow. ISR should increment the upper cell(s) of the cycle count.
+- 2 = UART transmitter is ready for another byte.
+Loading the next byte within one character period prevents any dead time in the output.
+- 3 = UART receiver is full. You have one character period to process it before overflow.

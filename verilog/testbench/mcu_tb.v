@@ -1,12 +1,15 @@
-// MCU testbench                                     10/10/2020 BNE
+// MCU testbench                                     11/12/2020 BNE
 // License: This code is a gift to the divine.
 
 // The MCU connects to a SPI flash model from FMF.
-// Run this for 600 usec.
+// Run this for 700 usec.
 
-`timescale 1ns/10ps
+`timescale 100ps/10ps
 
 module mcu_tb();
+
+  localparam CLKPERIOD = 104;   // 96 MHz
+  localparam UBAUD = 32;        // 3 MBPS
 
   reg	        clk = 1;
   reg	        rst_n = 0;
@@ -57,7 +60,7 @@ module mcu_tb();
     .oe       (oe      )
   );
 
-  always #5 clk <= !clk;
+  always #(CLKPERIOD / 2) clk <= !clk;
 
   // Send a byte: 1 start, 8 data, 1 stop
   task UART_TX;
@@ -65,7 +68,7 @@ module mcu_tb();
     begin
       rxd = 1'b0;
       repeat (10) begin
-        #500
+        #(CLKPERIOD * UBAUD)
         rxd = i_Data[0];
         i_Data = {1'b1, i_Data[7:1]};
       end
@@ -75,7 +78,7 @@ module mcu_tb();
   // Main Testing:
   initial
     begin
-      #107
+      #123
       rst_n <= 1'b1;
       @(posedge cs_n);
       $display("Finished booting");
@@ -107,19 +110,21 @@ module mcu_tb();
       UART_TX(8'h12);           // deactivate ISP
       UART_TX(8'h00);
       repeat (2000) @(posedge clk);
+      UART_TX(8'h41);           // send char to the CPU to test urxirq
+      repeat (2000) @(posedge clk);
       $stop();
     end
 
   // Capture UART data puttering along at 2 MBPS
   reg [7:0] uart_rxdata;
   always @(negedge txd) begin   // wait for start bit
-    #250
+    #(CLKPERIOD * UBAUD / 2)
     uart_rxdata = 8'd0;
     repeat (8) begin
-      #500
+      #(CLKPERIOD * UBAUD)
       uart_rxdata = {txd, uart_rxdata[7:1]};
     end
-    #500
+    #(CLKPERIOD * UBAUD)
     $display("UART: %02Xh", uart_rxdata);
   end
 

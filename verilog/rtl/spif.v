@@ -10,7 +10,6 @@ module spif
   parameter BASEBLOCK = 0,              // first 64KB sector of user flash
   parameter PRODUCT_ID0 = 0,            // 8-bit key ID for ISP
   parameter PRODUCT_ID1 = 1,            // 16-bit product ID for ISP
-  parameter UART_RATE_POR = 868,        // default UART baud rate = Fclk / this
   parameter KEY0 = 32'h0,               // flash cipher key, 0 means no cipher
   parameter KEY1 = 32'h0,               // the ISP host will need the same key
   parameter KEY_LENGTH = 56
@@ -37,7 +36,6 @@ module spif
   input  wire              u_full,      // UART has received a byte
   output reg               u_rd,        // UART received strobe
   input  wire [7:0]        u_din,       // UART received data
-  output reg  [15:0]       u_rate,      // UART baud rate divisor
 // Flash Memory interface
   input  wire              f_ready,     // Ready for next byte to send
   output reg               f_wr,        // Flash transmit strobe
@@ -53,8 +51,10 @@ module spif
   output wire              we_o,        // 1 = write, 0 = read
   output wire              stb_o,       // strobe
   input wire               ack_i,       // acknowledge
-// Interrupt request strobes
-  output reg               cyclev       // cycle count overflow
+// Interrupt requests
+  output reg               cyclev,      // cycle count overflow strobe
+  output wire              urxirq,      // UART full strobe
+  output wire              utxirq       // UART ready strobe
 );
 
 // Wishbone bus master
@@ -112,17 +112,20 @@ module spif
 
   wire u_rxok = u_full & ~u_rd;         // ok to get raw data from UART
   wire u_rxready = (ispActive) ? ~ISPfull : ~uartRXfull;
+  reg uartRXfull_d;
+  assign urxirq = uartRXfull & ~uartRXfull_d;
 
   always @(posedge clk or negedge arstn)
     if (!arstn)
       begin
         uartRXfull <= 1'b0;     u_rd <= 1'b0;
         ISPfull <= 1'b0;   ispActive <= 1'b0;
-        uartRXbyte <= 8'h00;  u_rate <= UART_RATE_POR[15:0];
+        uartRXbyte <= 8'h00;   uartRXfull_d <= 1'b0;
         ISPbyte <= 8'h00;    r_state <= UART_RX_IDLE;
       end
     else
       begin
+        uartRXfull_d <= uartRXfull;
         u_rd <= 1'b0;
         if (u_rxok)
           case (r_state)
@@ -185,7 +188,6 @@ module spif
         if (io_wr)
           if (!p_hold)
             case (mem_addr[2:0])
-            3'b010: u_rate <= din[15:0];// set UART baud rate
             3'b100:                     // jam an ISP byte
               {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
             endcase
@@ -193,7 +195,7 @@ module spif
 
   reg  [2:0] b_state;                   // boot FSM state
   wire booting = (b_state) ? 1'b1 : 1'b0;
-  wire txbusy = ~u_ready;
+  wire txbusy = ~u_ready | ispActive;   // tell CPU that TX is busy
   reg [WIDTH-1:0] spif_dout;
 
   always @* begin                       // i/o read mux
@@ -215,8 +217,8 @@ module spif
   reg [7:0] u_txbyte;                   // manual UART output
   always @* begin                       // UART output mux
     if (ispActive)
-      case (i_usel[2:0])
-      3'b000:  u_dout <= 8'hAA;         // sanity check
+      case (i_usel[2:0])                // ping response:
+      3'b000:  u_dout <= 8'hAA;         // 'tis a ping
       3'b001:  u_dout <= PRODUCT_ID1[15:8];
       3'b010:  u_dout <= PRODUCT_ID1[7:0];
       3'b011:  u_dout <= PRODUCT_ID0[7:0];
@@ -236,6 +238,15 @@ module spif
     end else
       iobusy = 1'b0;
   end
+
+  reg txbusy_d;
+  assign utxirq = ~txbusy & txbusy_d;   // falling txbusy
+
+  always @(posedge clk or negedge arstn)
+    if (!arstn)
+      txbusy_d <= 1'b0;
+    else
+      txbusy_d <= txbusy;
 
 //==============================================================================
 // Shared variables between ISP and gecko
@@ -260,7 +271,7 @@ module spif
       if (g_reset_n) begin
         if (g_load)                     // shift in a key digit:
           widekey <= {widekey[KEY_LENGTH - 13 : 0], i_count};
-        else if (key_index) begin
+        else if (key_index) begin       // shift out a bit
           key_index <= key_index - 1'b1;
           widekey <= {1'b0, widekey[KEY_LENGTH - 1 : 1]};
         end
@@ -368,10 +379,10 @@ module spif
                         i_state <= ISP_PING;
                         i_count <= 12'd3;
                       end
-                      if (ISPbyte[2])
+                      if (ISPbyte[0])
                         b_state <= 3'd1;// reboot from flash
                       g_load <= ISPbyte[3];
-                      g_reset_n <= ~ISPbyte[4];
+                      g_reset_n <= ~ISPbyte[2];
                     end
                   2'b10:          	// send a run of bytes to flash
                     begin

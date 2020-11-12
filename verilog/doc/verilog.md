@@ -20,7 +20,7 @@ But how does it handle? As it turns out, nicer than expected.
 
 - Registers and wires are declared as such, not inferred from signals.
 - You can declare regs and wires near where you use them.
-- The syntax is much more concise.
+- The syntax is much more concise. Much is borrowed from C syntax.
 - Case sensitivity.
 - File operations are much easier.
 - Vectors may have a width of 1.
@@ -40,10 +40,11 @@ examples are garbage. Although my examples could also be garbage.
 
 I like to declare the port list in a VHDL-ish style, including "wire" and "reg"
 keywords to show up-front what kind of signals the ports are.
-Declaring a signal "output reg" makes it clear that it's a registered output,
-which is good design practice.
 
 I usually declare regs and wires as far down in the file as possible,
 near where they are first used. This makes them a lot easier to find.
 
 I use 8-character tabs and 2-character indents.
+
+I inline `begin` and `end` with their respective `if`, `else`, etc.
+to reduce the line count unless it gets too ugly.

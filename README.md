@@ -27,6 +27,12 @@ The Chad CPU, like the J1, has excellent semantic density.
 The application of the J1 was a UDP stack in a Xilinx FPGA.
 The code was 70% smaller than the equivalent C on a MicroBlaze.
 The code just wouldn't fit in memory, so the J1 was used instead.
+Admittedly, MicroBlaze is a hog. However J1 has a lot going for it.
+Calls and jumps take only a single cycle.
+Often a return is combined with an ALU instruction to cause a return in
+zero instructions.
+It's a little freaky to watch in simulation if you're used to control flow
+changes having to deal with pipelines.
 
 Chad improves on the J1 to facilitate bigger apps.
 `chad` protects your software investment by targeting a very simple but
@@ -98,6 +104,28 @@ The documentation is re-built each time you build your app.
 
 The 20th Century was great and all, with its books and PDF equivalents.
 We have web browsers now.
+
+## Some interesting features of Chad
+
+It's built for security. The ISA doesn't support random read of code memory,
+which makes reverse engineering and hacking the code an exercise in chip
+probing if it can even be done.
+The MCU boots from SPI flash, which may be encrypted using a stream cipher.
+The weak spot then becomes key management: How secure are keys,
+how hard can you make it to probe memory busses on the ASIC die, etc.
+
+In-system programming (ISP) is handled by hardware state machines, not firmware.
+The SPI flash controller integrates a UART and processor memories so that the
+RAMs can be loaded from flash at boot time. The UART can also be used to
+program flash by any host computer with a serial port.
+It can also reset the processor.
+
+The sample MCU has a Wishbone Bus Master so that you can add peripherals from
+sites like OpenCores.
+
+The interrupt system uses a style that's conducive to small stacks and Forth.
+It trades a little extra interrupt latency (which you can control) for simpler
+and less error-prone interrupt handling that's similar in concept to Forth's PAUSE.
 
 ## Status
 

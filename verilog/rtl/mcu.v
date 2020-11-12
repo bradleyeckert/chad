@@ -7,9 +7,10 @@
 `default_nettype none
 module mcu
 #(
-  parameter WIDTH = 18
+  parameter WIDTH = 18,
+  parameter URATE = 32                  // 96 MHz / 32 = 3MBPS baud rate
 )(
-  input wire               clk,
+  input wire               clk,         // target frequency is 96 MHz
   input wire               rst_n,
 // 6-wire connection to SPI flash chip
   output wire              sclk,
@@ -42,7 +43,6 @@ module mcu
   wire                u_full;           // UART has received a byte       i
   wire                u_rd;             // UART received strobe           o
   wire [7:0]          u_dout;           // UART received data             i
-  wire [15:0]         u_rate;           // UART baud rate divisor         o
   // Flash Memory interface
   wire                f_ready;          // Ready for next byte to send    i
   wire                f_wr;             // Flash transmit strobe          o
@@ -81,6 +81,8 @@ module mcu
 // Interrupts
 
   wire cyclev;                          // raw cycle counter overflow
+  wire urxirq;                          // UART full strobe
+  wire utxirq;                          // UART ready strobe
   reg [15:0] ipending;                  // up to 15 interrupts available
 
   prio_enc #(4) pe (.a(ipending), .y(ivec));
@@ -93,6 +95,8 @@ module mcu
       ipending <= 0;
     end else begin
       ipending[1] <= ipending[1] | cyclev;
+      ipending[2] <= ipending[2] | utxirq;
+      ipending[3] <= ipending[3] | urxirq;
       if (iack)   ipending[ivec] <= 1'b0;
     end
   end
@@ -111,8 +115,8 @@ module mcu
 
 // spif is the SPI flash controller for the chad processor
 // 2048 words of code, 2048 words of data
-  spif #(11, WIDTH, 11, 0, 0, 0, 50) bridge (
-  // spif #(11, WIDTH, 11, 0, 1, 0, 50, 24'h123456, 32'h87654321) u1 (
+  spif #(11, WIDTH, 11, 0, 0, 0) bridge (
+  // spif #(11, WIDTH, 11, 0, 1, 0, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
@@ -133,7 +137,6 @@ module mcu
     .u_full   (u_full   ),
     .u_rd     (u_rd     ),
     .u_din    (u_din    ),
-    .u_rate   (u_rate   ),
     .f_ready  (f_ready  ),
     .f_wr     (f_wr     ),
     .f_who    (f_who    ),
@@ -147,7 +150,9 @@ module mcu
     .we_o     (we_o     ),
     .stb_o    (stb_o    ),
     .ack_i    (ack_i    ),
-    .cyclev   (cyclev   )
+    .cyclev   (cyclev   ),
+    .urxirq   (urxirq   ),
+    .utxirq   (utxirq   )
   );
 
 // Convert SPI flash connection to a byte stream
@@ -183,7 +188,7 @@ module mcu
     .full     (u_full  ),
     .rd       (u_rd    ),
     .dout     (u_din   ),
-    .bitperiod(u_rate  ),
+    .bitperiod(URATE[15:0]),
     .rxd      (rxd_s   ),
     .txd      (txd     )
   );

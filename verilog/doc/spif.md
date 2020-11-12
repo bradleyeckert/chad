@@ -38,7 +38,6 @@ flash-based FPGA such as an Intel MAX10 or a Gowin GW1N.
 Allows room for FPGA bitstream if used.
 - PRODUCT_ID0: First product ID byte, user defined.
 - PRODUCT_ID1: Second product ID byte, user defined.
-- UART_RATE_POR: Default baud rate divisor for UART, Baud = Fclk / this.
 - KEY0, KEY1, KEY2, KEY3: SPI flash cipher key
 
 ## Ports
@@ -61,7 +60,8 @@ To keep the J1 naming conventions, the ports on the J1 side are:
 | p_reset  | out | 1    | Processor reset                 |
 
 A streaming byte interface is intended to connect to a host PC. This is usually
-a UART. A simple protocol is used to act as a system master from the PC to:
+a UART. The baud rate is not programmable so that software can't block access.
+A simple protocol is used to act as a system master from the PC to:
 
 - Hold the CPU in reset
 - Control the SPI flash chip over UART
@@ -77,7 +77,6 @@ UART ports are:
 | u_full   | in  | 1    | UART has received a byte        |
 | u_rd     | out | 1    | UART received strobe            |
 | u_din    | in  | 8    | UART received data              |
-| u_rate   | in  | 16   | UART baud rate                  |
 
 Other kinds of byte streaming devices can be used with the UART port.
 For example, registers in a JTAG chain or a FTDI FT232H in FSI mode.
@@ -146,9 +145,16 @@ received by `spif`. `0x10 n` is interpreted as:
 ISP command bytes:
 
 - `00nnnnnn` set 12-bit run length N (use two of these)
-- `01xxxbpr` b=boot, p=ping, r=reset
+- `01xxkgpr` k=key, g=gecko, p=ping, r=reset
 - `10xxxxff` Write N bytes to flash using format f
 - `11xxxxff` Read N bytes from flash using format f
+
+`01xxkgpr` detail:
+
+- k = Load key for cipher: key = (key << 12) | N.
+- g = Reset the cipher. It will reload the key.
+- p = Trigger a ping. It will send boilerplate out the UART.
+- r = Reboot from flash and reset the processor.
 
 The ISP commands are enough to erase and program the SPI flash.
 When an erase or programming operation is in progress, the chip's WIP
