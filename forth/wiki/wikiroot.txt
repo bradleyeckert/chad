@@ -54,9 +54,13 @@ So, we don't do it.
  Points to the input buffer.
 =1.0073: dp ( -- addr )
  A variable pointing to the next free byte in data space.
-=1.0074: base ( -- addr )
+=1.0074: cp ( -- addr )
+ A variable pointing to the next free instruction in code space.
+=1.0075: base ( -- addr )
  The radix for numeric conversion.
-=1.0075: state ( -- addr )
+=1.0076: wids ( -- addr )
+ WID lookup table, up to 8 entries.
+=1.0077: state ( -- addr )
  Interpreter state: 0 = interpret, 1 = compile.
 =1.0080: stats ( -- )
  Prints simulator statistics.
@@ -112,6 +116,9 @@ H</ul>
 =1.0138: boot ( <filename> -- )
  Load a boot file into flash, interpret the boot data to load memory, and run
  the processor at address 0.
+=1.0139: make-heads ( addr -- )
+ Create a header list data structure in flash memory at a given base address.
+ `forth-wordlist` must be in the search order.
 =1.0140: equ ( x <name> -- )
  A synonym of constant that's guaranteed to not use any target resources
  for its definition. It creates a word that pushes x onto the stack.
@@ -247,9 +254,15 @@ H</ul>
 =1.1020: \ ( ccc<EOL> -- )
  Parse ccc to end-of-line and discard it.
  `\` is an immediate word.
-=1.1030: .( ( ccc) -- )
+=1.1030: .( ( ccc> -- )
  Parse ccc delimited by `)` (right parenthesis) and print it.
  If there is no `)`, print the remainder of the line.
+=1.1035: ." ( ccc> -- )
+ Parse ccc delimited by `)` (right parenthesis) and compile it to flash.
+ At run time, read the string from flash and print it.
+=1.1036: c" ( ccc> -- faddr )
+ Parse ccc delimited by `)` (right parenthesis) and compile it to flash.
+ At run time, push its address to the stack.
 =1.1040: constant ( x <name> -- )
  Create a word that pushes `x` onto the stack. Same as `equ`.
 =1.1050: aligned ( addr -- a-addr )
@@ -370,8 +383,8 @@ H</ul>
  Typical usage: `[defined] -foo [if] -foo [else] marker -foo [then]`
 =1.1290: there ( -- taddr )
  Push the code pointer onto the stack.
-=1.1300: torg ( taddr -- )
- Set the code pointer.
+=1.1300: forg ( faddr -- )
+ Set the flash pointer. Text strings will be compiled here.
 =1.1310: later ( <name> -- )
  Define a forward reference. Compile a jump instruction whose address
  will be resolved later by `resolves`. For example:

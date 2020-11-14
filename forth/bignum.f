@@ -33,9 +33,9 @@ there
    repeat  r> ;
 
 : du/mod ( divd . divr . -- rem . quot . )
-   4 stack[
+   4 stack(
    ?dup 0= if  ( there is a leading zero "digit" in divisor. )
-      >r  0 r@ um/mod  r> swap >r  um/mod  0 swap r>  ]stack exit
+      >r  0 r@ um/mod  r> swap >r  um/mod  0 swap r>  )stack exit
    then  normalize-divisor dup >r rot rot 2>r
    1 swap lshift tum*
    ( guess leading "digit" of quotient. )
@@ -47,7 +47,7 @@ there
       dup 0< if ( if still negative, do it one more time. )
          r> 1-  2r@  rot >r  0 t+
    then  then ( undo normalization of dividend to get remainder. )
-   r>  2r> 2drop  1 r>  rot >r  lshift tum/  r> 0  ]stack
+   r>  2r> 2drop  1 r>  rot >r  lshift tum/  r> 0  )stack
 ;
 
 \ Ratio search, based on the Farey sequence, by Brad Eckert
@@ -88,7 +88,7 @@ variable maxden                         \ maximum allowed denominator
 \ Don't search for anything very close to 0, it will take forever.
 
 : ratio  ( d_frac maxden -- num den )
-   3 stack[
+   3 stack(
    /ratio  expected 2!
    begin
       ratio_x1 2@ +  ratio_x2 2@ +  2dup dfrac    \ a+c b+d d_actual
@@ -101,7 +101,7 @@ variable maxden                         \ maximum allowed denominator
       dup>r ratio_x2 + !  r> ratio_x1 + !
    exhausted? until
    ratio_x2 @ maxden @ u<  ratio/
-   ]stack
+   )stack
 ;
 
 \ For 24-bit cells and 20-bit results, you can usually get to within

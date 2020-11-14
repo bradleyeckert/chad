@@ -84,7 +84,7 @@ previous definitions
 
 ## Floating point numbers
 
-Are a compile option: See `HASFLOATS` in `config.h`.
+Floats are a compile option: See `HASFLOATS` in `config.h`.
 If `HASFLOATS` is defined, numbers are treated as floating point if `base` = 10
 and the number contains an `e` or `E`.
 
@@ -162,3 +162,53 @@ host interpreter.
 
 The frame stack grows upward. 
 The top of `fpad` is also used for numeric conversion, which grows downward.
+
+## Flash memory copy of header space
+
+To have a Forth interpreter on the target, a header data structure must
+be built in flash. Wordlists use the same 8-bit identifiers as in `chad`.
+Host-side compilation semantics are translated to target-side equivalents.
+This structure should be extensible: Each wordlist has a pointer in RAM.
+The wordlist pointers are held in data space, to be initialized at bootup.
+
+The structure of headers is based on bytes and cells where cell data is
+packed into the least number of bytes (M) that fits it.
+Memory used by headers is byte-addressable. 
+Links are relative to the beginning of header space.
+A header contains:
+
+| Length  | Name  | Usage                |
+| ------- | ----- | --------------------:|
+| M bytes | link  | Link to next header  |
+| 1 byte  | flags | Packed flags (0=on)  | 
+| 1 byte  | N     | Length of `name`     | 
+| N bytes | name  | Name string          |
+| M bytes | xte   | *xt* for Execution   |
+| M bytes | xtc   | *xt* for Compilation |
+| M bytes | w     | Optional data        |
+| 1 byte  | len   | Length of definition | 
+| M bytes | forg  | Flash address        |
+
+Flags:
+
+- 0: notail, 0 = no tail recursion allowed
+- 1: flashed, 0 = header has fields for *len* and *forg*
+- 7: smudge, 1 = smudged
+
+The first header in a list has a link value of 0.
+The list name is placed directly before the list using this format:
+
+| Length  | Usage                |
+| ------- | --------------------:|
+| N bytes | Name string          |
+| 1 byte  | Length of name       | 
+| x bytes | Headers start here   | 
+
+## Target compilation
+
+I/O registers are used to write to code space.
+Code RAM is writable but not randomly readable.
+You can't `see` a compiled word unless it has been copied to flash memory
+for later loading into code RAM.
+The `forg` field points to the flash version.
+If `len` is 0, `forg` may be omitted.

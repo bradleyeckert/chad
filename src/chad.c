@@ -44,16 +44,26 @@ SI error;                               // simulator and interpreter error code
 
 // Shared variables
 #define toin  0                         // pointer to next character
-#define tibs  1                         // chars in input buffer
-#define atib  2                         // address of input buffer
-#define dp    3                         // define shared variables
-#define base  4                         // use cells not bytes for compatibility
-#define state 5                         // define cell addresses
+#define tibs  (toin + 1)                // chars in input buffer
+#define atib  (tibs + 1)                // address of input buffer
+#define dp    (atib + 1)                // data space pointer
+#define cp    (dp   + 1)                // code space pointer
+#define base  (cp   + 1)                // use cells not bytes for compatibility
+#define wids  (base + 1)                // list of wids
+#define state (wids + 9)                // last variable
 
-SV Hex(void) { Data[base] = 16; }
-SV Decimal(void) { Data[base] = 10; }
-SV toImmediate(void) { Data[state] = 0; }
-SV toCompile(void) { Data[state] = 1; }
+#define TOIN  Data[toin]
+#define TIBS  Data[tibs]
+#define ATIB  Data[atib]
+#define DP    Data[dp]
+#define CP    Data[cp]
+#define BASE  Data[base]
+#define STATE Data[state]
+
+SV Hex(void) { BASE = 16; }
+SV Decimal(void) { BASE = 10; }
+SV toImmediate(void) { STATE = 0; }
+SV toCompile(void) { STATE = 1; }
 CELL DisassembleInsn(cell IR);
 
 static char* itos(uint32_t x, uint8_t radix, int8_t digits, int isUnsigned) {
@@ -79,7 +89,7 @@ static char* itos(uint32_t x, uint8_t radix, int8_t digits, int isUnsigned) {
 }
 
 SV Cdot(cell x) {
-    printf("%s ", itos(x, Data[base], 0, 0));
+    printf("%s ", itos(x, BASE, 0, 0));
 }
 
 SV PrintDataStack(void) {
@@ -337,18 +347,17 @@ SV Cold(void) {                         // cold boot and run until error
 //##############################################################################
 // Compiler
 
-CELL cp = 0;                            // dictionary pointer for code space
 CELL latest = 0;                        // latest writable code word
 SI notail = 0;                          // tail recursion inhibited for call
 
 SV toCode (cell x) {                    // compile to code space
-    chadToCode(cp++, x);
+    chadToCode(CP++, x);
 }
 SV CompExit (void) {                    // compile an exit
-    if (latest == cp) {                 // code run is empty
+    if (latest == CP) {                 // code run is empty
         goto plain;                     // nothing to optimize
     }
-    int a = (cp-1) & (CodeSize-1);
+    int a = (CP-1) & (CodeSize-1);
     int old = Code[a];                  // previous instruction
     if (((old & 0x8000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
         Code[a] = rdn | old | ret;      // make the ALU instruction return
@@ -439,7 +448,7 @@ SV DpushFP(double x) {
 }
 
 SI isfloat(char* s) {
-    if (Data[base] != 10) return 0;     // FP is only valid for base 10
+    if (BASE != 10) return 0;     // FP is only valid for base 10
     if (strchr(s, 'E')) return 1;       // must have exponent
     if (strchr(s, 'e')) return 1;
     return 0;
@@ -491,9 +500,9 @@ SV sane(void) {
 
 // Addressing beyond 1FFFh is not supported yet.
 
-SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= cp;  latest = cp; }
-SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = cp; }
-SV MarkFwd(void) { CtrlStack[++ConSP] = cp; }
+SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= CP;  latest = CP; }
+SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = CP; }
+SV MarkFwd(void) { CtrlStack[++ConSP] = CP; }
 SV doBegin(void) { MarkFwd(); }
 SV doAgain(void) { ResolveRev(jump); }
 SV doUntil(void) { ResolveRev(zjump); }
@@ -509,7 +518,7 @@ SV noExecute(void) { error = BAD_NOEXECUTE; }
 SV doNext(void) {
     toCode(alu | RM1toT | TtoN | sup);  /* (R-1)@ */
     toCode(alu | zeq | TtoR);  ResolveRev(zjump);
-    toCode(alu | rdn);  latest = cp;    /* rdrop */
+    toCode(alu | rdn);  latest = CP;    /* rdrop */
 }
 
 // HTML output is a kind of log file of token handling. It's a browsable
@@ -639,11 +648,11 @@ SV LogColor(uint32_t color, int ID, char* s) {
 // A wid points to a linked list of headers.
 // The head pointer of the list is created by WORDLIST.
 
-SI order[32];                           // search order list
-SI orders;                              // items in the search order list
+static uint8_t order[32];               // search order list
+static uint8_t orders;                  // items in the search order list
 static cell wordlist[MaxWordlists];     // head pointers to linked lists
 static char wordlistname[MaxWordlists][16];// optional name string
-static cell wordlists;
+SI wordlists;                           // number of defined wordlists
 SI root_wid;                            // the basic wordlists
 SI forth_wid;
 SI asm_wid;
@@ -660,7 +669,7 @@ SV printWID(int wid) {
 
 SV Order(void) {
     printf(" Context : ");
-    for (int i = 1; i <= orders; i++)  printWID(order[i]);
+    for (uint8_t i = 1; i <= orders; i++)  printWID(order[i]);
     printf("\n Current : ");  printWID(current);
 }
 
@@ -681,7 +690,7 @@ SI findinWL(char* key, int wid) {       // find in wordlist
 }
 
 SI FindWord(char* key) {                // find in context
-    for (int i = orders; i > 0; i--) {
+    for (uint8_t i = orders; i > 0; i--) {
         int id = findinWL(key, i);
         if (id >= 0) {
             Header[me].references += 1; // bump reference counter
@@ -711,13 +720,13 @@ SV Words(void) {
     printf("\n");
 }
 
-SV OrderPush(int n) {
+SV OrderPush(uint8_t n) {
     order[31 & ++orders] = n;
     if (orders == 16) error = BAD_ORDER_OVER;
 }
 
 SI OrderPop(void) {
-    int r = (order[31 & orders--]);
+    uint8_t r = (order[31 & orders--]);
     if (orders < 0) error = BAD_ORDER_UNDER;
     return r;
 }
@@ -753,7 +762,7 @@ SI NotKeyword (char *key) {             // do a command, return 0 if found
     if (i < 0)
         return -1;                      // not found
     LogColor(Header[i].color, i, key);
-    if (Data[state])
+    if (STATE)
         Header[i].CompFn();
     else
         Header[i].ExecFn();
@@ -919,7 +928,7 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
             break;
         case 7:
             target = (IR & 0xFF) | (IR & 0xE00) >> 1;
-            appendDA(itos((lex << 11) + target, Data[base], 0, 0));
+            appendDA(itos((lex << 11) + target, BASE, 0, 0));
             appendDA("imm");
             if (IR & ret) { appendDA("exit"); }  break;
         default:
@@ -1092,14 +1101,14 @@ SI OpenNewFile(char *name) {            // Push a new file onto the file stack
 static char tok[LineBufferSize+1];      // blank-delimited token
 
 SI parseword(char delimiter) {
-    while (buf[Data[toin]] == delimiter) {
+    while (buf[TOIN] == delimiter) {
         Log(" ");
-        Data[toin]++;
+        TOIN++;
     }
     int length = 0;  char c;
-    while ((c = buf[Data[toin]++]) != delimiter) {
+    while ((c = buf[TOIN++]) != delimiter) {
         if (!c) {                       // hit EOL
-            Data[toin]--;  break;       // step back to terminator
+            TOIN--;  break;       // step back to terminator
         }
         tok[length++] = c;
     }
@@ -1108,9 +1117,9 @@ SI parseword(char delimiter) {
 }
 
 SV ParseFilename(void) {
-    while (buf[Data[toin]] == ' ') Data[toin]++;
-    if (buf[Data[toin]] == '"') {
-        Data[toin]++;  parseword('"');  // allow filename in quotes
+    while (buf[TOIN] == ' ') TOIN++;
+    if (buf[TOIN] == '"') {
+        TOIN++;  parseword('"');  // allow filename in quotes
     }
     else {
         parseword(' ');                 // or a filename with no spaces
@@ -1146,24 +1155,24 @@ SV SaveFlashHex(void) {                 // format for SPI flash Verilog model
 SV Colon(void) {
     parseword(' ');
     if (AddHead(tok, "")) {             // start a definition
-        cp = (cp + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
+        CP = (CP + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
         LogColor(COLOR_DEF, 0, tok);
-        SetFns(cp, Def_Exec, Def_Comp);
-        Header[hp].target = cp;
+        SetFns(CP, Def_Exec, Def_Comp);
+        Header[hp].target = CP;
         Header[hp].color = COLOR_WORD;
         Header[hp].smudge = 1;
         DefMarkID = hp;                 // save for later reference
-        DefMark = cp;
-        latest = cp;                    // code starts here
+        DefMark = CP;
+        latest = CP;                    // code starts here
         ConSP = 0;
         toCompile();
     }
 }
 
 SV NoName(void) {
-    Dpush(cp);  DefMarkID = 0;          // no length
+    Dpush(CP);  DefMarkID = 0;          // no length
     toCompile();
-    latest = cp;
+    latest = CP;
     ConSP = 0;
 }
 
@@ -1193,7 +1202,7 @@ SV BrackDefined(void) {
 
 SV EndDefinition(void) {                   // resolve length of definition
     if (DefMarkID) {
-        Header[DefMarkID].length = cp - DefMark;
+        Header[DefMarkID].length = CP - DefMark;
         Header[DefMarkID].smudge = 0;
     }
 }
@@ -1223,14 +1232,14 @@ SV NoTailRecursion (void) {
 }
 
 SV SaveMarker(cell* dest) {
-    dest[0] = hp;    dest[1] = cp;  dest[4] = fileID;
-    dest[2] = wordlists;  dest[3] = Data[dp];
+    dest[0] = hp;    dest[1] = CP;  dest[4] = fileID;
+    dest[2] = wordlists;  dest[3] = DP;
     memcpy(&dest[5], wordlist, sizeof(cell) * MaxWordlists);
 }
 
 SV LoadMarker(cell* src) {
-    hp = src[0];     cp = src[1];   fileID = src[4];
-    wordlists = src[2];  Data[dp] = src[3];
+    hp = src[0];     CP = src[1];   fileID = src[4];
+    wordlists = src[2];  DP = src[3];
     memcpy(wordlist, &src[5], sizeof(cell) * MaxWordlists);
 }
 
@@ -1243,7 +1252,7 @@ SV Marker_Exec(void) {                  // execution semantics of a marker
 SV Marker (void) {
     parseword(' ');
     if (AddHead(tok, "")) {
-        SetFns(cp, Marker_Exec, noCompile);
+        SetFns(CP, Marker_Exec, noCompile);
         Header[hp].color = COLOR_ROOT;
         cell* pad = malloc(sizeof(cell) * (MaxWordlists + 8));
         Header[hp].aux = pad;
@@ -1252,14 +1261,20 @@ SV Marker (void) {
     }
 }
 
-SI tick (void) {                        // get the w field of the word
-    parseword(' ');
-    if (FindWord(tok) < 0) {
+SI Ctick(char* name) {
+    if (FindWord(name) < 0) {
         error = UNRECOGNIZED;
+//      printf("<%s> ", name);
         return 0;
     }
-    LogColor(COLOR_WORD, me, tok);
     return Header[me].target;           // W field of found word
+}
+
+SI tick (void) {                        // get the w field of the word
+    parseword(' ');
+    int xt = Ctick(tok);
+    LogColor(COLOR_WORD, me, tok);
+    return xt;
 }
 
 SV See (void) {                         // ( <name> -- )
@@ -1306,7 +1321,7 @@ SV Resolves(void) {                     // ( xt <name> -- )
 }
 
 SV SkipToPar(void) {
-    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");  Data[toin]++;
+    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");  TOIN++;
 }
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
@@ -1317,8 +1332,7 @@ SV EchoToPar (void) { SkipToPar();  printf("%s", tok); }
 SV Cr        (void) { printf("\n"); }
 SV Tick      (void) { Dpush(tick()); }
 SV BrackTick (void) { Literal(tick()); }
-SV There     (void) { Dpush(cp); }
-SV Torg      (void) { cp = Dpop(); }
+SV There     (void) { Dpush(CP); }
 SV WrProtect (void) { writeprotect = CodeFence;  killHostIO(); }
 SV SemiComp  (void) { CompExit();  EndDefinition();  toImmediate();  sane();}
 SV Semicolon (void) { EndDefinition();  sane(); }
@@ -1330,7 +1344,7 @@ SV SetFPexpbits(void) { FPexpbits = Dpop(); }
 #endif
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
-    char* src = &buf[Data[toin]];
+    char* src = &buf[TOIN];
     char* p = src;
     char* dest = Header[DefMarkID].help;
     LogColor(COLOR_COM, 0, src);
@@ -1347,7 +1361,7 @@ SV SkipToEOL(void) {                    // and look for x.xxxx format number
         if ((p = strchr(src, '\\')) != NULL) *p = '\0';
         strmove(dest, src, MaxAnchorSize);
     }
-    Data[toin] = (int)strlen(buf);
+    TOIN = (int)strlen(buf);
 }
 
 
@@ -1365,7 +1379,7 @@ SV trimCR(char* buf) {                  // clean up the buffer returned by fgets
 
 SI refill(void) {
     int result = -1;
-ask: Data[toin] = 0;
+ask: TOIN = 0;
     int lineno = File.LineNumber++;
     if (File.fp == stdin) {
         printf("ok>");
@@ -1564,20 +1578,29 @@ endparagraph:               if (found > 1)
 }
 
 SI flashPtr;
-SV flashC8(uint8_t c)       { FlashMemStore(flashPtr++, c); }
-SV flashC16(uint16_t w)     { flashC8(w >> 8);  flashC8((uint8_t)w); }
-SV flashAN(uint16_t w) { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
+SV forg(void)           { flashPtr = Dpop(); }
+SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c); }
+SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
+SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
+SV flashStr(char* s)    { char c;  while ((c = *s++)) flashC8(c); }
 
-// Write boot data to `flash.c`
+SV cQuote(void) {
+    Literal(flashPtr);  parseword('"');
+    flashC8((uint8_t)strlen(tok));  
+    flashStr(tok);
+}
+SV dotQuote(void)       { cQuote();  CompCall(Ctick("f$type")); }
+
+// Write boot data to flash memory image in `flash.c`
 SV MakeBootList(void) {
     flashPtr = 0;
     flashC8(0x80);                      // speed up SCLK
-    flashAN(cp);
+    flashAN(CP);
     flashC8(1);                         // 16-bit code write
-    for (uint16_t i = 0; i < cp; i++) {
+    for (uint16_t i = 0; i < CP; i++) {
         flashC16(Code[i]);
     }
-    uint16_t count = Data[dp];
+    uint16_t count = DP;
     uint8_t bytes = (CELLBITS + 7) >> 3;
     flashAN(count);
     flashC8(3 + bytes);                 // 16-bit data write
@@ -1595,6 +1618,67 @@ SV Boot(void) {
     FlashMemBoot();                     // boot from flash
     SkipToEOL();                        // don't trust >in anymore
     Cold();                             // run CPU
+}
+
+SV flashCC(uint32_t w) {                // append big endian cell with bytes
+    if (CELLBITS == 16)                 // 2 bytes
+        flashC16(w);
+    else if (CELLBITS == 32) {          // 4 bytes
+        flashC16(w >> 16);  flashC16(w);
+    }
+    else {                              // 3 bytes
+        flashC16(w >> 8);  flashC8(w);
+    }
+}
+
+static char* FnTargetName(void (*fn)()) { // target: ( w -- )
+    if (fn == Def_Exec)  return "execute";
+    if (fn == Def_Comp)  return "compile,";
+    if (fn == Equ_Exec)  return "noop";
+    if (fn == Equ_Comp)  return "lit,";
+//  if (fn == Prim_Exec) return "PrimExec";
+//  if (fn == Prim_Comp) return "PrimComp";
+    if (fn == doInstMod) return "or";
+    if (fn == doLitOp)   return "lit,";
+    if (fn == noCompile) return "noCompile";
+    return NULL;
+}
+
+// Build header data in flash memory image in `flash.c`
+SV MakeHeaders(void) {
+    for (uint8_t i = wordlists; i > 0; i--) {
+        char* wname = &wordlistname[i][0];
+        size_t len = strlen(wname);
+        for (size_t i = 0; i < len; i++) 
+            flashC8(*wname++);          // begin wordlist with its name
+        flashC8((uint8_t)len);
+        uint32_t link = 0;
+        uint16_t p = wordlist[i];
+        while (p) {
+            char* exec = FnTargetName(Header[p].ExecFn);
+            char* comp = FnTargetName(Header[p].CompFn);
+            if ((exec) && (comp)) {
+                uint32_t nextlink = flashPtr;
+                flashCC(link);
+                link = nextlink;
+                uint8_t flags = 0xFF;
+                if (Header[p].smudge == 0) flags &= ~0x80;
+                if (Header[p].notail)      flags &= ~0x01;
+                flashC8(flags);
+                wname = Header[p].name;
+                len = strlen(wname);
+                flashC8((uint8_t)len);
+                for (size_t i = 0; i < len; i++)
+                    flashC8(*wname++);
+                flashC8(0);             // applet ID
+                flashCC(Ctick(exec));   // target versions of host fns
+                flashCC(Ctick(comp));
+                flashCC(Header[p].w);
+            }
+            p = Header[p].link;
+        }
+        Data[wids + i - 1] = link;
+    }
 }
 
 // char and [char] support utf-8:
@@ -1619,11 +1703,11 @@ CELL getUTF8(void) {
 // shareable. You can build a language with these, but it will only be usable
 // on the host.
 
-SV allot     (int n) { Data[dp] = n + Data[dp]; }
-SV buffer    (int n) { Dpush(Data[dp]);  Constant();  allot(n); }
+SV allot     (int n) { DP = n + DP; }
+SV buffer    (int n) { Dpush(DP);  Constant();  allot(n); }
 SV Buffer     (void) { buffer(Dpop()); }
 SV Cvariable  (void) { buffer(1); }
-SV Align      (void) { Data[dp] = aligned(Data[dp]); }
+SV Align      (void) { DP = aligned(DP); }
 SV Variable   (void) { Align();  buffer(CELLS); }
 SV Twovariable(void) { Variable();  allot(CELLS); }
 SV Char       (void) { parseword(' ');  Dpush(getUTF8()); }
@@ -1650,16 +1734,19 @@ SV LoadKeywords(void) {
     AddEquate("#tib",         "1.0071 -- addr",       BYTE_ADDR(tibs));
     AddEquate("'tib",         "1.0072 -- addr",       BYTE_ADDR(atib));
     AddEquate("dp",           "1.0073 -- addr",       BYTE_ADDR(dp));
-    AddEquate("base",         "1.0074 -- addr",       BYTE_ADDR(base));
-    AddEquate("state",        "1.0075 -- addr",       BYTE_ADDR(state));
+    AddEquate("cp",           "1.0074 -- addr",       BYTE_ADDR(cp));
+    AddEquate("base",         "1.0075 -- addr",       BYTE_ADDR(base));
+    AddEquate("wids",         "1.0076 -- addr",       BYTE_ADDR(wids));
+    AddEquate("state",        "1.0077 -- addr",       BYTE_ADDR(state));
     AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0085 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
     AddKeyword("load-flash",  "1.0134 <filename> --", LoadFlash,     noCompile);
     AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
     AddKeyword("save-flash",  "1.0136 pid <filename> --", SaveFlash, noCompile);
-    AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);
+    AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);    
     AddKeyword("boot",        "1.0138 <filename> --", Boot,          noCompile);
+    AddKeyword("make-heads",  "1.0139 addr --",       MakeHeaders,   noCompile);
     AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
@@ -1695,12 +1782,14 @@ SV LoadKeywords(void) {
     AddKeyword("include",     "1.1000 <filename> --", Include,       noCompile);
     AddKeyword("(",           "1.1010 ccc<paren> --", SkipToPar,     SkipToPar);
     AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
-    AddKeyword(".(",          "1.1030 ccc) --",       EchoToPar,     noCompile);
+    AddKeyword(".(",          "1.1030 ccc> --",       EchoToPar,     noCompile);
+    AddKeyword(".\"",         "1.1035 ccc> --",       noExecute,     dotQuote);
+    AddKeyword("c\"",         "1.1036 ccc> -- faddr", noExecute,     cQuote);
     AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
     AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
     AddKeyword("align",       "1.1060 --",            Align,         noCompile);
     AddKeyword("char",        "1.1070 <c> -- n",      Char,          noCompile);
-    AddKeyword("chars",       "1.1080 n1 -- n2",      Nothing,         Nothing);
+    AddKeyword("chars",       "1.1080 n1 -- n2",      Nothing,       Nothing);
     AddKeyword("cr",          "1.1090 --",            Cr,            noCompile);
     AddKeyword("decimal",     "1.1110 --",            Decimal,       noCompile);
     AddKeyword("hex",         "1.1120 --",            Hex,           noCompile);
@@ -1723,7 +1812,7 @@ SV LoadKeywords(void) {
     AddKeyword("immediate",   "1.1270 --",            Immediate,     noCompile);
     AddKeyword("marker",      "1.1280 <name> --",     Marker,        noCompile);
     AddKeyword("there",       "1.1290 -- taddr",      There,         noCompile);
-    AddKeyword("torg",        "1.1300 taddr --",      Torg,          noCompile);
+    AddKeyword("forg",        "1.1300 faddr --",      forg,          noCompile);
     AddKeyword("later",       "1.1310 <name> --",     Later,         noCompile);
     AddKeyword("resolves",    "1.1320 xt <name> --",  Resolves,      noCompile);
     AddKeyword("macro",       "1.1330 --",            Macro,         noCompile);
@@ -1856,10 +1945,10 @@ SV LoadKeywords(void) {
 
 SV CopyBuffer(void) {                   // copy buf to tib region in Data
     char* src = buf;
-    cell bytes = Data[tibs];
+    cell bytes = TIBS;
     cell words = (bytes + CELLS - 1) / CELLS;
     cell addr = DataSize - CELL_ADDR(MaxLineLength);
-    Data[atib] = BYTE_ADDR(addr);
+    ATIB = BYTE_ADDR(addr);
     cell* dest = &Data[addr];
     for (cell i = 0; i < words; i++) {  // pack string into data memory
         uint32_t w = 0;                 // little-endian packing
@@ -1887,9 +1976,9 @@ int chad(char * line, int maxlength) {
         cycles = spMax = rpMax = 0;     // CPU stats
         sp = rp = 0;                    // stacks
         while (!error) {
-            Data[toin] = 0;
-            Data[tibs] = strlen(buf);
-            if (Data[tibs] >= MaxLineLength)
+            TOIN = 0;
+            TIBS = strlen(buf);
+            if (TIBS >= MaxLineLength)
                 error = BAD_INPUT_LINE;
             else
                 CopyBuffer();
@@ -1901,7 +1990,7 @@ int chad(char * line, int maxlength) {
                 }
                 if (NotKeyword(tok)) {  // try to convert to number
                     LogColor(COLOR_NUM, 0, tok);
-                    int i = 0;   int radix = Data[base];   char c = 0;
+                    int i = 0;   int radix = BASE;   char c = 0;
                     if (radix == 0)
                         error = DIV_BY_ZERO;
 #ifdef HASFLOATS
@@ -1910,7 +1999,7 @@ int chad(char * line, int maxlength) {
                         double y = strtod(tok, &eptr);
                         if ((errno == ERANGE) || (errno == EINVAL)) 
                             goto bogus;
-                        if (Data[state])
+                        if (STATE)
                             LiteralFP(y);
                         else
                             DpushFP(y);
@@ -1948,7 +2037,7 @@ int chad(char * line, int maxlength) {
                         if (!error) {
                             if (decimal < 0) {
                                 x &= CELLMASK;
-                                if (Data[state]) {
+                                if (STATE) {
                                     Literal((cell)x);
                                 }
                                 else {
@@ -1956,7 +2045,7 @@ int chad(char * line, int maxlength) {
                                 }
                             }
                             else {
-                                if (Data[state]) {
+                                if (STATE) {
                                     Literal((cell)(x & CELLMASK));
                                     Literal((cell)(x >> CELLBITS) & CELLMASK);
                                 }
@@ -1974,7 +2063,7 @@ int chad(char * line, int maxlength) {
                     printf(")\n");
                 }
                 if (verbose & VERBOSE_SRC) {
-                    printf(") (%s", &buf[Data[toin]]);
+                    printf(") (%s", &buf[TOIN]);
                 }
                 if (sp == (StackSize - 1)) error = BAD_STACKUNDER;
                 if (rp == (StackSize - 1)) error = BAD_RSTACKUNDER;
@@ -2011,47 +2100,6 @@ done:       elapsed_us = GetMicroseconds() - time0;
 
 //##############################################################################
 // Other exported functions
-// These are called by iomap.c so that Forth code can access host data.
-// Executable Forth may exercise the SPI bus to compile to SPI flash.
-// This is beyond the scope of the C side of Chad.
-// chadGetHeader would be used when building a header structure in flash.
-
-uint32_t chadGetHeader (uint32_t select) {
-    int ID = select >> 7;
-    select &= 0x7F;
-    int field = select >> 5; // 0 to 3
-    if (ID > hp) return -1;
-    switch (select) {
-    case 0: return (Header[ID].ExecFn == Def_Exec); // it's executable code
-    case 1: return (Header[ID].ExecFn == Header[ID].CompFn); // immediate
-    case 2: return Header[ID].target;
-    case 3: return Header[ID].length;
-    case 4: return Header[ID].w;
-    case 5: return Header[ID].w2;
-    case 6: return Header[ID].notail;
-    case 7: return Header[ID].link;
-    case 8: return Header[ID].isALU;
-    case 9: return Header[ID].srcFile;
-    case 10: return Header[ID].srcLine;
-    case 11: return Header[ID].color;
-    case 16: return cp;
-    case 17: return hp;
-    case 18: return wordlists;
-    case 19: return wordlist[ID];
-    case 20: return wordlistname[ID / 16][ID % 16];
-    case 21: return fileID;
-    case 22: return LineBufferSize;
-    default:
-        select = ID & 0x1F;
-        switch (field) {
-        case 1:  return Header[ID].name[select];
-        case 2:  return Header[ID].help[select];
-        case 3:  return FilePaths[ID].filepath[select];
-        default: return 0;
-        }
-    }
-    return 0;
-}
 
 void chadError (int32_t n) {
     if (n & MSB) n |= ~CELLMASK;        // sign extend errorcode

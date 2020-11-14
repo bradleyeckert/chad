@@ -101,6 +101,7 @@ module spif
   reg ispActive;                        // Indicate that ISP mode is active
   reg ISPfull, ISPack;                  // Indicate ISP byte was received
   reg iobusy;
+  wire txbusy = ~u_ready | ispActive;   // tell CPU that TX is busy
 
   reg [3:0] r_state;                    // UART receive state
   localparam unlockbyte0  = 8'hA5;
@@ -193,26 +194,7 @@ module spif
             endcase
       end
 
-  reg  [2:0] b_state;                   // boot FSM state
-  wire booting = (b_state) ? 1'b1 : 1'b0;
-  wire txbusy = ~u_ready | ispActive;   // tell CPU that TX is busy
-  reg [WIDTH-1:0] spif_dout;
-
-  always @* begin                       // i/o read mux
-    case (mem_addr[2:0])                // Verilog zero-extends smaller vectors
-    3'b000:  spif_dout = uartRXbyte;    // char
-    3'b001:  spif_dout = uartRXfull;    // char is in the buffer
-    3'b010:  spif_dout = txbusy;        // EMIT is busy?
-    3'b011:  spif_dout = f_din;         // flash SPI result
-    3'b100:  spif_dout = ISPfull;       // jammed byte is still pending
-    3'b101:  spif_dout = booting;       // still reading flash?
-    3'b110:  spif_dout = cycles;        // free-running counter
-    3'b111:  spif_dout = wbxi;          // Wishbone bus extra input bits
-    endcase
-  end
-
-  assign io_dout = (internal) ? spif_dout : dat_i[WIDTH-1:0];
-
+  reg [2:0] b_state;                    // boot FSM state
   reg [2:0] i_usel;                     // UART output select for ISP
   reg [7:0] u_txbyte;                   // manual UART output
   always @* begin                       // UART output mux
@@ -318,7 +300,12 @@ module spif
   wire b_rxok = ISPfull & ~ISPack;
   wire b_txok = u_ready & ~u_wr;
   wire f_ok = f_ready & ~f_wr & g_ready;
-  reg init;                             // init memory
+  reg init;                             // initialize memory at POR
+
+// Strobes to trigger writes
+
+  wire codeAddrS = (mem_addr[2:0] == 3'b001) & io_wr & internal & ~p_hold;
+  wire codeDataS = (mem_addr[2:0] == 3'b010) & io_wr & internal & ~p_hold;
 
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
@@ -383,6 +370,7 @@ module spif
                         b_state <= 3'd1;// reboot from flash
                       g_load <= ISPbyte[3];
                       g_reset_n <= ~ISPbyte[2];
+                      f_wr <= ISPbyte[5];
                     end
                   2'b10:          	// send a run of bytes to flash
                     begin
@@ -425,6 +413,13 @@ module spif
               default:
                 i_state <= ISP_IDLE;
               endcase
+              if (codeAddrS)            // CPU sets start address
+                b_dest <= din[15:0];
+              if (codeDataS) begin      // CPU writes next code word
+                b_data <= din[15:0];
+                codeWr <= 1'b1;
+                bumpDest <= 1'b1;
+              end
             end
           3'b111:                       // ========== Interpret flash bytes
             begin
@@ -491,18 +486,38 @@ module spif
         b_dest <= b_dest + 16'd1;
       if (io_wr)
         if (!p_hold)
-          if (internal)
+          if (internal)                 // write to register:
             case (mem_addr[2:0])
             3'b000: begin
-                u_wr <= 1'b1;             // write to UART
+                u_wr <= 1'b1;           // UART output byte
        	        i_usel <= 3'd5;
                 u_txbyte <= din[7:0];
               end
-            3'b011: b_state <= 3'd6;      // interpret flash byte stream
-            3'b111:
+            3'b011: b_state <= 3'd6;    // interpret flash byte stream
+            3'b111:                     // upper bits of outgoing Wishbone
               if (WIDTH != 32) wbxo <= din[31-WIDTH:0];
             endcase
     end
+
+  wire booting = (b_state) ? 1'b1 : 1'b0;
+  reg [WIDTH-1:0] spif_dout;
+  wire jammin = ISPfull | ~f_ok;
+
+  always @* begin                       // i/o read mux
+    case (mem_addr[2:0])                // Verilog zero-extends smaller vectors
+    3'b000:  spif_dout = uartRXbyte;    // char
+    3'b001:  spif_dout = uartRXfull;    // char is in the buffer
+    3'b010:  spif_dout = txbusy;        // EMIT is busy?
+    3'b011:  spif_dout = f_din;         // flash SPI result
+    3'b100:  spif_dout = jammin;        // jammed byte is still pending
+    3'b101:  spif_dout = booting;       // still reading flash?
+    3'b110:  spif_dout = cycles;        // free-running counter
+    3'b111:  spif_dout = wbxi;          // Wishbone bus extra input bits
+    endcase
+  end
+
+  assign io_dout = (internal) ? spif_dout : dat_i[WIDTH-1:0];
+
 
 // The Data and Code RAMs are accessed via DMA by the boot process.
 // The bootloader writes to either code or data RAM.

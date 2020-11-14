@@ -20,17 +20,6 @@ there
 : count   dup 1+ swap c@ ;              \ 2.1200 a -- a+1 c
 : xcount  dup cell+ swap @ ;            \ 2.1210 a -- a+cell u
 
-\ lshift and rshift are rarely used so they are not optimized
-
-: lshift  				\ 2.1110 x1 u -- x2
-    dup if  for  2*  next  exit
-    then drop
-;
-
-: rshift  				\ 2.1120 x1 u -- x2
-    dup if  for  0 >carry 2/c  next  exit
-    then drop
-;
 
 : 2@   _@ _dup@ swap cell + @ swap ;    \ 2.1220 a-addr -- x1 x2
 : 2!   _! cell + ! ;                    \ 2.1230 x1 x2 a-addr --
@@ -55,7 +44,11 @@ there
     r> carry -  r> -c drop carry 0= 0=
 ;
 
+\ 2nip saves 1 inst by using w. Same trick isn't used with 2swap
+\ because carry and w are not safe across calls.
+
 : 2swap  rot >r rot r> ;                \ 2.1190 abcd -- cdab
+: 2nip   >carry nip nip w ;
 
 there swap - . .( instructions used by core ext) cr
 

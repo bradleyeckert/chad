@@ -145,14 +145,15 @@ received by `spif`. `0x10 n` is interpreted as:
 ISP command bytes:
 
 - `00nnnnnn` set 12-bit run length N (use two of these)
-- `01xxkgpr` k=key, g=gecko, p=ping, r=reset
-- `10xxxxff` Write N bytes to flash using format f
-- `11xxxxff` Read N bytes from flash using format f
+- `01sxkgpr` s=SPI, k=key, g=gecko, p=ping, r=reset
+- `10xxxfff` Write N+1 bytes to flash using format fff
+- `11xxxfff` Read N+1 bytes from flash using format fff
 
-`01xxkgpr` detail:
+`01sxkgpr` detail:
 
-- k = Load key for cipher: key = (key << 12) | N.
-- g = Reset the cipher. It will reload the key.
+- s = SPI cycle: write byte again, reading the result.
+- k = Append key for cipher: key = (key << 12) | N.
+- g = Load the cipher with the new key.
 - p = Trigger a ping. It will send boilerplate out the UART.
 - r = Reboot from flash and reset the processor.
 
@@ -260,7 +261,8 @@ Read:
 Write:
 
 - 0: UART transmit
-- 2: Set UART baud rate = sysclk / N
+- 1: Set the address for code write
+- 2: Write 16-bit instruction to code RAM and bump the address
 - 3: Trigger the flash boot interpreter
 - 4: Jam an ISP byte (see UART ISP protocol)
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
@@ -300,19 +302,17 @@ That won't happen in this architecture, the way `chad` is set up.
 
 ## Why spif?
 
-The `spif` hardware itself takes 217 LEs, so putting SPI flash and the UART
-in I/O space without the `spif` functionality would reduce LUT utilization
-by 18%. Should I have stuck with a boot ROM? The advantages of `spif` are:
+Should I have stuck with a boot ROM for this? The advantages of `spif` are:
 
-- No ROM required: RAMs are loaded by hardware at bootup.
+- No ROM required: RAMs are loaded from SPI flash by hardware at bootup.
 - No extra mux in the `inst` datapath, which would slow instruction decoding.
 - The UART can be used for programming flash memory without a ROM.
-- It's a lot easier to include a cypher for code protection.
+- Decryption hardware protects code stored in easily accessed flash.
 - Code may stream in flash data using DMA instead of code.
 
 Thanks to the DMA, the processor can work on data streamed in from flash while
 loading the next data it's going to use.
-So, that extra 18% of logic frees up processing power that would otherwise
+So, spending 10% to 20% more on logic frees up processing power that would otherwise
 be spent spinning in a loop waiting for bytes to move through the SPI.
 
 ### Encryption

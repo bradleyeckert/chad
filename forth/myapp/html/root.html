@@ -483,9 +483,9 @@ control stack hack if you span a lot of code before resolving the
 reference.
 </p>
 <a name="1.1300"></a>
-<h3><ref>1.1300:</ref> <chad>torg</chad> <com><i>( taddr -- )</i></com></h3>
+<h3><ref>1.1300:</ref> <chad>forg</chad> <com><i>( faddr -- )</i></com></h3>
 
-<p>Set the code pointer.
+<p>Set the flash pointer. Text strings will be compiled here.
 </p>
 <a name="1.1290"></a>
 <h3><ref>1.1290:</ref> <chad>there</chad> <com><i>( -- taddr )</i></com></h3>
@@ -699,8 +699,20 @@ character onto the stack.
 
 <p>Create a word that pushes <tok>x</tok> onto the stack. Same as <tok>equ</tok>.
 </p>
+<a name="1.1036"></a>
+<h3><ref>1.1036:</ref> <chad>c&quot;</chad> <com><i>( ccc&gt; -- faddr )</i></com></h3>
+
+<p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
+At run time, push its address to the stack.
+</p>
+<a name="1.1035"></a>
+<h3><ref>1.1035:</ref> <chad>.&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
+
+<p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
+At run time, read the string from flash and print it.
+</p>
 <a name="1.1030"></a>
-<h3><ref>1.1030:</ref> <chad>.(</chad> <com><i>( ccc) -- )</i></com></h3>
+<h3><ref>1.1030:</ref> <chad>.(</chad> <com><i>( ccc&gt; -- )</i></com></h3>
 
 <p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and print it.
 If there is no <tok>)</tok>, print the remainder of the line.
@@ -922,6 +934,12 @@ The stack is printed between <tok>\</tok> and <tok>ok&gt;</tok>.
 <p>A synonym of constant that&apos;s guaranteed to not use any target resources
 for its definition. It creates a word that pushes x onto the stack.
 </p>
+<a name="1.0139"></a>
+<h3><ref>1.0139:</ref> <chad>make-heads</chad> <com><i>( addr -- )</i></com></h3>
+
+<p>Create a header list data structure in flash memory at a given base address.
+<tok>forth-wordlist</tok> must be in the search order.
+</p>
 <a name="1.0138"></a>
 <h3><ref>1.0138:</ref> <chad>boot</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
 
@@ -984,15 +1002,25 @@ If the file can&apos;t be opened, display the line number.
 
 <p>Prints simulator statistics.
 </p>
-<a name="1.0075"></a>
-<h3><ref>1.0075:</ref> <chad>state</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0077"></a>
+<h3><ref>1.0077:</ref> <chad>state</chad> <com><i>( -- addr )</i></com></h3>
 
 <p>Interpreter state: 0 = interpret, 1 = compile.
 </p>
-<a name="1.0074"></a>
-<h3><ref>1.0074:</ref> <chad>base</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0076"></a>
+<h3><ref>1.0076:</ref> <chad>wids</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>WID lookup table, up to 8 entries.
+</p>
+<a name="1.0075"></a>
+<h3><ref>1.0075:</ref> <chad>base</chad> <com><i>( -- addr )</i></com></h3>
 
 <p>The radix for numeric conversion.
+</p>
+<a name="1.0074"></a>
+<h3><ref>1.0074:</ref> <chad>cp</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>A variable pointing to the next free instruction in code space.
 </p>
 <a name="1.0073"></a>
 <h3><ref>1.0073:</ref> <chad>dp</chad> <com><i>( -- addr )</i></com></h3>

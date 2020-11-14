@@ -4,18 +4,25 @@
 \ ..\chad include myapp.f  (in Windows), or
 \ ../chad include myapp.f  (in Linux)
 
+\ Put strings high enough in memory that they won't get clobbered by
+\ boot code and headers. Should be a multiple of 4096.
+
+16384 forg              \ strings in flash go here
+
 include ../core.f
 include ../coreext.f
 include ../redirect.f
+include ../flash.f
 include ../frame.f
 include ../numout.f
+include ../compile.f
 include ../ctea.f
 include ../bignum.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.
 
-:noname  ( error -- )  ?dup if $8000 io! then
+:noname  ( error -- )  ?dup if  [ $4000 cells ] literal io!  then
 ; resolves exception
 
 \ Hardware loads code and data RAMs from flash. Upon coming out of reset,
@@ -23,19 +30,17 @@ include ../bignum.f
 
 \ A very simple app would output some numbers and then hang.
 
-variable tally
+variable hicycles
 
-: myisr  ( -- )
-   tally @ 1 +
-   tally !
-;
-
-' myisr resolves irqdemo
+:noname ( -- )
+   hicycles @ 1 +
+   hicycles !
+; resolves irqtick \ clock cycle counter overflow
 
 : myapp  ( -- )
 \    42 512 io!
 \    512 io@ emit
-    cr
+    cr ." Hello World!" cr
     10 for r@ . next
     begin noop again
 ;
@@ -56,6 +61,7 @@ variable tally
 \ Try 25 fib, then stats
 
 make-boot               \ create a boot record in flash
+make-heads              \ append headers to flash
 0 save-flash myapp.bin  \ save to a 'chad' file you can boot from
 save-flash-h myapp.txt  \ also save in hex for flash memory model
 

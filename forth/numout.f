@@ -35,8 +35,8 @@ frp0 equ numbuf                         \ buffer for numeric conversion
 : sign    0< if [char] - hold then ;    \ 2.3230 n --
 : #>      2drop hld @ numbuf  over - ;  \ 2.3240 ud -- c-addr u
 : s.r     over - spaces type ;          \ length width --
-: d.r     3 stack[  >r dup >r dabs      \ 2.3250 d width --
-          <# #s r> sign #> r> s.r ]stack ;
+: d.r     3 stack(  >r dup >r dabs      \ 2.3250 d width --
+          <# #s r> sign #> r> s.r )stack ;
 : u.r     0 swap d.r ;                  \ 2.3260 u width --
 : .r      >r s>d r> d.r ;               \ 2.3270 n width --
 : d.      0 d.r space ;                 \ 2.3280 d --

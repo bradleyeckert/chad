@@ -127,12 +127,12 @@ static uint8_t format;                  // SPI format, 0 = 1-bit
 static uint64_t mark;                   // Flash time-out
 
 void FlashMemSPIformat(int n) {
-	format = 7 & (n >> 1);
-	if ((n & 1) == 0)
-		state = idle;                   // CS line low = inactive
+	format = 7 & (n >> 1);				// basically ignored
+	if (n == 0)
+		state = idle;                   // CS line = inactive
 #ifdef VERBOSE
 	if (n)
-		printf("[");
+		printf("[%d:", format);
 	else
 		printf("]\n");
 #endif

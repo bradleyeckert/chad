@@ -1,10 +1,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#define OPTIONS 3
+#define OPTIONS 7
 
 // bit 0: hardware unsigned multiplier exists
 // bit 1: hardware unsigned divider exists
+// bit 2: hardware shifter exists
 
 static uint64_t mtime, dtime, stime, product, shifted;
 static uint32_t quot, rem, overflow;
@@ -20,7 +21,7 @@ uint32_t coproc_c(
 	uint32_t mask = -1;		    // "bits" 1s
 	if (bits < 32) 
 		mask = mask >> (32 - bits);
-	switch (sel) {
+	switch (sel & 0x0F) {
 	case 0:
 		return (cycles < mtime) | (cycles < dtime) | (cycles < stime);
 	case 1:

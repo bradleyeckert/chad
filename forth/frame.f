@@ -8,10 +8,10 @@
 \ The frame stack is for freeing up stack space for library code to run
 \ without overflowing the hardware stack.
 
-\ stack[  ( n -- ) Pushes the return stack and most of the data stack
+\ stack(  ( n -- ) Pushes the return stack and most of the data stack
 \ except for the top n cells to the frame stack.
 
-\ ]stack  ( -- )  Restores the stack data saved by frame.
+\ )stack  ( -- )  Restores the stack data saved by frame.
 
 there
 variable frp                            \ frame stack pointer
@@ -50,7 +50,7 @@ variable frp1                           \ temporary frame pointer
 \ The return stack is emptied except for one cell to keep the sim running.
 \ "11 22 33 44 55  2 f[" --> FS = 33 22 11 3 0    stack = ( 44 55 )
 \                                           fp----^
-: stack[  ( ... n -- x[n-1] ... x[0] )  \ 2.2950 n --
+: stack(  ( ... n -- x[n-1] ... x[0] )  \ 2.2950 n --
     depth
     2dup- 0< if
         r> frp @  spstat swapb 63 and   ( RA fp rdepth )
@@ -69,7 +69,7 @@ variable frp1                           \ temporary frame pointer
     then
 ;
 
-: ]stack                                \ 2.2960 ? -- ?
+: )stack                                \ 2.2960 ? -- ?
     depth  fpad ds>mem  frp1 !          \ save whatever is on the stack
     frp @   mem>ds                      \ restore the old bottom
     r>  swap  mem>                      ( RA fp cnt )

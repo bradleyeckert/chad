@@ -17,8 +17,7 @@
 <hr>
 <!-- No reference for fib -->
 <!-- No reference for myapp -->
-<!-- No reference for myisr -->
-<!-- No reference for tally -->
+<!-- No reference for hicycles -->
 <!-- No reference for ud* -->
 <!-- No reference for ratio -->
 <!-- No reference for ratio/ -->
@@ -47,6 +46,16 @@
 <!-- No reference for CTrounds -->
 <!-- No reference for CTdelta -->
 <!-- No reference for CTkey -->
+<!-- No reference for noCompile -->
+<!-- No reference for doLitOp -->
+<!-- No reference for exit, -->
+<!-- No reference for relast -->
+<!-- No reference for compile, -->
+<!-- No reference for lit, -->
+<!-- No reference for extended_lit -->
+<!-- No reference for ,c -->
+<!-- No reference for lastinst -->
+<!-- No reference for !c -->
 <a name="2.3320"></a>
 <h3><ref>2.3320:</ref> <a href="../../numout.f">h.x</a> <com><i>( u n -- )</i></com></h3>
 
@@ -196,12 +205,12 @@ An ambiguous condition exists if there are less than u+2
 items on the stack before <tok>pick</tok> is executed.
 </p>
 <a name="2.2960"></a>
-<h3><ref>2.2960:</ref> <a href="../../frame.f">]stack</a> <com><i>( ? -- ? )</i></com></h3>
+<h3><ref>2.2960:</ref> <a href="../../frame.f">)stack</a> <com><i>( ? -- ? )</i></com></h3>
 
 <p>Restore the stacks saved by <tok>f[</tok>.
 </p>
 <a name="2.2950"></a>
-<h3><ref>2.2950:</ref> <a href="../../frame.f">stack[</a> <com><i>( n -- )</i></com></h3>
+<h3><ref>2.2950:</ref> <a href="../../frame.f">stack(</a> <com><i>( n -- )</i></com></h3>
 
 <p>Move the data stack to the frame stack, leaving <tok>n</tok> cells on top.
 The return stack is emptied except for one cell to keep the sim running.
@@ -236,6 +245,15 @@ The return stack is emptied except for one cell to keep the sim running.
 <!-- No reference for frp1 -->
 <!-- No reference for frp -->
 <!-- No reference for |framestack| -->
+<!-- No reference for f$type -->
+<!-- No reference for ftype -->
+<!-- No reference for fcount -->
+<!-- No reference for c@f -->
+<!-- No reference for fcmd24 -->
+<!-- No reference for fabyte -->
+<!-- No reference for ispcmd -->
+<!-- No reference for ispwait -->
+<!-- No reference for _isp -->
 <!-- No reference for /profile -->
 <!-- No reference for stdout_table -->
 <!-- No reference for _page -->
@@ -277,6 +295,7 @@ The actions in a table are:
 
 <p>8-bit UART output buffer.
 </p>
+<!-- No reference for 2nip -->
 <a name="2.1190"></a>
 <h3><ref>2.1190:</ref> <a href="../../coreext.f">2swap</a> <com><i>( abcd -- cdab )</i></com></h3>
 
@@ -330,22 +349,6 @@ consecutive cell. It is equivalent to the sequence <tok>swap over ! cell+ !</tok
 
 <p>Fetch the cell pair x1 x2 stored at a-addr. x2 is stored at a-addr and x1 at
 the next consecutive cell. It is equivalent to the sequence <tok>dup cell+ @ swap @</tok>.
-</p>
-<a name="2.1120"></a>
-<h3><ref>2.1120:</ref> <a href="../../coreext.f">rshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
-
-<p>Perform a logical right shift of u bit-places on x1, giving x2.
-Put zeroes into the most significant bits vacated by the shift.
-An ambiguous condition exists if u is greater than or equal to
-the number of bits in a cell.
-</p>
-<a name="2.1110"></a>
-<h3><ref>2.1110:</ref> <a href="../../coreext.f">lshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
-
-<p>Perform a logical left shift of u bit-places on x1, giving x2.
-Put zeroes into the least significant bits vacated by the shift.
-An ambiguous condition exists if u is greater than or equal to
-the number of bits in a cell.
 </p>
 <a name="2.1210"></a>
 <h3><ref>2.1210:</ref> <a href="../../coreext.f">xcount</a> <com><i>( a -- a+cell u )</i></com></h3>
@@ -547,6 +550,26 @@ single-cell quotient <tok>quot</tok>. An ambiguous condition exists if <tok>n2</
 
 <p>Multiply <tok>n1</tok> by <tok>n2</tok> giving the product <tok>n3</tok>.
 </p>
+<a name="2.1120"></a>
+<h3><ref>2.1120:</ref> <a href="../../core.f">rshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
+
+<p>Perform a logical right shift of u bit-places on x1, giving x2.
+Put zeroes into the most significant bits vacated by the shift.
+An ambiguous condition exists if u is greater than or equal to
+the number of bits in a cell.
+</p>
+<a name="2.1110"></a>
+<h3><ref>2.1110:</ref> <a href="../../core.f">lshift</a> <com><i>( x1 u -- x2 )</i></com></h3>
+
+<p>Perform a logical left shift of u bit-places on x1, giving x2.
+Put zeroes into the least significant bits vacated by the shift.
+An ambiguous condition exists if u is greater than or equal to
+the number of bits in a cell.
+</p>
+<!-- No reference for dlshift -->
+<!-- No reference for darshift -->
+<!-- No reference for drshift -->
+<!-- No reference for )dshift -->
 <a name="2.0420"></a>
 <h3><ref>2.0420:</ref> <a href="../../core.f">um/mod</a> <com><i>( ud u -- ur uq )</i></com></h3>
 
@@ -708,7 +731,7 @@ interrupt latency.
 
 <p>Exception processing forward reference.
 </p>
-<!-- No reference for irqdemo -->
+<!-- No reference for irqtick -->
 <a name="2.0010"></a>
 <h3><ref>2.0010:</ref> <a href="../../core.f">cold</a> <com><i>( --  )</i></com></h3>
 

@@ -6,9 +6,9 @@
 0 equ check_alignment                   \ 2.0000 -- n
 \ enable @, !, w@, and w! to check address alignment
 
-0 torg
+0 cp _! drop
 later cold                              \ 2.0010 -- \ boots here
-later irqdemo
+later irqtick
 :noname exit exit exit exit exit ; drop \ inactive interrupt vectors
 later exception                         \ 2.0020 n --
 
@@ -212,6 +212,53 @@ CODE um/mod                             \ 2.0420 ud u -- ur uq
         (um/mod) >carry
     next
     drop swap 2*c invert                \ finish quotient
+;
+[then]
+
+cop_options 4 and [if]                  \ hardware shifter?
+CODE )dshift                            \ d1 -- d2
+    N d-1 alu   N d-1 alu               \ 2drop
+    begin
+        cop  COP T->N d+1 alu           \ get busy flag
+    while
+        drop ' noop scall               \ spin while it's busy
+    repeat
+    drop 7 cop
+    COP T->N d+1 alu                    \ get result
+    drop 6 cop
+    COP T->N d+1 RET alu
+;CODE
+
+CODE drshift                            \ d1 u -- d2
+    N CO d-1 alu                        \ count to W
+    drop 10 cop                         \ trigger right shift
+    drop ' )dshift branch               \ finish up
+;CODE
+
+CODE darshift                           \ d1 u -- d2
+    N CO d-1 alu                        \ count to W
+    drop 10 128 + cop                   \ trigger arithmetic right shift
+    drop ' )dshift branch               \ finish up
+;CODE
+
+CODE dlshift                            \ d1 u -- d2
+    N CO d-1 alu                        \ count to W
+    drop 10 64 + cop                    \ trigger left shift
+    drop ' )dshift branch               \ finish up
+;CODE
+
+: lshift  over swap dlshift drop ;	\ 2.1110 x1 u -- x2
+: rshift  0 swap drshift drop ;		\ 2.1120 x1 u -- x2
+
+[else]
+: lshift  				\ 2.1110 x1 u -- x2
+    dup if  for  2*  next  exit
+    then drop
+;
+
+: rshift  				\ 2.1120 x1 u -- x2
+    dup if  for  0 >carry 2/c  next  exit
+    then drop
 ;
 [then]
 

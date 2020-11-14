@@ -164,9 +164,13 @@ static void JamISP(uint8_t c) {
         case 1: // ignore reset and ping flags
             if (c & 2) { printf("ISP: no ping\n"); }
             if (c & 4) { FlashMemBoot(); }
+            if (c & 32) { FlashSPI(0); }
             break;
-        case 2: state = sel;  break;
-        case 3: state = sel;  break;
+        case 2:
+        case 3: 
+            FlashMemSPIformat(c & 7);
+            state = sel;  
+            break;
         default: n = (n << 6) + (c & 0x3F);
         } break;
     case 2: // write makes sense
@@ -212,7 +216,8 @@ uint32_t readIOmap (uint32_t addr) {
 // In the J1, output devices sit on (mem_addr,dout)
 
 void writeIOmap (uint32_t addr, uint32_t x) {
-    if ((addr & 0x8000) && (nohostAPI))
+    static uint32_t codeAddr = 0;
+    if ((addr & 0xFFFFC000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
     case 0:                             // emit
@@ -222,15 +227,14 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     usleep(1000);
 #endif
         break;
-    case 2: break;                      // set baud rate
+    case 1: codeAddr = x;  break;
+    case 2: chadToCode(codeAddr++, x);  break;
     case 3: FlashInterpret();  break;
     case 4: JamISP(x);  break;          // Jam ISP byte
-    case 7: nohostAPI = x;  break;
     case 12: TFTLCDwrite(x);  break;
-    case 0x8000:                        // trigger an error
+    case 15: nohostAPI = x;  break;
+    case 0x4000:                        // trigger an error
         chadError(x);  break;
-    case 0x8001:                        // trigger a header data read 
-        header_data = chadGetHeader(x);  break;
     default: chadError(BAD_IOADDR);
     }
 }
