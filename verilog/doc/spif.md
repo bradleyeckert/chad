@@ -42,7 +42,8 @@ Allows room for FPGA bitstream if used.
 
 ## Ports
 
-To keep the J1 naming conventions, the ports on the J1 side are:
+Let N be the cell size in bits, 16 to 32.
+To keep the J1 naming conventions, the ports on the processor side are:
 
 | Name     | Dir | Bits | Usage                           |
 |----------|:---:|-----:|---------------------------------|
@@ -51,9 +52,9 @@ To keep the J1 naming conventions, the ports on the J1 side are:
 | mem_addr | in  | 16   | Data memory address             |
 | mem_wr   | in  | 1    | Data memory write enable        |
 | mem_rd   | in  | 1    | Data memory read enable         |
-| din      | in  | 18   | Data memory (and I/O) in        |
-| mem_dout | out | 18   | Data memory out                 |
-| io_dout  | out | 18   | I/O data out                    |
+| din      | in  | N    | Data memory (and I/O) in        |
+| mem_dout | out | N    | Data memory out                 |
+| io_dout  | out | N    | I/O data out                    |
 | code_addr| in  | 16   | Code memory address             |
 | insn     | out | 16   | Code memory data                |
 | p_hold   | out | 1    | Processor hold                  |
@@ -200,6 +201,7 @@ since pages can be re-programmed in case of bad verification.
 
 A 'ping' command (0x42) sends 5 bytes out the UART:
 - BASEBLOCK, first 64KB sector of user flash
+- KEYID, identifies the boot code decryption key (0 = plaintext)
 - PRODUCT_ID0, product ID\[7:0]
 - PRODUCT_ID1, product ID\[15:8]
 - 0xAA, sanity check
@@ -212,10 +214,10 @@ Yup, numbers as free as air.
 If you want to reserve your PRODUCT_ID1 to avoid collision with other adopters
 of `chad`, add it to this list and do a pull request:
 
-### Reserved PRODUCT_ID1 values
+### Reserved PRODUCT_ID values
 
 - 0, Demonstration models for `chad`
-- 1 to 3, Reserved for Brad Eckert's commercial projects
+- 1 to 99, Reserved for Brad Eckert's commercial projects
 
 ## Boot Loader
 
@@ -270,7 +272,7 @@ Write:
 ### Jamming ISP bytes
 
 Bytes can be fed into the ISP interpreter by writing them to io\[4].
-This way of using the ISP lets you control the SPI flash directly to
+This way of using the ISP lets software control the SPI flash directly to
 execute flash commands. You can set up the DMA registers, start the command,
 and trigger a DMA memory load.
 
@@ -288,10 +290,10 @@ Since `cyc_o` is always the same as `stb_o`, it is not duplicated.
 
 ## Sample MCU
 
-The MCU in the `verilog` folder connects to SPI flash and a USB UART such as
-CH330N. A pushbutton can keep CS# high so the MCU bootloader sees a blank flash
-so that it doesn't try to boot up.
-The UART then has free reign over the SPI flash for programming it.
+The MCU in the `verilog` folder connects to SPI flash and a USB UART such as CH330N.
+If software somehow manages to disable the ISP, a shorting block or pushbutton can
+keep CS# high so the MCU bootloader sees a blank flash so that it doesn't try to
+boot up. The UART then has free reign over the SPI flash for programming it.
 
 Any synthesis tool will infer the RAMs, although some will
 warn you about possible simulation mismatch. Such problems occur if you try to

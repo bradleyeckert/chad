@@ -1,11 +1,15 @@
 # Interrupts
 
+Interrupts are handled by modifying the return instruction.
+I call this method "lazy interrupts".
+
 IRQs in a lazy-interrupt system trade latency time for overhead.
 Since an interrupt only happens upon a return,
 registers (such as carry flags) are free to be trashed.
+Critical sections don't need interrupt disabling.
 There is no need to disable ISRs while they are being serviced because the next
 ISR won’t be serviced until the next return.
-Multiple interrupts are naturally chained, with the priority encoder deciding who’s next.
+Multiple interrupts are naturally chained, with a priority encoder deciding who’s next.
 
 An interrupt request is serviced by modifying the PC instead of popping it from
 the return stack. This avoids excess return stack usage, which is important in a system
@@ -24,10 +28,11 @@ awakened a cooperative task to handle clean-up so as not to burden the interrupt
 The same idea applies to lazy interrupts.
 Once the time-critical part of the interrupt is taken care of, you can call
 non-time-critical parts of the ISR whose return instructions service the interrupt system.
-Admittedly, this costs a little return stack, so you need to make sure there's enough to handle it.
+Admittedly, this costs a little return stack, so you need to make sure there's enough
+hardware stack to handle it.
 You could think of return instructions as an analog of Forth’s PAUSE.
 
-The maximum interrupt latency is easy enough to measure in HDL simulation.
+The maximum interrupt latency is easy enough to instrument in HDL simulation.
 A timer could track the maximum time between rising `irq` and `iack`.
 Since Forth executes `return` quite often, it's usually pretty low.
 
