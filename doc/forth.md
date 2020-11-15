@@ -178,7 +178,7 @@ Links are relative to the beginning of header space.
 A header contains:
 
 | Length  | Name  | Usage                |
-| ------- | ----- | --------------------:|
+| ------- |:-----:| --------------------:|
 | M bytes | link  | Link to next header  |
 | 1 byte  | flags | Packed flags (0=on)  | 
 | 1 byte  | N     | Length of `name`     | 

@@ -1,4 +1,4 @@
-// Serial Flash Controller for Chad                  		11/6/2020 BNE
+// Serial Flash Controller for Chad                  		11/15/2020 BNE
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -8,8 +8,9 @@ module spif
   parameter WIDTH = 18,                 // word size of data memory
   parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
   parameter BASEBLOCK = 0,              // first 64KB sector of user flash
-  parameter PRODUCT_ID0 = 0,            // 8-bit key ID for ISP
-  parameter PRODUCT_ID1 = 1,            // 16-bit product ID for ISP
+  parameter PRODUCT_KEY = 0,            // 8-bit key ID for ISP
+  parameter PRODUCT_ID = 1,             // 16-bit product ID for ISP
+  parameter STWIDTH = 9,                // Width of outgoing stream data
   parameter KEY0 = 32'h0,               // flash cipher key, 0 means no cipher
   parameter KEY1 = 32'h0,               // the ISP host will need the same key
   parameter KEY_LENGTH = 56
@@ -51,6 +52,10 @@ module spif
   output wire              we_o,        // 1 = write, 0 = read
   output wire              stb_o,       // strobe
   input wire               ack_i,       // acknowledge
+// User stream output (from flash or processor)
+  output reg [STWIDTH-1:0] st_o,        // stream output data
+  output wire              st_stb,      // stream strobe
+  input wire               st_busy,     // 1 = not ready for st_stb
 // Interrupt requests
   output reg               cyclev,      // cycle count overflow strobe
   output wire              urxirq,      // UART full strobe
@@ -201,9 +206,9 @@ module spif
     if (ispActive)
       case (i_usel[2:0])                // ping response:
       3'b000:  u_dout <= 8'hAA;         // 'tis a ping
-      3'b001:  u_dout <= PRODUCT_ID1[15:8];
-      3'b010:  u_dout <= PRODUCT_ID1[7:0];
-      3'b011:  u_dout <= PRODUCT_ID0[7:0];
+      3'b001:  u_dout <= PRODUCT_ID[15:8];
+      3'b010:  u_dout <= PRODUCT_ID[7:0];
+      3'b011:  u_dout <= PRODUCT_KEY[7:0];
       3'b100:  u_dout <= BASEBLOCK[7:0];
       default: u_dout <= f_din;
       endcase
@@ -239,7 +244,7 @@ module spif
 
 //==============================================================================
 // Key generation for gecko.v cipher
-// The cipher secures code and data in off-chip SPI flash to some degree.
+// The cipher secures code and data in off-chip SPI flash if you use it right.
 //==============================================================================
 
   reg [KEY_LENGTH-1:0] widekey;         // 0 = no cipher
@@ -289,7 +294,9 @@ module spif
   reg codeWr, dataWr;
   reg [1:0] bytes, bytecount;           // bytes per b_data word
   reg bumpDest;                         // trigger address bump
-  reg [2:0] b_mode;                     // boot interpreter mode
+  reg [3:0] b_mode;                     // boot interpreter mode
+  reg [1:0] st_new;                     // stream triggers
+  assign st_stb = st_new[0];
 
   reg [3:0] i_state;
   localparam ISP_IDLE =   4'b0001;
@@ -297,9 +304,10 @@ module spif
   localparam ISP_DNLOAD = 4'b0100;
   localparam ISP_PING =   4'b1000;
 
-  wire b_rxok = ISPfull & ~ISPack;
-  wire b_txok = u_ready & ~u_wr;
-  wire f_ok = f_ready & ~f_wr & g_ready;
+  wire b_rxok = ISPfull & ~ISPack;      // okay to process UART input
+  wire b_txok = u_ready & ~u_wr;        // okay to send to UART
+  wire st_ready = ~(st_busy & (bytecount == 0)); // blocked on last flash byte
+  wire f_ok = f_ready & ~f_wr & g_ready & st_ready;
   reg init;                             // initialize memory at POR
 
 // Strobes to trigger writes
@@ -313,13 +321,14 @@ module spif
       f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
       b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= 0;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
-      b_mode <= 3'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
+      b_mode <= 4'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd5;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
       u_txbyte <= 8'h5B;  // power-up output character
       init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
+      st_new <= 2'b00;
     end else begin
       codeWr <= 1'b0;                   // strobes
       dataWr <= 1'b0;
@@ -327,6 +336,7 @@ module spif
       g_next <= 1'b0;
       g_load <= 1'b0;
       g_reset_n <= 1'b1;
+      st_new <= 2'b00;
       if (init) begin
         codeWr <= 1'b1;                 // clear RAMs
         dataWr <= 1'b1;
@@ -424,8 +434,9 @@ module spif
           3'b111:                       // ========== Interpret flash bytes
             begin
               g_next <= 1'b1;
-              case (b_mode[2:1])        // what kind of byte is it?
-              2'b00:                    // 00x = command
+              case (b_mode[3:1])        // what kind of byte is it?
+              3'b000,                   // 000x = command
+              3'b001:
                 case (plain[7:6])
                 2'b11:               	// blank = "end"
                   begin
@@ -435,7 +446,7 @@ module spif
                       p_reset  <= plain[4];
                       b_state  <= 3'd0; // reset FSM
                     end else
-                      b_mode <= {1'b1, plain[1:0]};
+                      b_mode <= {2'b01, plain[1:0]};
                   end
                 2'b10:               	// SCLK frequency
                   begin
@@ -443,37 +454,40 @@ module spif
                   end
                 default:             	// data mode
                   begin
-                    b_mode <= {2'b01, plain[2]};
+                    b_mode <= {1'b1, plain[4:2]};
                     bytes <= plain[1:0];
                     bytecount <= plain[1:0];
                   end
                 endcase
-              2'b01:                    // 01x = write to memory
-                begin
-                  b_data <= {b_data[WIDTH-9:0], plain};
-                  if (bytecount)
-                    bytecount <= bytecount - 2'd1;
-                  else
-                    begin
-                      bytecount <= bytes;
-                      codeWr <= ~b_mode[0];
-                      dataWr <=  b_mode[0];
-                      bumpDest <= 1'b1;
-                      if (b_count)  b_count <= b_count - 16'd1;
-                      else          b_mode <= 3'd0;
-                    end
-                end
-              2'b10:                    // 10x = set destination address
+              3'b010:                   // 010x = set destination address
                 if (b_mode[0]) begin
                   b_dest[15:8] <= plain;   b_mode[0] <= 1'b0;
                 end else begin
                   b_dest[7:0] <= plain;    b_mode <= 3'd0;
                 end
-              default:                  // 11x = set data length
+              3'b011:                   // 011x = set data length
                 if (b_mode[0]) begin
                   b_count[15:8] <= plain;  b_mode[0] <= 1'b0;
                 end else begin
                   b_count[7:0] <= plain;   b_mode <= 3'd0;
+                end
+              default:                  // 1mmx = write to memory
+                begin
+                  b_data <= {b_data[WIDTH-9:0], plain};
+                  if (bytecount)
+                    bytecount <= bytecount - 2'd1;
+                  else
+                    begin               // write to 1 of 8 sinks
+                      bytecount <= bytes;
+                      case (b_mode[2:0])
+                      3'd0: codeWr <= 1'b1;
+                      3'd1: dataWr <= 1'b1;
+                      3'd2: st_new <= 2'b11;
+                      endcase
+                      bumpDest <= 1'b1;
+                      if (b_count)  b_count <= b_count - 16'd1;
+                      else          b_mode <= 3'd0;
+                    end
                 end
               endcase
             end
@@ -482,8 +496,10 @@ module spif
           endcase
         end
       end
-      if (bumpDest)
+      if (bumpDest) begin
         b_dest <= b_dest + 16'd1;
+        b_data <= 0;
+      end
       if (io_wr)
         if (!p_hold)
           if (internal)                 // write to register:
@@ -494,9 +510,15 @@ module spif
                 u_txbyte <= din[7:0];
               end
             3'b011: b_state <= 3'd6;    // interpret flash byte stream
+            3'b110: begin
+                st_o <= din[STWIDTH-1:0];
+                st_new <= 2'b01;
+              end
             3'b111:                     // upper bits of outgoing Wishbone
               if (WIDTH != 32) wbxo <= din[31-WIDTH:0];
             endcase
+      if (st_new == 2'b11)
+        st_o <= b_data[STWIDTH-1:0];
     end
 
   wire booting = (b_state) ? 1'b1 : 1'b0;

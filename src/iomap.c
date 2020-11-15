@@ -80,36 +80,48 @@ static void FlashInterpret(void) {      // see spif.v, line 288
                     return;
                 }
                 else {                  // 110xxxmm
-                    b_mode = 4 + (SPIresult & 3); // 4 to 7
+                    b_mode = 18 + (SPIresult & 3); // 18 to 21
                 }
             case 0x80: break;           // f_rate doesn't matter
             default:
-                b_mode = 2 + ((SPIresult >> 2) & 1); // 2 to 3
+                b_mode = 2 + ((SPIresult >> 2) & 15); // 2 to 17
                 bytecount = bytes = (SPIresult & 3);
             } break;
         case 1:                         // data mode
+        case 2:                         // space for 16 sinks
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
             boot_data = (boot_data << 8) + SPIresult;
             if (bytecount)
                 bytecount--;
             else {
                 bytecount = bytes;
-                if (b_mode & 1) {
-#ifdef VERBOSE
-                    printf("data[%Xh]=%Xh\n", b_dest, boot_data);
-#endif
-                    chadToData(b_dest++, boot_data);
-                }
-                else {
+                switch (b_mode) {
+                case 2:
 #ifdef VERBOSE
                     printf("code[%Xh]=%Xh\n", b_dest, boot_data);
 #endif
                     chadToCode(b_dest++, boot_data);
+                    break;
+                case 3:
+#ifdef VERBOSE
+                    printf("data[%Xh]=%Xh\n", b_dest, boot_data);
+#endif
+                    chadToData(b_dest++, boot_data);
+                    break;
+                case 4:
+                    TFTLCDwrite(boot_data);
+                    break;
                 }
                 boot_data = 0;
                 if (b_count)  b_count--;
                 else          b_mode = 0;
             } break;
-        case 2:
+        case 9:
             if (b_mode & 1) {
                 b_dest = (b_dest & 0x00FF) | (SPIresult << 8);
                 b_mode--;
@@ -118,7 +130,7 @@ static void FlashInterpret(void) {      // see spif.v, line 288
                 b_dest = (b_dest & 0xFF00) | SPIresult;
                 b_mode = 0;
             } break;
-        default:
+        case 10:
             if (b_mode & 1) {
                 b_count = (b_count & 0x00FF) | (SPIresult << 8);
                 b_mode--;
@@ -189,8 +201,9 @@ static void JamISP(uint8_t c) {
 // The `_IORD_` field in an ALU instruction strobes io_rd.
 // In the J1, input devices sit on (mem_addr,io_din)
 
-static uint32_t header_data;            // host API return data
 static uint8_t nohostAPI;               // prohibit access to host API
+static uint32_t WishboneUpperRx;
+static uint32_t WishboneUpperTx;
 
 static int termKey(void);
 static int termQkey(void);
@@ -206,7 +219,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 4: return 0;                   // Jam status, not busy
     case 5: return 0;                   // DMA status, not busy
     case 6: return (uint32_t)chadCycles();
-    case 0x8000: return header_data;
+    case 7: return WishboneUpperRx;
     default: chadError(BAD_IOADDR);
     }
     return 0;
@@ -231,7 +244,8 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     case 2: chadToCode(codeAddr++, x);  break;
     case 3: FlashInterpret();  break;
     case 4: JamISP(x);  break;          // Jam ISP byte
-    case 12: TFTLCDwrite(x);  break;
+    case 6: TFTLCDwrite(x);  break;
+    case 7: WishboneUpperTx = x;  break;
     case 15: nohostAPI = x;  break;
     case 0x4000:                        // trigger an error
         chadError(x);  break;

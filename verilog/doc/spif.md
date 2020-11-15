@@ -228,7 +228,7 @@ The stream of bytes is interpreted to get start addresses, lengths,
 memory types, etc. The stream starts at address 0 (or BASEBLOCK<<16)
 using the "fast read" (0Bh) flash command. Boot loader command bytes are:
 
-- `0xxxxmbb` = Load memory from flash, b+1 bytes/word, to code or data space
+- `0xxxmmbb` = Load memory from flash, b+1 bytes/word, to code or data space
 - `10xxssss` = Set SCLK divisor
 - `110xxx00` = Load dest\[7:0] with 8-bit value
 - `110xxx01` = Load dest with 16-bit value (big endian)
@@ -238,12 +238,21 @@ using the "fast read" (0Bh) flash command. Boot loader command bytes are:
 
 The memory type is `0` for code and `1` for data when loading memories from
 flash. The protocol has room for a 5-bit memory selection field, so it could
-load the memories on 16 different CPU cores.
+load the memories on 16 different CPU cores or various other devices.
+Memory type `2` is for a user output stream.
 
 The SCLK frequency starts out at sysclk / 16 to be conservative.
 At some point early on, you should include a command byte to raise the
 frequency to more closely match the capability of the flash chip.
 For example, `A0` sets the maximum SCLK.
+
+## User output stream
+
+Flash memory can be streamed to a user device without CPU intervention.
+Parameter STWIDTH is the number of bits in `st_o`. It may be anything up to
+the cell size. 
+A `st_stb` strobe is produced when a new word is output.
+Writing to register 6 also produces a stream word.
 
 ## I/O space
 
@@ -267,6 +276,7 @@ Write:
 - 2: Write 16-bit instruction to code RAM and bump the address
 - 3: Trigger the flash boot interpreter
 - 4: Jam an ISP byte (see UART ISP protocol)
+- 6: Write raw data to user output stream
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
 
 ### Jamming ISP bytes

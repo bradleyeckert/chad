@@ -1,4 +1,4 @@
-// Minimal MCU based on J1-type CPU                             10/29/2020 BNE
+// Minimal MCU based on J1-type CPU                             11/15/2020 BNE
 // License: This code is a gift to the divine.
 
 // This is expected to be wrapped by an I/O ring that steers bidirectional
@@ -101,6 +101,11 @@ module mcu
     end
   end
 
+// stream stub
+  wire [8:0] st_o;                      // stream output data
+  wire       st_stb;                    // stream strobe
+  wire st_busy = 1'b0;
+
 // Wishbone master
   wire [14:0] adr_o;
   wire [31:0] dat_o, dat_i;
@@ -116,7 +121,7 @@ module mcu
 // spif is the SPI flash controller for the chad processor
 // 2048 words of code, 2048 words of data
   spif #(11, WIDTH, 11, 0, 0, 0) bridge (
-  // spif #(11, WIDTH, 11, 0, 1, 0, 24'h123456, 32'h87654321) u1 (
+  // spif #(11, WIDTH, 11, 0, 1, 0, 9, 24'h123456, 32'h87654321) u1 (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
@@ -150,6 +155,9 @@ module mcu
     .we_o     (we_o     ),
     .stb_o    (stb_o    ),
     .ack_i    (ack_i    ),
+    .st_o     (st_o     ),
+    .st_stb   (st_stb   ),
+    .st_busy  (st_busy  ),
     .cyclev   (cyclev   ),
     .urxirq   (urxirq   ),
     .utxirq   (utxirq   )
