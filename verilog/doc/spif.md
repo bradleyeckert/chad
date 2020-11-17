@@ -38,7 +38,7 @@ flash-based FPGA such as an Intel MAX10 or a Gowin GW1N.
 Allows room for FPGA bitstream if used.
 - PRODUCT_ID0: First product ID byte, user defined.
 - PRODUCT_ID1: Second product ID byte, user defined.
-- KEY0, KEY1, KEY2, KEY3: SPI flash cipher key
+- KEY0, KEY1, KEY2, KEY3: SPI flash cypher key
 
 ## Ports
 
@@ -146,17 +146,17 @@ received by `spif`. `0x10 n` is interpreted as:
 ISP command bytes:
 
 - `00nnnnnn` set 12-bit run length N (use two of these)
-- `01sxkgpr` s=SPI, k=key, g=gecko, p=ping, r=reset
+- `01sxgbpr` s=SPI, g=gecko, b=boot, p=ping, r=reset
 - `10xxxfff` Write N+1 bytes to flash using format fff
 - `11xxxfff` Read N+1 bytes from flash using format fff
 
-`01sxkgpr` detail:
+`01sxgbpr` detail:
 
 - s = SPI cycle: write byte again, reading the result.
-- k = Append key for cipher: key = (key << 12) | N.
-- g = Load the cipher with the new key.
+- g = Load the cypher with the new key.
+- b = Reboot from flash.
 - p = Trigger a ping. It will send boilerplate out the UART.
-- r = Reboot from flash and reset the processor.
+- r = Reset the processor.
 
 The ISP commands are enough to erase and program the SPI flash.
 When an erase or programming operation is in progress, the chip's WIP
@@ -276,6 +276,7 @@ Write:
 - 2: Write 16-bit instruction to code RAM and bump the address
 - 3: Trigger the flash boot interpreter
 - 4: Jam an ISP byte (see UART ISP protocol)
+- 5: Write key: key = key<<cellbits + n
 - 6: Write raw data to user output stream
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
 
@@ -338,7 +339,7 @@ Encrypting the SPI flash contents is useful because it protects against
 tampering and reverse engineering.
 It's an important part of any risk management plan.
 
-The easiest method of encryption is to use a stream cipher to
+The easiest method of encryption is to use a stream cypher to
 decrypt the boot stream inside of `spif` as SPI flash data is loaded.
 I went ahead and put this in, adding 200 LEs to the size. Not bad.
 There are some very compact stream ciphers. LIZARD is one of the smallest.
@@ -347,7 +348,7 @@ LIZARD, so I simplified it and named the module "gecko".
 
 Along with the fact that random read of code space isn't supported by hardware,
 making the plaintext unavailable, attacks will likely have to be brute-force.
-A 56-bit key is used so that publication of source code isn't a problem.
+A 56-bit key is used so that publication of source code isn't an export problem.
 A large network of FPGAs could crack it if it's used as-is.
 
 A fixed key has its downsides, which

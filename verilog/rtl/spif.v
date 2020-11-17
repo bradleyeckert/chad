@@ -11,9 +11,9 @@ module spif
   parameter PRODUCT_KEY = 0,            // 8-bit key ID for ISP
   parameter PRODUCT_ID = 1,             // 16-bit product ID for ISP
   parameter STWIDTH = 9,                // Width of outgoing stream data
-  parameter KEY0 = 32'h0,               // flash cipher key, 0 means no cipher
+  parameter KEY0 = 32'h0,               // flash cypher key, 0 means no cypher
   parameter KEY1 = 32'h0,               // the ISP host will need the same key
-  parameter KEY_LENGTH = 56
+  parameter KEY_LENGTH = 7
 )(
   input  wire              clk,
   input  wire              arstn,       // async reset (active low)
@@ -201,7 +201,7 @@ module spif
 
   reg [2:0] b_state;                    // boot FSM state
   reg [2:0] i_usel;                     // UART output select for ISP
-  reg [7:0] u_txbyte;                   // manual UART output
+  reg [WIDTH-1:0] outword;              // general purpose output word
   always @* begin                       // UART output mux
     if (ispActive)
       case (i_usel[2:0])                // ping response:
@@ -212,7 +212,7 @@ module spif
       3'b100:  u_dout <= BASEBLOCK[7:0];
       default: u_dout <= f_din;
       endcase
-    else  u_dout <= u_txbyte;
+    else  u_dout <= outword[7:0];
   end
 
   always @* begin                       // insert i/o wait states
@@ -243,27 +243,28 @@ module spif
   reg g_load, g_reset_n;                // gecko control strobes
 
 //==============================================================================
-// Key generation for gecko.v cipher
-// The cipher secures code and data in off-chip SPI flash if you use it right.
+// Key generation for gecko.v cypher
+// The cypher secures code and data in off-chip SPI flash if you use it right.
+// "I know what you're thinking: Why, oh why, didn't I take the blue pill?"
 //==============================================================================
 
-  reg [KEY_LENGTH-1:0] widekey;         // 0 = no cipher
-  reg [5:0] key_index;
+  reg [KEY_LENGTH*8-1:0] widekey;       // 0 = no cypher
+  reg [3:0] key_index;
 
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
       key_index <= KEY_LENGTH - 1;
-      widekey <= {KEY0[KEY_LENGTH-33:0], KEY1[31:0]};
+      widekey <= {KEY0[KEY_LENGTH*8-33:0], KEY1[31:0]};
     end else begin
       if (g_reset_n) begin
         if (g_load)                     // shift in a key digit:
-          widekey <= {widekey[KEY_LENGTH - 13 : 0], i_count};
-        else if (key_index) begin       // shift out a bit
+          widekey <= {widekey[KEY_LENGTH*8 - (WIDTH+1) : 0], outword};
+        else if (key_index) begin       // shift out a byte
           key_index <= key_index - 1'b1;
-          widekey <= {1'b0, widekey[KEY_LENGTH - 1 : 1]};
+          widekey <= {8'b0, widekey[KEY_LENGTH*8 - 1 : 8]};
         end
       end else
-        key_index <= KEY_LENGTH - 1;
+        key_index <= KEY_LENGTH - 1;    // sync reset
     end
 
   wire g_ready;                         // g_dout is ready
@@ -271,13 +272,13 @@ module spif
   reg g_next;                           // trigger next byte
   wire [7:0] plain = f_din ^ g_dout;    // plaintext version of SPI flash
 
-  gecko #(KEY_LENGTH) cipher (
+  gecko #(KEY_LENGTH) cypher (
     .clk        (clk),
     .rst_n      (g_reset_n),
     .clken      (1'b1),
     .ready      (g_ready),
     .next       (g_next),
-    .key        (widekey[0]),
+    .key        (widekey[7:0]),
     .dout	(g_dout)
   );
 
@@ -326,7 +327,7 @@ module spif
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
-      u_txbyte <= 8'h5B;  // power-up output character
+      outword <= 91;  // power-up output character
       init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
       st_new <= 2'b00;
     end else begin
@@ -376,10 +377,9 @@ module spif
                         i_state <= ISP_PING;
                         i_count <= 12'd3;
                       end
-                      if (ISPbyte[0])
+                      if (ISPbyte[2])
                         b_state <= 3'd1;// reboot from flash
-                      g_load <= ISPbyte[3];
-                      g_reset_n <= ~ISPbyte[2];
+                      g_reset_n <= ~ISPbyte[3];
                       f_wr <= ISPbyte[5];
                     end
                   2'b10:          	// send a run of bytes to flash
@@ -507,15 +507,20 @@ module spif
             3'b000: begin
                 u_wr <= 1'b1;           // UART output byte
        	        i_usel <= 3'd5;
-                u_txbyte <= din[7:0];
+                outword <= din;
               end
             3'b011: b_state <= 3'd6;    // interpret flash byte stream
+            3'b101: begin
+                g_load <= 1'b1;         // load key
+                outword <= din;
+              end
             3'b110: begin
                 st_o <= din[STWIDTH-1:0];
                 st_new <= 2'b01;
               end
             3'b111:                     // upper bits of outgoing Wishbone
-              if (WIDTH != 32) wbxo <= din[31-WIDTH:0];
+              if (WIDTH != 32)
+                wbxo <= din[31-WIDTH:0];
             endcase
       if (st_new == 2'b11)
         st_o <= b_data[STWIDTH-1:0];

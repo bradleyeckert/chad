@@ -94,6 +94,8 @@ H</ul>
  Stackrobatics usually means you need to re-think your approach.
  But it does look cool and it's an easy way to see what your code is doing
  in each instruction.
+=1.0093: +bkey ( u -- )
+ Shift `u` into the SPI flash encryption key for use by the boot record.
 =1.0100: load-code ( <filename> -- )
  Loads the code space from a binary file.
 

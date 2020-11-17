@@ -20,7 +20,10 @@
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Put strings high enough in memory that they won't get clobbered by 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>boot code and headers. Should be a multiple of 4096. 
 
-</font><font color=#AA0000>16384 </font><font color=#00AAAA><a href = "root.html#1.1300" style="text-decoration: none; color: #00AAAA">forg</a>             &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>strings in flash go here 
+</font><font color=#AA0000>16384 </font><font color=#00AAAA><a href = "root.html#1.1300" style="text-decoration: none; color: #00AAAA">forg</a>                     &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>strings in flash go here 
+
+</font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0093" style="text-decoration: none; color: #00AAAA">+bkey</a>                        &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>encrypt boot record if not zero 
+</font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0094" style="text-decoration: none; color: #00AAAA">+tkey</a>                        &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>encrypt text if not zero 
 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../core.f 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../coreext.f 
@@ -74,10 +77,10 @@
 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Try 25 fib, then stats 
 
-</font><font color=#00AAAA><a href = "root.html#1.0137" style="text-decoration: none; color: #00AAAA">make-boot</a>              &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>create a boot record in flash 
-</font><font color=#00AAAA><a href = "root.html#1.0139" style="text-decoration: none; color: #00AAAA">make-heads</a>             &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>append headers to flash 
-</font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0136" style="text-decoration: none; color: #00AAAA">save-flash</a> </font><font color=#000000>myapp.bin  </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>save to a 'chad' file you can boot from 
-</font><font color=#00AAAA><a href = "root.html#1.0135" style="text-decoration: none; color: #00AAAA">save-flash-h</a> </font><font color=#000000>myapp.txt  </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>also save in hex for flash memory model 
+</font><font color=#00AAAA><a href = "root.html#1.0137" style="text-decoration: none; color: #00AAAA">make-boot</a>                      &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>create a boot record in flash 
+</font><font color=#00AAAA><a href = "root.html#1.0139" style="text-decoration: none; color: #00AAAA">make-heads</a>                     &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>append headers to flash 
+</font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0136" style="text-decoration: none; color: #00AAAA">save-flash</a> </font><font color=#000000>myapp.bin         &nbsp;</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>save to a 'chad' file you can boot from 
+</font><font color=#00AAAA><a href = "root.html#1.0135" style="text-decoration: none; color: #00AAAA">save-flash-h</a> </font><font color=#000000>myapp.txt         &nbsp;</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>also save in hex for flash memory model 
 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>You can now run the app with "boot myapp.bin". 
 

@@ -7,6 +7,7 @@
 #include "chad.h"
 #include "flash.h"
 #include "TFTsim.h"
+#include "gecko.h"
 #ifdef __linux__
 #include <unistd.h>
 /**
@@ -55,12 +56,14 @@ int KbHit(void) {
 // 110xxx11 = Load length with 16-bit value(big endian)
 // 111rxxxx = End bootup and start processor
 
+uint64_t ChadBootKey = 0;               // global needed by chad.c
+
 static uint8_t SPIresult;
 
 static void FlashSPI(uint8_t c) {
     int r = FlashMemSPI8(c);
     if (r < 0) chadError(r);
-    SPIresult = r;
+    SPIresult = r ^ GeckoByte();
 }
 
 static void FlashInterpret(void) {      // see spif.v, line 288
@@ -70,6 +73,7 @@ static void FlashInterpret(void) {      // see spif.v, line 288
     uint32_t boot_data = 0;
     uint16_t b_dest = 0;
     uint16_t b_count = 0;
+    GeckoLoad(ChadBootKey);
     while (1) {
         switch (b_mode >> 1) {
         case 0:                         // command mode
@@ -156,13 +160,15 @@ void FlashMemBoot(void) {
     FlashInterpret();
 }
 
+static uint64_t gkey = 0;
+
 // ISP interpreter. In a real system, the UART can control the ISP.
 // In a PC environment, stdin is not given this access.
 // But, the processor can jam ISP bytes into a simulated ISP interpreter.
 // JamISP keeps a little internal state.
 
 // `00nnnnnn` set 12 - bit run length N(use two of these)
-// `01xxxbpr` b = boot, p = ping, r = reset cpu
+// `01xxgbpr` g = gecko, b = boot, p = ping, r = reset cpu
 // `10xxxxff` Write N+1 bytes to flash using format f
 // `11xxxxff` Read N+1 bytes from flash using format f
 
@@ -176,6 +182,7 @@ static void JamISP(uint8_t c) {
         case 1: // ignore reset and ping flags
             if (c & 2) { printf("ISP: no ping\n"); }
             if (c & 4) { FlashMemBoot(); }
+            if (c & 8) { GeckoLoad(gkey);  gkey = 0; }
             if (c & 32) { FlashSPI(0); }
             break;
         case 2:
@@ -244,6 +251,7 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     case 2: chadToCode(codeAddr++, x);  break;
     case 3: FlashInterpret();  break;
     case 4: JamISP(x);  break;          // Jam ISP byte
+    case 5: gkey = (gkey << CELLBITS) + x;
     case 6: TFTLCDwrite(x);  break;
     case 7: WishboneUpperTx = x;  break;
     case 15: nohostAPI = x;  break;

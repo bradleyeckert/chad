@@ -14,4 +14,6 @@ void FlashMemBoot(void);
 #define BAD_IOADDR  -70
 #define BAD_HOSTAPI -76
 
+extern uint64_t ChadBootKey;
+
 #endif // __IOMAP_H__

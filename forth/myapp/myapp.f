@@ -7,7 +7,10 @@
 \ Put strings high enough in memory that they won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
 
-16384 forg              \ strings in flash go here
+16384 forg                      \ strings in flash go here
+
+0 +bkey                         \ encrypt boot record if not zero
+0 +tkey                         \ encrypt text if not zero
 
 include ../core.f
 include ../coreext.f
@@ -61,10 +64,10 @@ variable hicycles
 
 \ Try 25 fib, then stats
 
-make-boot               \ create a boot record in flash
-make-heads              \ append headers to flash
-0 save-flash myapp.bin  \ save to a 'chad' file you can boot from
-save-flash-h myapp.txt  \ also save in hex for flash memory model
+make-boot                       \ create a boot record in flash
+make-heads                      \ append headers to flash
+0 save-flash myapp.bin          \ save to a 'chad' file you can boot from
+save-flash-h myapp.txt          \ also save in hex for flash memory model
 
 \ You can now run the app with "boot myapp.bin".
 

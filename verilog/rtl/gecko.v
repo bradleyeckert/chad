@@ -6,19 +6,19 @@
 // The key is loaded immediately after reset. Use clken to sync with the key data.
 // If the key is all zeros, dout will stay at 8'd0 which disables decryption.
 // This is not a problem: loading a 0 key just makes decryption not work.
-// Matching utility "key.c" uses the same algorithm in C.
+// Matching "key.c" uses the same algorithm in C.
 
 `default_nettype none
 
 module gecko
 #(
-  parameter KEY_LENGTH = 56
+  parameter KEY_LENGTH = 7      // in bytes
 )(
   input wire clk,
   input wire rst_n,             // async reset, active low
   input wire clken,             // clock enable
   output reg ready,             // byte is ready
-  input wire key,               // 56-bit randomized key
+  input wire [7:0] key,         // randomized key byte
   input wire next,              // trigger next byte
   output reg [7:0] dout         // PRNG output
 );
@@ -50,24 +50,27 @@ module gecko
   localparam LOAD    = 4'b0010;
   localparam DIFFUSE = 4'b0100;
   localparam RUN     = 4'b1000;
-  reg [6:0] count;
-  wire inkey = (count > (120 - KEY_LENGTH)) ? key : b[120 - KEY_LENGTH];
+  reg [4:0] count;
+
+  // Cycle the key after KEY_LENGTH bytes
+  wire recycle = (count > (15 - KEY_LENGTH));
+  wire [7:0] inkey = (recycle) ? key : b[(16 - KEY_LENGTH)*8 : (16 - KEY_LENGTH)*8 - 7];
 
   always @(posedge clk or negedge rst_n)
     if (!rst_n) begin
       state <= LOAD;
       ready <= 1'b0;  dout <= 8'd0;
-      count <= 7'd121;
+      count <= 5'd15;
     end else if (clken) begin
       case (state)
       LOAD:                     // load the key into s and b
         begin
-          s <= {inkey, s[30:1]};
-          b <= {s[0], b[89:1]};
+          s <= {inkey, s[30:8]};
+          b <= {s[7:0], b[89:8]};
           if (count)            // after KEY_LENGTH bits, the key is looped
             count <= count - 1'b1; // to fill out the internal state
           else begin
-            count <= 7'd127;
+            count <= 5'd31;
             state <= DIFFUSE;
           end
         end
@@ -79,7 +82,7 @@ module gecko
             count <= count - 1'b1;
           else begin
             state <= RUN;
-            count <= 7'd7;
+            count <= 5'd7;
           end
         end
       RUN:                      // one pseudorandom bit per clock
@@ -96,7 +99,7 @@ module gecko
         end
       WAIT:                     // wait for the next byte trigger
         if (next) begin
-          count <= 7'd7;
+          count <= 5'd7;
           ready <= 1'b0;
           state <= RUN;
         end

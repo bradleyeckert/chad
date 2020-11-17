@@ -32,6 +32,7 @@ static uint64_t GetMicroseconds() {
 #include "iomap.h"
 #include "config.h"
 #include "flash.h"
+#include "gecko.h"
 
 SI verbose = 0;
 uint8_t sp, rp;                         // stack pointers
@@ -1585,14 +1586,31 @@ endparagraph:               if (found > 1)
     if (fpr) fclose(fpr);
 }
 
+// The gecko key must be set up before calling GeckoByte.
+// MakeBootList uses all the same key, to be the key's reset value on the target.
+
 SI flashPtr;
+SV AddBootKey(void)     { ChadBootKey = (ChadBootKey << CELLBITS) + Dpop(); }
 SV forg(void)           { flashPtr = Dpop(); }
-SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c); }
+SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c ^ GeckoByte()); }
 SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
 SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
 SV flashStr(char* s)    { char c;  while ((c = *s++)) flashC8(c); }
 
+// Strings in flash may use a text encryption key in combination with the 
+// flash address to set the key. f$type needs to load this key.
+
+uint64_t ChadTextKey = 0;
+
+SV NewTextKey(void) {
+    if (ChadTextKey)
+        GeckoLoad((ChadTextKey << CELLBITS) | (flashPtr & CELLMASK));
+    else
+        GeckoLoad(0);
+}
+
 SV fcQuote(void) {
+    NewTextKey();
     Literal(flashPtr);
     if (flashPtr > CELLMASK)
         error = BAD_FSOVERFLOW;
@@ -1603,10 +1621,20 @@ SV fcQuote(void) {
 SV dotQuote(void) { 
     fcQuote();  CompCall(Ctick("f$type"));
 }
+SV AddTextKey(void) {
+    ChadTextKey = (ChadTextKey << CELLBITS) + Dpop();
+}
+SV ExecTextKey(void) { 
+    Dpush(ChadTextKey & CELLMASK);  Dpush((cell)(ChadTextKey >> CELLBITS));
+}
+SV CompTextKey(void) { 
+    Literal(ChadTextKey & CELLMASK);  Literal((cell)(ChadTextKey >> CELLBITS));
+}
 
 // Write boot data to flash memory image in `flash.c`
 SV MakeBootList(void) {
     flashPtr = 0;
+    GeckoLoad(ChadBootKey);
     flashC8(0x80);                      // speed up SCLK
     flashAN(CP);
     flashC8(1);                         // 16-bit code write
@@ -1660,6 +1688,7 @@ static char* FnTargetName(void (*fn)()) { // target: ( w -- )
 // Build header data in flash memory image in `flash.c`
 SV MakeHeaders(void) {
     for (uint8_t i = wordlists; i > 0; i--) {
+        NewTextKey();
         char* wname = &wordlistname[i][0];
         size_t len = strlen(wname);
         for (size_t i = 0; i < len; i++) 
@@ -1757,6 +1786,9 @@ SV LoadKeywords(void) {
     AddKeyword("stats",       "1.0090 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0091 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0092 flags --",      Verbosity,     noCompile);
+    AddKeyword("+bkey",       "1.0093 u --",          AddBootKey,    noCompile);
+    AddKeyword("+tkey",       "1.0094 u --",          AddTextKey,    noCompile);
+    AddKeyword("tkey",        "1.0095 -- ud",         ExecTextKey, CompTextKey);
     AddKeyword("load-flash",  "1.0134 <filename> --", LoadFlash,     noCompile);
     AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
     AddKeyword("save-flash",  "1.0136 pid <filename> --", SaveFlash, noCompile);

@@ -19,6 +19,15 @@ there hex
 : ispcmd  ( c -- )              \ write ISP command
    _isp ispwait
 ;
+
+\ The gecko key is loaded by writing to a register and then triggering a load.
+
+: gkey  ( n -- )                \ shift in a new key
+   [ 5 cells ] literal io!
+;
+: )gkey  ( n -- )               \ re-key the gecko keystream
+   48 ispcmd
+;
 : fabyte  ( df-addr shift -- df-addr )
    >r  2dup  r> drshift drop ispcmd
 ;
@@ -54,11 +63,13 @@ there hex
       for  fcount emit  next
    then  2drop
 ;
+\ to do: roll together fcount and ftype so decryption will work
 : f$type  ( f-addr -- )         \ emit the "flash string"
+\   tkey gkey gkey dup gkey )gkey \ set the decryption key
    0  fcount  ftype
 ;
 
-: fdump  ( f-addr len -- )
+: fdump  ( f-addr len -- )      \ only useful if tkey is 0
    over 5 h.x  0 swap
    for
       over 0F and 0= if cr over 5 h.x then
