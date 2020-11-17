@@ -18,7 +18,7 @@ there
 ; no-tail-recursion
 : third   >r >r dup r> swap r> swap ;   \ 2.1100 x1 x2 x3 -- x1 x2 x3 x1
 : count   dup 1+ swap c@ ;              \ 2.1200 a -- a+1 c
-: xcount  dup cell+ swap @ ;            \ 2.1210 a -- a+cell u
+: @+      dup cell+ swap @ ;            \ 2.1210 a -- a+cell u
 
 
 : 2@   _@ _dup@ swap cell + @ swap ;    \ 2.1220 a-addr -- x1 x2

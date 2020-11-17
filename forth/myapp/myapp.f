@@ -12,12 +12,13 @@
 include ../core.f
 include ../coreext.f
 include ../redirect.f
-include ../flash.f
 include ../frame.f
 include ../numout.f
+include ../flash.f
 include ../compile.f
 include ../ctea.f
 include ../bignum.f
+include ../order.f
 
 \ iomap.c sends errors to the Chad interpreter
 \ A QUIT loop running on the CPU would do something different.

@@ -60,14 +60,20 @@ So, we don't do it.
  The radix for numeric conversion.
 =1.0076: wids ( -- addr )
  WID lookup table, up to 8 entries.
-=1.0077: state ( -- addr )
+=1.0077: #order ( -- addr )
+ Number of WIDs in the search order.
+=1.0076: orders ( -- addr )
+ Search order stack, up to 8 entries. Grows upward.
+=1.0076: current ( -- addr )
+ WID of the current definition.
+=1.0080: state ( -- addr )
  Interpreter state: 0 = interpret, 1 = compile.
-=1.0080: stats ( -- )
+=1.0090: stats ( -- )
  Prints simulator statistics.
-=1.0085: locate ( <name> -- )
+=1.0091: locate ( <name> -- )
  Display the source file path and source code of a word.
  If the file can't be opened, display the line number.
-=1.0090: verbosity ( flags -- )
+=1.0092: verbosity ( flags -- )
  There are four bit flags in the verbosity setting that control what the
  interpreter prints out.
 

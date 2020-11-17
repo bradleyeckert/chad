@@ -92,6 +92,7 @@ void ErrorMessage (int error, char *s) {
        case  -77: msg = "Invalid CREATE DOES> usage";                   break;
        case  -80: msg = "Dictionary full";                              break;
        case  -81: msg = "Writing to invalid flash sector";              break;
+       case  -82: msg = "Flash string space overflow";                  break;
        case  -98: msg = "Compiling an execute-only word";               break;
        case  -99: msg = "Nesting overflow during include";              break;
        case -100: msg = "ALLOCATE failed";                              break;

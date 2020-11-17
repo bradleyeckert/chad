@@ -699,12 +699,6 @@ character onto the stack.
 
 <p>Create a word that pushes <tok>x</tok> onto the stack. Same as <tok>equ</tok>.
 </p>
-<a name="1.1036"></a>
-<h3><ref>1.1036:</ref> <chad>c&quot;</chad> <com><i>( ccc&gt; -- faddr )</i></com></h3>
-
-<p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
-At run time, push its address to the stack.
-</p>
 <a name="1.1035"></a>
 <h3><ref>1.1035:</ref> <chad>.&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
 
@@ -804,12 +798,12 @@ identifiers <tok>widN</tok> ... <tok>wid1</tok> identifying these word lists.
 <tok>widN</tok> the word list that is searched last. The search order is unaffected.
 </p>
 <a name="1.0460"></a>
-<h3><ref>1.0460:</ref> <chad>set-current</chad> <com><i>( wid -- )</i></com></h3>
+<h3><ref>1.0460:</ref> <chad>set-CURRENT</chad> <com><i>( wid -- )</i></com></h3>
 
 <p>Set the compilation word list to the word list identified by <tok>wid</tok>.
 </p>
 <a name="1.0450"></a>
-<h3><ref>1.0450:</ref> <chad>get-current</chad> <com><i>( -- wid )</i></com></h3>
+<h3><ref>1.0450:</ref> <chad>get-CURRENT</chad> <com><i>( -- wid )</i></com></h3>
 
 <p>Return <tok>wid</tok>, the identifier of the compilation word list.
 </p>
@@ -970,8 +964,8 @@ keyID = 0 if the saved boot data is in plaintext format.
 
 <p>Load flash memory from a binary file, skipping over the 16-byte boilerplate.
 </p>
-<a name="1.0090"></a>
-<h3><ref>1.0090:</ref> <chad>verbosity</chad> <com><i>( flags -- )</i></com></h3>
+<a name="1.0092"></a>
+<h3><ref>1.0092:</ref> <chad>verbosity</chad> <com><i>( flags -- )</i></com></h3>
 
 <p>There are four bit flags in the verbosity setting that control what the
 interpreter prints out.
@@ -991,21 +985,30 @@ Stackrobatics usually means you need to re-think your approach.
 But it does look cool and it&apos;s an easy way to see what your code is doing
 in each instruction.
 </p>
-<a name="1.0085"></a>
-<h3><ref>1.0085:</ref> <chad>locate</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
+<a name="1.0091"></a>
+<h3><ref>1.0091:</ref> <chad>locate</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
 
 <p>Display the source file path and source code of a word.
 If the file can&apos;t be opened, display the line number.
 </p>
-<a name="1.0080"></a>
-<h3><ref>1.0080:</ref> <chad>stats</chad> <com><i>( -- )</i></com></h3>
+<a name="1.0090"></a>
+<h3><ref>1.0090:</ref> <chad>stats</chad> <com><i>( -- )</i></com></h3>
 
 <p>Prints simulator statistics.
 </p>
-<a name="1.0077"></a>
-<h3><ref>1.0077:</ref> <chad>state</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0080"></a>
+<h3><ref>1.0080:</ref> <chad>state</chad> <com><i>( -- addr )</i></com></h3>
 
 <p>Interpreter state: 0 = interpret, 1 = compile.
+</p>
+<a name="1.0079"></a>
+<h3><ref>1.0079:</ref> <chad>current</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0078"></a>
+<h3><ref>1.0078:</ref> <chad>orders</chad> <com><i>( -- addr )</i></com></h3>
+<a name="1.0077"></a>
+<h3><ref>1.0077:</ref> <chad>#order</chad> <com><i>( -- addr )</i></com></h3>
+
+<p>Number of WIDs in the search order.
 </p>
 <a name="1.0076"></a>
 <h3><ref>1.0076:</ref> <chad>wids</chad> <com><i>( -- addr )</i></com></h3>

@@ -43,21 +43,29 @@ CELL Raddr;                             // data memory read address
 SI error;                               // simulator and interpreter error code
 
 // Shared variables
-#define toin  0                         // pointer to next character
-#define tibs  (toin + 1)                // chars in input buffer
-#define atib  (tibs + 1)                // address of input buffer
-#define dp    (atib + 1)                // data space pointer
-#define cp    (dp   + 1)                // code space pointer
-#define base  (cp   + 1)                // use cells not bytes for compatibility
-#define wids  (base + 1)                // list of wids
-#define state (wids + 9)                // last variable
-
-#define TOIN  Data[toin]
-#define TIBS  Data[tibs]
-#define ATIB  Data[atib]
-#define DP    Data[dp]
-#define CP    Data[cp]
-#define BASE  Data[base]
+#define toin    0                       // pointer to next character
+#define tibs    (toin + 1)              // chars in input buffer
+#define atib    (tibs + 1)              // address of input buffer
+#define dp      (atib + 1)              // data space pointer
+#define cp      (dp   + 1)              // code space pointer
+#define base    (cp   + 1)              // use cells not bytes for compatibility
+#define wids    (base + 1)              // table of target wids
+#define orders  (wids + 9)              // # of wids in the search order
+#define order   (orders + 1)            // search order stack
+#define current (order + 9)             // wid of the current definition
+#define state   (current + 1)           // this the shared last variable
+                
+#define TOIN    Data[toin]
+#define TIBS    Data[tibs]
+#define ATIB    Data[atib]
+#define DP      Data[dp]
+#define CP      Data[cp]
+#define BASE    Data[base]
+#define ORDERS  Data[orders]
+#define ORDERS  Data[orders]
+#define ORDER(x) Data[order + (x)]
+#define CURRENT Data[current]
+#define CONTEXT ORDER(ORDERS - 1)
 #define STATE Data[state]
 
 SV Hex(void) { BASE = 16; }
@@ -642,22 +650,22 @@ SV LogColor(uint32_t color, int ID, char* s) {
     LogR(" ");
 }
 
-// The search order is a lists of contexts with order[orders] searched first
+// The search order is a list of wordlists with CONTEXT searched first
 // order:   wid3 wid2 wid1
-// context------------^ ^-----orders
+// context------------^      ^-----ORDERS
 // A wid points to a linked list of headers.
 // The head pointer of the list is created by WORDLIST.
 
-static uint8_t order[32];               // search order list
-static uint8_t orders;                  // items in the search order list
 static cell wordlist[MaxWordlists];     // head pointers to linked lists
 static char wordlistname[MaxWordlists][16];// optional name string
 SI wordlists;                           // number of defined wordlists
 SI root_wid;                            // the basic wordlists
 SI forth_wid;
 SI asm_wid;
-SI current;                             // the current definition
-SI context(void) { return order[orders]; } // top of context
+SI context(void) { 
+    if (ORDERS == 0) return 0;
+    return CONTEXT; 
+}
 
 SV printWID(int wid) {
     char* s = &wordlistname[wid][0];
@@ -669,8 +677,8 @@ SV printWID(int wid) {
 
 SV Order(void) {
     printf(" Context : ");
-    for (uint8_t i = 1; i <= orders; i++)  printWID(order[i]);
-    printf("\n Current : ");  printWID(current);
+    for (uint8_t i = 0; i < ORDERS; i++)  printWID(ORDER(i));
+    printf("\n Current : ");  printWID(CURRENT);
 }
 
 SI findinWL(char* key, int wid) {       // find in wordlist
@@ -690,7 +698,7 @@ SI findinWL(char* key, int wid) {       // find in wordlist
 }
 
 SI FindWord(char* key) {                // find in context
-    for (uint8_t i = orders; i > 0; i--) {
+    for (cell i = ORDERS; i > 0; i--) {
         int id = findinWL(key, i);
         if (id >= 0) {
             Header[me].references += 1; // bump reference counter
@@ -721,35 +729,35 @@ SV Words(void) {
 }
 
 SV OrderPush(uint8_t n) {
-    order[31 & ++orders] = n;
-    if (orders == 16) error = BAD_ORDER_OVER;
+    ORDER(15 & ORDERS++) = n;
+    if (ORDERS == 9) error = BAD_ORDER_OVER;
 }
 
 SI OrderPop(void) {
-    uint8_t r = (order[31 & orders--]);
-    if (orders < 0) error = BAD_ORDER_UNDER;
+    uint8_t r = (ORDER(15 & --ORDERS));
+    if (ORDERS & 0x10) error = BAD_ORDER_UNDER;
     return r;
 }
 
-SV Only       (void) { orders = 0; OrderPush(root_wid); OrderPush(forth_wid); }
-SV ForthLex   (void) { order[orders] = forth_wid; }
-SV AsmLex     (void) { order[orders] = asm_wid; }
-SV Definitions(void) { current = context(); }
+SV Only       (void) { ORDERS = 0; OrderPush(root_wid); OrderPush(forth_wid); }
+SV ForthLex   (void) { CONTEXT = forth_wid; }
+SV AsmLex     (void) { CONTEXT = asm_wid; }
+SV Definitions(void) { CURRENT = context(); }
 SV PlusOrder  (void) { OrderPush(Dpop()); }
 SV Previous   (void) { OrderPop(); }
 SV Also       (void) { int v = OrderPop();  OrderPush(v);  OrderPush(v); }
-SV SetCurrent (void) { current = Dpop(); }
-SV GetCurrent (void) { Dpush(current); }
+SV SetCurrent (void) { CURRENT = Dpop(); }
+SV GetCurrent (void) { Dpush(CURRENT); }
 
 SV GetOrder(void) {
-    for (int i = 0; i < orders; i++)
-        Dpush(order[i]);
-    Dpush(orders);
+    for (cell i = 0; i < ORDERS; i++)
+        Dpush(ORDER(i));
+    Dpush(ORDERS);
 }
 
 SV SetOrder(void) {
     int8_t len = Dpop();
-    orders = 0;
+    ORDERS = 0;
     if (len < 0)
         Only();
     else
@@ -800,9 +808,9 @@ SI AddHead (char* name, char* anchor) { // add a header to the list
         Header[hp].isALU = 0;
         Header[hp].srcFile = File.FID;
         Header[hp].srcLine = File.LineNumber;
-        Header[hp].link = wordlist[current];
+        Header[hp].link = wordlist[CURRENT];
         Header[hp].references = 0;
-        wordlist[current] = hp;
+        wordlist[CURRENT] = hp;
     } else {
         printf("Please increase MaxKeywords and rebuild.\n");
         r = 0;  error = BYE;
@@ -1584,12 +1592,17 @@ SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
 SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
 SV flashStr(char* s)    { char c;  while ((c = *s++)) flashC8(c); }
 
-SV cQuote(void) {
-    Literal(flashPtr);  parseword('"');
+SV fcQuote(void) {
+    Literal(flashPtr);
+    if (flashPtr > CELLMASK)
+        error = BAD_FSOVERFLOW;
+    parseword('"');
     flashC8((uint8_t)strlen(tok));  
     flashStr(tok);
 }
-SV dotQuote(void)       { cQuote();  CompCall(Ctick("f$type")); }
+SV dotQuote(void) { 
+    fcQuote();  CompCall(Ctick("f$type"));
+}
 
 // Write boot data to flash memory image in `flash.c`
 SV MakeBootList(void) {
@@ -1661,19 +1674,19 @@ SV MakeHeaders(void) {
                 uint32_t nextlink = flashPtr;
                 flashCC(link);
                 link = nextlink;
-                uint8_t flags = 0xFF;
-                if (Header[p].smudge == 0) flags &= ~0x80;
-                if (Header[p].notail)      flags &= ~0x01;
-                flashC8(flags);
                 wname = Header[p].name;
                 len = strlen(wname);
                 flashC8((uint8_t)len);
                 for (size_t i = 0; i < len; i++)
                     flashC8(*wname++);
-                flashC8(0);             // applet ID
                 flashCC(Ctick(exec));   // target versions of host fns
                 flashCC(Ctick(comp));
                 flashCC(Header[p].w);
+                uint8_t flags = 0xFF;
+                if (Header[p].smudge == 0) flags &= ~0x80;
+                if (Header[p].notail)      flags &= ~0x01;
+                flashC8(flags);
+                flashC8(0);             // applet ID
             }
             p = Header[p].link;
         }
@@ -1722,7 +1735,7 @@ SV LoadKeywords(void) {
     root_wid = AddWordlist("root");
     forth_wid = AddWordlist("forth");
     Only(); // order = root _forth
-    current = root_wid;
+    CURRENT = root_wid;
     AddEquate("root",         "1.0000 -- wid",        root_wid);
     AddEquate("forth-wordlist", "1.0010 -- wid",      forth_wid);
     AddEquate("cm-writable",  "1.0020 -- addr",       CodeFence);
@@ -1737,10 +1750,13 @@ SV LoadKeywords(void) {
     AddEquate("cp",           "1.0074 -- addr",       BYTE_ADDR(cp));
     AddEquate("base",         "1.0075 -- addr",       BYTE_ADDR(base));
     AddEquate("wids",         "1.0076 -- addr",       BYTE_ADDR(wids));
-    AddEquate("state",        "1.0077 -- addr",       BYTE_ADDR(state));
-    AddKeyword("stats",       "1.0080 --",            Stats,         noCompile);
-    AddKeyword("locate",      "1.0085 <name> --",     Locate,        noCompile);
-    AddKeyword("verbosity",   "1.0090 flags --",      Verbosity,     noCompile);
+    AddEquate("#order",       "1.0077 -- addr",       BYTE_ADDR(orders));
+    AddEquate("orders",       "1.0078 -- addr",       BYTE_ADDR(order));
+    AddEquate("current",      "1.0079 -- addr",       BYTE_ADDR(current));
+    AddEquate("state",        "1.0080 -- addr",       BYTE_ADDR(state));
+    AddKeyword("stats",       "1.0090 --",            Stats,         noCompile);
+    AddKeyword("locate",      "1.0091 <name> --",     Locate,        noCompile);
+    AddKeyword("verbosity",   "1.0092 flags --",      Verbosity,     noCompile);
     AddKeyword("load-flash",  "1.0134 <filename> --", LoadFlash,     noCompile);
     AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
     AddKeyword("save-flash",  "1.0136 pid <filename> --", SaveFlash, noCompile);
@@ -1769,8 +1785,8 @@ SV LoadKeywords(void) {
     AddKeyword("forth",       "1.0420 --",            ForthLex,      noCompile);
     AddKeyword("assembler",   "1.0430 --",            AsmLex,        noCompile);
     AddKeyword("definitions", "1.0440 --",            Definitions,   noCompile);
-    AddKeyword("get-current", "1.0450 -- wid",        GetCurrent,    noCompile);
-    AddKeyword("set-current", "1.0460 wid --",        SetCurrent,    noCompile);
+    AddKeyword("get-CURRENT", "1.0450 -- wid",        GetCurrent,    noCompile);
+    AddKeyword("set-CURRENT", "1.0460 wid --",        SetCurrent,    noCompile);
     AddKeyword("get-order",   "1.0470 -- widN..wid1 N", GetOrder,    noCompile);
     AddKeyword("set-order",   "1.0480 widN..wid1 N --", SetOrder,    noCompile);
     AddKeyword("only",        "1.0490 --",            Only,          noCompile);
@@ -1784,7 +1800,6 @@ SV LoadKeywords(void) {
     AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
     AddKeyword(".(",          "1.1030 ccc> --",       EchoToPar,     noCompile);
     AddKeyword(".\"",         "1.1035 ccc> --",       noExecute,     dotQuote);
-    AddKeyword("c\"",         "1.1036 ccc> -- faddr", noExecute,     cQuote);
     AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
     AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
     AddKeyword("align",       "1.1060 --",            Align,         noCompile);
@@ -1886,7 +1901,7 @@ SV LoadKeywords(void) {
     // assembler
     asm_wid = AddWordlist("asm");
     AddEquate("asm",        "1.5000 -- wid", asm_wid);
-    current = asm_wid;
+    CURRENT = asm_wid;
     AddKeyword("begin",     "1.5100 --",  doBegin,   noCompile);
     AddKeyword("again",     "1.5110 --",  doAgain,   noCompile);
     AddKeyword("until",     "1.5120 --",  doUntil,   noCompile);
@@ -1940,7 +1955,7 @@ SV LoadKeywords(void) {
     AddLitOp("litx",        "1.9050 n -- 0",  litx );
     AddLitOp("cop",         "1.9060 n -- 0",  copop );
     AddLitOp("imm",         "1.9070 n -- 0",  lit  );
-    current = forth_wid;
+    CURRENT = forth_wid;
 }
 
 SV CopyBuffer(void) {                   // copy buf to tib region in Data

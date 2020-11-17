@@ -237,7 +237,7 @@ H</ul>
  `a+1` is the address of the first character after `a`.
  `u` is the contents of the character at `a`,
  which is the length in characters of the string at `a+1`.
-=2.1210: xcount ( a -- a+cell u )
+=2.1210: @+ ( a -- a+cell u )
  Return the character string specification for the counted string stored at `a`.
  `a+cell` is the address of the first character after `a`.
  `u` is the contents of the cell at `a`,

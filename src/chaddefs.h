@@ -207,6 +207,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_IS          -74 // Trying to IS a non-DEFER
 #define BAD_WID_OVER    -75 // Too many WORDLISTs
 #define BAD_DOES        -77 // Invalid CREATE DOES> usage
+#define BAD_FSOVERFLOW  -82 // Flash string overflow
 #define BAD_NOCOMPILE   -98 // Compiling an execute-only word
 #define BAD_INCLUDING   -99 // Nesting overflow during include
 #define BAD_CREATEFILE -198
