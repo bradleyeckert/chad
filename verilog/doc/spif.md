@@ -254,6 +254,10 @@ the cell size.
 A `st_stb` strobe is produced when a new word is output.
 Writing to register 6 also produces a stream word.
 
+A typical use case for the stream is a TFT LCD module.
+A stream of bytes or words in SPI flash can be written to the module without
+processor intervention. This could be used to load bitmaps onto the screen.
+
 ## I/O space
 
 The 3-bit address allows for 8 read and 8 write registers.

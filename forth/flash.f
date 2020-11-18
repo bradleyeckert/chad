@@ -31,14 +31,14 @@ there hex
 : fabyte  ( df-addr shift -- df-addr )
    >r  2dup  r> drshift drop ispcmd
 ;
-: fcmd24  ( df-addr cmd len -- ) \ set start address and set command
+: fcmd24  ( df-addr cmd len --) \ set start address and set command
    0 _isp  _isp  82 _isp        \ len is 3 + extra chars
    ispcmd  10 fabyte  8 fabyte  0 fabyte
    2drop
 ;
 
-: c@f(  ( df-addr -- )          \ start 0B read command
-   0B 4 fcmd24  0 ispcmd
+: @f(  ( df-addr -- )           \ start 0B read command
+   0B  4 fcmd24  0 ispcmd
 ;
 : _c@f  ( -- c )                \ read byte from flash
    60 ispcmd                    \ trigger SPI transfer
@@ -49,11 +49,11 @@ there hex
       8 lshift _c@f +
    next
 ;
-: )c@f  ( -- )                  \ end read
+: )@f  ( -- )                   \ end read
    80 _isp
 ;
-: c@f  ( df-addr -- c )  c@f( _c@f )c@f ;
-: @f   ( df-addr -- c )  c@f( _@f  )c@f ;
+: c@f  ( df-addr -- c )  @f( _c@f )@f ;
+: @f   ( df-addr -- c )  @f( _@f  )@f ;
 
 : fcount  ( df-addr -- df-addr+1 c )
    2dup 1 0 d+  2swap c@f
@@ -130,14 +130,14 @@ there hex
    over 0= if dup xor exit then         \ addr 0 0   zero length string
    begin
       dup>r  /text
-      0 c@f(  _@f >r  _c@f              \ addr len1 len2 | head link
+      0 @f(  _@f >r  _c@f              \ addr len1 len2 | head link
       over = if
          2dup match if                  \ found
             rdrop dup r> +
             [ cellbits 8 / 1 + ] literal +
-            )c@f exit
+            )@f exit
          then
-      then )c@f r>  rdrop               \ end flash read
+      then )@f r>  rdrop               \ end flash read
    dup 0= until                         \ not found
 ;
 

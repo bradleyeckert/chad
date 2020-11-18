@@ -15,6 +15,19 @@ Now you can build computing platforms almost without a processor.
 If you have an FPGA or ASIC, there's your computer.
 `chad` is the at-speed simulation model.
 
+The C and Verilog models match as closely as possible so that the generated
+flash memory image can run on either model. Although the project started as
+a simple CPU, the SPI controller morphed into a central hub for handling
+memory decryption, in-system-programming, and boot-from-flash. Chad is:
+
+- Secure. Flash memory is encrypted.
+- Fast. 100 MHz on the slowest MAX10 FPGA. Single-cycle instructions.
+- Efficient. Forth provides excellent semantic density.
+- Low-power. In an ASIC, hardware stacks are power-efficient.
+- Portable. Runs on small FPGAs but is easily ported to ASIC.
+- Extensible. Really easy to customize.
+- Inexpensive. $0 up-front license cost, $0 per chip, $0 maintenance fee.
+
 ## A self-hosting Forth for J1-style CPUs
 
 James Bowman's seminal paper on the 

@@ -68,15 +68,13 @@ An Admiral in the US Navy started this whole language business.
 That zeitgeist led to everyone on the planet having an ARM processor
 in their hands.
 How about that? The entire world is ARMed. 
-It's Admiral Grace's intent writ large.
+It's Admiral Hopper's intent writ large.
 That's how intent works. The ripples keep on going.
 How's everyone at each other's throats working for you?
 
 How about waging peace?
 How about we forget about ARM and its wannabes like RISC V?
-They are all part of the same dying world.
-It's rather ironic that Corona-virus could bring an empire built on C
-to its knees.
+They are all part of the same obsolescent world.
 Sorry, C is not the language of peace.
 It's the language of commerce, or war without bullets as it's practiced.
 But here's the thing about planetary consciousness shifts.
@@ -123,7 +121,7 @@ Programming is a very good practice.
 Why not use a language that's built for it? 
 Like Forth?
 
-## Why Forth
+## Why Forth?
 
 You can find plenty of web sites listing the technical reasons.
 Forth is a very productive computer language, in the right hands.

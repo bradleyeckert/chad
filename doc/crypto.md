@@ -53,4 +53,6 @@ a string or header record is read from flash. The actual cypher key concatenates
 double constant. `/text` synchronizes the keystream by loading it and the address
 into the cypher for a total key length of 3 cells or 56 bits whichever is smaller.
 
+`+tkey` *( n -- )* shifts one cell into `tkey` from the right.
+
 `tkey` is a software feature. Hardware instantiation doesn't involve it.
