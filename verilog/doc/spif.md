@@ -330,15 +330,6 @@ be spent spinning in a loop waiting for bytes to move through the SPI.
 
 ### Encryption
 
-An SPI flash is easily read out using a clip-on probe and programming adapter.
-A flash die bonded out in an ASIC can be probed with some extra effort.
-Encrypting the application would protect it from prying eyes.
-Such paranoia seems justified if you look at the speed with which games and PC
-apps are cracked.
-Encrypting the SPI flash contents is useful because it protects against
-tampering and reverse engineering.
-It's an important part of any risk management plan.
-
 The easiest method of encryption is to use a stream cypher to
 decrypt the boot stream inside of `spif` as SPI flash data is loaded.
 I went ahead and put this in, adding 200 LEs to the size. Not bad.

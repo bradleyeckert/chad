@@ -3,14 +3,16 @@
 \ To load: With your working directory here, type:
 \ ..\chad include myapp.f  (in Windows), or
 \ ../chad include myapp.f  (in Linux)
+\ If SPI flash is encrypted, for example, with `1 +bkey`, launch with:
+\ ..\chad 1 +bkey boot myapp.bin
 
-\ Put strings high enough in memory that they won't get clobbered by
+\ Put text high enough in flash memory that it won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
 
-16384 forg                      \ strings in flash go here
+$4000 forg                      \ strings in flash start here
 
-0 +bkey                         \ encrypt boot record if not zero
-0 +tkey                         \ encrypt text if not zero
+1 +bkey                         \ encrypt boot record if not zero
+2 +tkey                         \ encrypt text if not zero
 
 include ../core.f
 include ../coreext.f
@@ -29,21 +31,28 @@ include ../order.f
 :noname  ( error -- )  ?dup if  [ $4000 cells ] literal io!  then
 ; resolves exception
 
-\ Hardware loads code and data RAMs from flash. Upon coming out of reset,
-\ both are initialized. The PC can launch from 0 (cold).
-
-\ A very simple app would output some numbers and then hang.
-
 variable hicycles
 
 :noname ( -- )
    hicycles @ 1 +
    hicycles !
-; resolves irqtick \ clock cycle counter overflow
+; resolves irqtick \ clock cycle counter overflow interrupt
+
+\ Read raw cycle count. Since io@ returns after the lower count is read,
+\ it will service iqrtick if it has rolled over. hicycles is safe to read.
+
+: rawcycles ( -- ud )
+   [ 6 cells ] literal io@
+   hicycles @
+;
+
+\ Hardware loads code and data RAMs from flash. Upon coming out of reset,
+\ both are initialized. The PC can launch from 0 (cold).
+
+\ A very simple app would output some numbers and then hang.
 
 : myapp  ( -- )
-\    42 512 io!
-\    512 io@ emit
+\    42 512 io!  512 io@ emit  \ Wishbone bus test
     cr ." Hello World!" cr
     10 for r@ . next
     begin noop again
@@ -53,7 +62,7 @@ variable hicycles
 
 \ You can now run the app with "cold"
 
-.( 你好，世界 ) cr
+: hi ." 多么美丽的世界 " ;
 
 \ Examples
 
@@ -72,7 +81,6 @@ save-flash-h myapp.txt          \ also save in hex for flash memory model
 \ You can now run the app with "boot myapp.bin".
 
 .( Total instructions: ) there . cr
-\ 0 there dasm
 
 \ Now let's generate a language standard
 only forth
@@ -83,3 +91,4 @@ asm +order
 gendoc ../wiki/wikiasm.txt html/asm.html
 only forth
 
+\ 0 there dasm \ dumps all code

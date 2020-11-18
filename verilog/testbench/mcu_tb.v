@@ -86,11 +86,13 @@ module mcu_tb();
       // Demonstrate ISP by reading the 3-byte JDID (9F command).
       // A more modern method of getting flash characteristics is with the
       // SFDP (5A command), which fixes the mess created by the JDID scheme.
+      $display("Activating ISP, trigger ping");
       UART_TX(8'h12);           // activate ISP
       UART_TX(8'hA5);
       UART_TX(8'h5A);
       UART_TX(8'h42);           // ping (4 bytes)
       repeat (2000) @(posedge clk);
+      $display("Get SPI flash JDID");
       UART_TX(8'h00);
       UART_TX(8'h00);
       UART_TX(8'h82);           // send to SPI flash
@@ -110,6 +112,7 @@ module mcu_tb();
       UART_TX(8'h12);           // deactivate ISP
       UART_TX(8'h00);
       repeat (2000) @(posedge clk);
+      $display("Sending test char to UART RXD");
       UART_TX(8'h41);           // send char to the CPU to test urxirq
       repeat (2000) @(posedge clk);
       $stop();

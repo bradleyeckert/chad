@@ -16,14 +16,16 @@
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>To load: With your working directory here, type: 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>..\chad include myapp.f  (in Windows), or 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>../chad include myapp.f  (in Linux) 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>If SPI flash is encrypted, for example, with `1 +bkey`, launch with: 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>..\chad 1 +bkey boot myapp.bin 
 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Put strings high enough in memory that they won't get clobbered by 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Put text high enough in flash memory that it won't get clobbered by 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>boot code and headers. Should be a multiple of 4096. 
 
-</font><font color=#AA0000>16384 </font><font color=#00AAAA><a href = "root.html#1.1300" style="text-decoration: none; color: #00AAAA">forg</a>                     &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>strings in flash go here 
+</font><font color=#AA0000>$4000 </font><font color=#00AAAA><a href = "root.html#1.1300" style="text-decoration: none; color: #00AAAA">forg</a>                     &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>strings in flash start here 
 
-</font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0093" style="text-decoration: none; color: #00AAAA">+bkey</a>                        &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>encrypt boot record if not zero 
-</font><font color=#AA0000>0 </font><font color=#00AAAA><a href = "root.html#1.0094" style="text-decoration: none; color: #00AAAA">+tkey</a>                        &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>encrypt text if not zero 
+</font><font color=#AA0000>1 </font><font color=#00AAAA><a href = "root.html#1.0093" style="text-decoration: none; color: #00AAAA">+bkey</a>                        &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>encrypt boot record if not zero 
+</font><font color=#AA0000>2 </font><font color=#00AAAA><a href = "root.html#1.0094" style="text-decoration: none; color: #00AAAA">+tkey</a>                        &nbsp;<a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>encrypt text if not zero 
 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../core.f 
 </font><font color=#00AAAA><a href = "root.html#1.1000" style="text-decoration: none; color: #00AAAA">include</a> </font><font color=#000000>../coreext.f 
@@ -42,21 +44,28 @@
 </font><font color=#00AAAA><a href = "root.html#1.1220" style="text-decoration: none; color: #00AAAA">:noname</a>  <a href = "root.html#1.1010" style="text-decoration: none; color: #00AAAA">(</a> </font><font color=#008800>error --  ) </font><font color=#0000FF><a href = "forth.html#2.0325" style="text-decoration: none; color: #0000FF">?dup</a> </font><font color=#00AAAA><a href = "root.html#1.2930" style="text-decoration: none; color: #00AAAA">if</a>  <a href = "root.html#1.1170" style="text-decoration: none; color: #00AAAA">[</a> </font><font color=#AA0000>$4000 </font><font color=#0000FF><a href = "forth.html#2.0170" style="text-decoration: none; color: #0000FF">cells</a> </font><font color=#00AAAA><a href = "root.html#1.1180" style="text-decoration: none; color: #00AAAA">]</a> <a href = "root.html#1.1260" style="text-decoration: none; color: #00AAAA">literal</a> </font><font color=#0000FF><a href = "forth.html#2.0120" style="text-decoration: none; color: #0000FF">io!</a>  </font><font color=#00AAAA><a href = "root.html#1.2950" style="text-decoration: none; color: #00AAAA">then</a> 
 </font><font color=#00AAAA><a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> <a href = "root.html#1.1320" style="text-decoration: none; color: #00AAAA">resolves</a> </font><font color=#0000FF><a href = "forth.html#2.0020" style="text-decoration: none; color: #0000FF">exception</a> 
 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Hardware loads code and data RAMs from flash. Upon coming out of reset, 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>both are initialized. The PC can launch from 0 (cold). 
-
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>A very simple app would output some numbers and then hang. 
-
 </font><font color=#00AAAA><a href = "root.html#1.1130" style="text-decoration: none; color: #00AAAA">variable</a> </font><font color=#AA00AA>hicycles 
 
 </font><font color=#00AAAA><a href = "root.html#1.1220" style="text-decoration: none; color: #00AAAA">:noname</a> <a href = "root.html#1.1010" style="text-decoration: none; color: #00AAAA">(</a> </font><font color=#008800>--  )
   &nbsp;</font><font color=#AA00AA><a href = "forth.html#(null)" style="text-decoration: none; color: #AA00AA">hicycles</a> </font><font color=#0000FF><a href = "forth.html#2.0210" style="text-decoration: none; color: #0000FF">@</a> </font><font color=#AA0000>1 </font><font color=#FF00FF><a href = "root.html#1.2080" style="text-decoration: none; color: #FF00FF">+</a> 
   &nbsp;</font><font color=#AA00AA><a href = "forth.html#(null)" style="text-decoration: none; color: #AA00AA">hicycles</a> </font><font color=#0000FF><a href = "forth.html#2.0200" style="text-decoration: none; color: #0000FF">!</a> 
-</font><font color=#00AAAA><a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> <a href = "root.html#1.1320" style="text-decoration: none; color: #00AAAA">resolves</a> </font><font color=#0000FF><a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">irqtick</a> </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>clock cycle counter overflow 
+</font><font color=#00AAAA><a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> <a href = "root.html#1.1320" style="text-decoration: none; color: #00AAAA">resolves</a> </font><font color=#0000FF><a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">irqtick</a> </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>clock cycle counter overflow interrupt 
+
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Read raw cycle count. Since io@ returns after the lower count is read, 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>it will service iqrtick if it has rolled over. hicycles is safe to read. 
+
+</font><font color=#00AAAA><a href = "root.html#1.1210" style="text-decoration: none; color: #00AAAA">:</a> </font><font color=#FF0000>rawcycles </font><font color=#00AAAA><a href = "root.html#1.1010" style="text-decoration: none; color: #00AAAA">(</a> </font><font color=#008800>-- ud  )
+  &nbsp;</font><font color=#00AAAA><a href = "root.html#1.1170" style="text-decoration: none; color: #00AAAA">[</a> </font><font color=#AA0000>6 </font><font color=#0000FF><a href = "forth.html#2.0170" style="text-decoration: none; color: #0000FF">cells</a> </font><font color=#00AAAA><a href = "root.html#1.1180" style="text-decoration: none; color: #00AAAA">]</a> <a href = "root.html#1.1260" style="text-decoration: none; color: #00AAAA">literal</a> </font><font color=#0000FF><a href = "forth.html#2.0110" style="text-decoration: none; color: #0000FF">io@</a> 
+  &nbsp;</font><font color=#AA00AA><a href = "forth.html#(null)" style="text-decoration: none; color: #AA00AA">hicycles</a> </font><font color=#0000FF><a href = "forth.html#2.0210" style="text-decoration: none; color: #0000FF">@</a> 
+</font><font color=#00AAAA><a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> 
+
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Hardware loads code and data RAMs from flash. Upon coming out of reset, 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>both are initialized. The PC can launch from 0 (cold). 
+
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>A very simple app would output some numbers and then hang. 
 
 </font><font color=#00AAAA><a href = "root.html#1.1210" style="text-decoration: none; color: #00AAAA">:</a> </font><font color=#FF0000>myapp  </font><font color=#00AAAA><a href = "root.html#1.1010" style="text-decoration: none; color: #00AAAA">(</a> </font><font color=#008800>--  )
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>   42 512 io! 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>   512 io@ emit 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>   42 512 io!  512 io@ emit  \ Wishbone bus test 
    &nbsp;</font><font color=#0000FF><a href = "forth.html#2.2111" style="text-decoration: none; color: #0000FF">cr</a> </font><font color=#00AAAA><a href = "root.html#1.1035" style="text-decoration: none; color: #00AAAA">."</a>  </font><font color=#0000FF><a href = "forth.html#2.2111" style="text-decoration: none; color: #0000FF">cr</a> 
    &nbsp;</font><font color=#AA0000>10 </font><font color=#00AAAA><a href = "root.html#1.2980" style="text-decoration: none; color: #00AAAA">for</a> </font><font color=#FF00FF><a href = "root.html#1.2190" style="text-decoration: none; color: #FF00FF">r@</a> </font><font color=#0000FF><a href = "forth.html#2.3300" style="text-decoration: none; color: #0000FF">.</a> </font><font color=#00AAAA><a href = "root.html#1.2990" style="text-decoration: none; color: #00AAAA">next</a> 
    &nbsp;</font><font color=#00AAAA><a href = "root.html#1.2900" style="text-decoration: none; color: #00AAAA">begin</a> </font><font color=#0000FF><a href = "forth.html#2.0100" style="text-decoration: none; color: #0000FF">noop</a> </font><font color=#00AAAA><a href = "root.html#1.2910" style="text-decoration: none; color: #00AAAA">again</a> 
@@ -66,7 +75,7 @@
 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>You can now run the app with "cold" 
 
-</font><font color=#00AAAA><a href = "root.html#1.1030" style="text-decoration: none; color: #00AAAA">.(</a> </font><font color=#008800>你好，世界  )</font><font color=#0000FF><a href = "forth.html#2.2111" style="text-decoration: none; color: #0000FF">cr</a> 
+</font><font color=#00AAAA><a href = "root.html#1.1210" style="text-decoration: none; color: #00AAAA">:</a> </font><font color=#FF0000>hi </font><font color=#00AAAA><a href = "root.html#1.1035" style="text-decoration: none; color: #00AAAA">."</a>  <a href = "root.html#1.1240" style="text-decoration: none; color: #00AAAA">;</a> 
 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Examples 
 
@@ -85,7 +94,6 @@
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>You can now run the app with "boot myapp.bin". 
 
 </font><font color=#00AAAA><a href = "root.html#1.1030" style="text-decoration: none; color: #00AAAA">.(</a> </font><font color=#008800>Total instructions:  )</font><font color=#00AAAA><a href = "root.html#1.1290" style="text-decoration: none; color: #00AAAA">there</a> </font><font color=#0000FF><a href = "forth.html#2.3300" style="text-decoration: none; color: #0000FF">.</a> <a href = "forth.html#2.2111" style="text-decoration: none; color: #0000FF">cr</a> 
-</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>0 there dasm 
 
 </font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>Now let's generate a language standard 
 </font><font color=#0000FF><a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">only</a> <a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">forth</a> 
@@ -96,6 +104,7 @@
 </font><font color=#00AAAA><a href = "root.html#1.1390" style="text-decoration: none; color: #00AAAA">gendoc</a> </font><font color=#000000>../wiki/wikiasm.txt html/asm.html 
 </font><font color=#0000FF><a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">only</a> <a href = "forth.html#(null)" style="text-decoration: none; color: #0000FF">forth</a> 
 
+</font><font color=#00AAAA><a href = "root.html#1.1020" style="text-decoration: none; color: #00AAAA">\</a> </font><font color=#008800>0 there dasm \ dumps all code 
 </pre>
 </body>
 </html>

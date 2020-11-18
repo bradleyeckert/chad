@@ -58,6 +58,16 @@ static void shift_s(uint8_t s30, uint8_t b89) {
     b[89] = b89;
 }
 
+uint8_t GeckoByte(void) {               // next PRNG byte
+    uint8_t r = 0;
+    for (int i = 0; i < 8; i++) {
+        logic();
+        shift_s(x, y);
+        r = (r << 1) + a;
+    }
+    return r;
+}
+
 void GeckoLoad(uint64_t key) {          // load the key
     for (int i = 0; i < 128; i++) {
         uint8_t k;
@@ -71,15 +81,5 @@ void GeckoLoad(uint64_t key) {          // load the key
         logic();
         shift_s(x ^ a, y ^ a);
     }
-}
-
-uint8_t GeckoByte(void) {               // next PRNG byte
-    uint8_t r = 0;
-    for (int i = 0; i < 8; i++) {
-        logic();
-        shift_s(x, y);
-        r = (r << 1) + a;
-    }
-    return r;
 }
 

@@ -11,8 +11,8 @@ module spif
   parameter PRODUCT_KEY = 0,            // 8-bit key ID for ISP
   parameter PRODUCT_ID = 1,             // 16-bit product ID for ISP
   parameter STWIDTH = 9,                // Width of outgoing stream data
-  parameter KEY0 = 32'h0,               // flash cypher key, 0 means no cypher
-  parameter KEY1 = 32'h0,               // the ISP host will need the same key
+  parameter BKEY_HI = 0,                // flash cypher key, 0 means no cypher
+  parameter BKEY_LO = 0,                // the ISP host will need the same key
   parameter KEY_LENGTH = 7
 )(
   input  wire              clk,
@@ -254,7 +254,7 @@ module spif
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
       key_index <= KEY_LENGTH - 1;
-      widekey <= {KEY0[KEY_LENGTH*8-33:0], KEY1[31:0]};
+      widekey <= {BKEY_HI[KEY_LENGTH*8-33:0], BKEY_LO[31:0]};
     end else begin
       if (g_reset_n) begin
         if (g_load)                     // shift in a key digit:
@@ -357,7 +357,6 @@ module spif
         if (f_ok) begin
           f_wr <= 1'b1;
           f_who <= 1'b0;
-          if (b_state == 3'd1)  f_format <= 3'b010;
           case (b_state)
           3'b000:
             begin
@@ -378,9 +377,10 @@ module spif
                         i_count <= 12'd3;
                       end
                       if (ISPbyte[2])
-                        b_state <= 3'd1;// reboot from flash
+                        b_state <= 3'b001; // reboot from flash
                       g_reset_n <= ~ISPbyte[3];
                       f_wr <= ISPbyte[5];
+                      g_next <= 1'b1;   // single write and read
                     end
                   2'b10:          	// send a run of bytes to flash
                     begin
@@ -423,13 +423,18 @@ module spif
               default:
                 i_state <= ISP_IDLE;
               endcase
-              if (codeAddrS)            // CPU sets start address
+              if (codeAddrS)            // CPU sets code start address
                 b_dest <= din[15:0];
               if (codeDataS) begin      // CPU writes next code word
                 b_data <= din[15:0];
                 codeWr <= 1'b1;
                 bumpDest <= 1'b1;
               end
+            end
+          3'b001:                       // begin fast read, single rate SPI
+            begin
+              f_format <= 3'b010;
+              b_state <= b_state + 1'b1;
             end
           3'b111:                       // ========== Interpret flash bytes
             begin
@@ -492,7 +497,7 @@ module spif
               endcase
             end
           default:
-            b_state <= b_state + 3'd1;
+            b_state <= b_state + 1'b1;
           endcase
         end
       end
@@ -535,7 +540,7 @@ module spif
     3'b000:  spif_dout = uartRXbyte;    // char
     3'b001:  spif_dout = uartRXfull;    // char is in the buffer
     3'b010:  spif_dout = txbusy;        // EMIT is busy?
-    3'b011:  spif_dout = f_din;         // flash SPI result
+    3'b011:  spif_dout = plain;         // flash SPI result
     3'b100:  spif_dout = jammin;        // jammed byte is still pending
     3'b101:  spif_dout = booting;       // still reading flash?
     3'b110:  spif_dout = cycles;        // free-running counter

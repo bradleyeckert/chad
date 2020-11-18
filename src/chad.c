@@ -1589,7 +1589,7 @@ endparagraph:               if (found > 1)
 // The gecko key must be set up before calling GeckoByte.
 // MakeBootList uses all the same key, to be the key's reset value on the target.
 
-SI flashPtr;
+static uint32_t flashPtr;
 SV AddBootKey(void)     { ChadBootKey = (ChadBootKey << CELLBITS) + Dpop(); }
 SV forg(void)           { flashPtr = Dpop(); }
 SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c ^ GeckoByte()); }
@@ -1597,14 +1597,16 @@ SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
 SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
 SV flashStr(char* s)    { char c;  while ((c = *s++)) flashC8(c); }
 
-// Strings in flash may use a text encryption key in combination with the 
+// Strings in flash use a text encryption key in combination with the 
 // flash address to set the key. f$type needs to load this key.
 
 uint64_t ChadTextKey = 0;
 
 SV NewTextKey(void) {
-    if (ChadTextKey)
+    if (ChadTextKey) {
         GeckoLoad((ChadTextKey << CELLBITS) | (flashPtr & CELLMASK));
+        GeckoByte();
+    }
     else
         GeckoLoad(0);
 }
@@ -1688,9 +1690,9 @@ static char* FnTargetName(void (*fn)()) { // target: ( w -- )
 // Build header data in flash memory image in `flash.c`
 SV MakeHeaders(void) {
     for (uint8_t i = wordlists; i > 0; i--) {
-        NewTextKey();
         char* wname = &wordlistname[i][0];
         size_t len = strlen(wname);
+        GeckoLoad(0);                   // wordlist name is not encrypted
         for (size_t i = 0; i < len; i++) 
             flashC8(*wname++);          // begin wordlist with its name
         flashC8((uint8_t)len);
@@ -1700,6 +1702,7 @@ SV MakeHeaders(void) {
             char* exec = FnTargetName(Header[p].ExecFn);
             char* comp = FnTargetName(Header[p].CompFn);
             if ((exec) && (comp)) {
+                NewTextKey();
                 uint32_t nextlink = flashPtr;
                 flashCC(link);
                 link = nextlink;

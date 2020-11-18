@@ -14,8 +14,8 @@ module gecko_tb();
   reg next = 1'b0;      // byte trigger
   wire [7:0] dout;      // PRNG output
 
-//  reg [63:0] widekey = 64'h0012345687654321;
-  reg [63:0] widekey = 64'h1;
+//  reg [55:0] widekey = 56'h12345687654321;
+  reg [55:0] widekey = 56'h1;
   reg [3:0] idx = 0;
   wire [7:0] key = widekey[7:0];
 
@@ -49,7 +49,7 @@ module gecko_tb();
       clken <= 1'b1;
       while (idx < 7) begin    // load the key
         @(posedge clk);
-        widekey <= {8'h00, widekey[63:8]};
+        widekey <= {8'h00, widekey[55:8]};
         idx = idx + 1;
       end
       repeat (1000) NEXT();

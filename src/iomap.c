@@ -63,7 +63,7 @@ static uint8_t SPIresult;
 static void FlashSPI(uint8_t c) {
     int r = FlashMemSPI8(c);
     if (r < 0) chadError(r);
-    SPIresult = r ^ GeckoByte();
+    SPIresult = r;
 }
 
 static void FlashInterpret(void) {      // see spif.v, line 288
@@ -75,21 +75,23 @@ static void FlashInterpret(void) {      // see spif.v, line 288
     uint16_t b_count = 0;
     GeckoLoad(ChadBootKey);
     while (1) {
+        FlashSPI(0);
+        uint8_t plain = SPIresult ^ GeckoByte();
         switch (b_mode >> 1) {
         case 0:                         // command mode
-            switch (SPIresult & 0xC0) {
+            switch (plain & 0xC0) {
             case 0xC0:
-                if (SPIresult & 0x20) { // 111xxxxx
+                if (plain & 0x20) { // 111xxxxx
                     FlashMemSPIformat(0);
                     return;
                 }
                 else {                  // 110xxxmm
-                    b_mode = 18 + (SPIresult & 3); // 18 to 21
+                    b_mode = 18 + (plain & 3); // 18 to 21
                 }
             case 0x80: break;           // f_rate doesn't matter
             default:
-                b_mode = 2 + ((SPIresult >> 2) & 15); // 2 to 17
-                bytecount = bytes = (SPIresult & 3);
+                b_mode = 2 + ((plain >> 2) & 15); // 2 to 17
+                bytecount = bytes = (plain & 3);
             } break;
         case 1:                         // data mode
         case 2:                         // space for 16 sinks
@@ -99,7 +101,7 @@ static void FlashInterpret(void) {      // see spif.v, line 288
         case 6:
         case 7:
         case 8:
-            boot_data = (boot_data << 8) + SPIresult;
+            boot_data = (boot_data << 8) + plain;
             if (bytecount)
                 bytecount--;
             else {
@@ -127,24 +129,23 @@ static void FlashInterpret(void) {      // see spif.v, line 288
             } break;
         case 9:
             if (b_mode & 1) {
-                b_dest = (b_dest & 0x00FF) | (SPIresult << 8);
+                b_dest = (b_dest & 0x00FF) | (plain << 8);
                 b_mode--;
             }
             else {
-                b_dest = (b_dest & 0xFF00) | SPIresult;
+                b_dest = (b_dest & 0xFF00) | plain;
                 b_mode = 0;
             } break;
         case 10:
             if (b_mode & 1) {
-                b_count = (b_count & 0x00FF) | (SPIresult << 8);
+                b_count = (b_count & 0x00FF) | (plain << 8);
                 b_mode--;
             }
             else {
-                b_count = (b_count & 0xFF00) | SPIresult;
+                b_count = (b_count & 0xFF00) | plain;
                 b_mode = 0;
             } break;
         }
-        FlashSPI(0);
     }
 }
 
@@ -156,11 +157,11 @@ void FlashMemBoot(void) {
     FlashSPI(0);
     FlashSPI(0);
     FlashSPI(0);                // dummy byte
-    FlashSPI(0);                // read first byte
     FlashInterpret();
 }
 
 static uint64_t gkey = 0;
+static uint8_t xorkey;
 
 // ISP interpreter. In a real system, the UART can control the ISP.
 // In a PC environment, stdin is not given this access.
@@ -168,7 +169,7 @@ static uint64_t gkey = 0;
 // JamISP keeps a little internal state.
 
 // `00nnnnnn` set 12 - bit run length N(use two of these)
-// `01xxgbpr` g = gecko, b = boot, p = ping, r = reset cpu
+// `01sxgbpr` s=SPI, x=unused, g = gecko, b = boot, p = ping, r = reset cpu
 // `10xxxxff` Write N+1 bytes to flash using format f
 // `11xxxxff` Read N+1 bytes from flash using format f
 
@@ -176,21 +177,43 @@ static void JamISP(uint8_t c) {
     static state = 0;
     static n = 0;
     int sel = c >> 6;
+#ifdef VERBOSE
+    printf("j[%d,%02X] ", state, c);
+#endif
     switch (state) {
     case 0: // command
         switch (sel) {
-        case 1: // ignore reset and ping flags
+        case 0: // 00nnnnnn
+            n = (n << 6) + (c & 0x3F);
+            break;
+        case 1: // 01
+            // (c & 1) ignore reset
             if (c & 2) { printf("ISP: no ping\n"); }
             if (c & 4) { FlashMemBoot(); }
-            if (c & 8) { GeckoLoad(gkey);  gkey = 0; }
-            if (c & 32) { FlashSPI(0); }
+            if (c & 8) { 
+#ifdef VERBOSE
+                printf("Loading Key %X%08X\n", (uint32_t)(gkey >> 32), (uint32_t)gkey);
+#endif
+                GeckoLoad(gkey);
+                gkey = 0; 
+                xorkey = GeckoByte();
+            }
+            if (c & 32) {
+                FlashSPI(0); 
+                xorkey = GeckoByte();
+#ifdef VERBOSE
+                printf("SPI xfer, keystream=%02Xh, raw=%02X\n", xorkey, SPIresult);
+#endif
+            }
             break;
         case 2:
+            FlashMemSPIformat(c & 7);
+            if (c & 7) state = sel;
+            break;
         case 3: 
             FlashMemSPIformat(c & 7);
             state = sel;  
             break;
-        default: n = (n << 6) + (c & 0x3F);
         } break;
     case 2: // write makes sense
         FlashSPI(c);
@@ -200,7 +223,6 @@ static void JamISP(uint8_t c) {
     default: state = 0; // weird state
     }
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Host words start at I/O address 8000h.
@@ -222,7 +244,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 0: return termKey();           // Get the next incoming stream char
     case 1: return termQkey();
     case 2: return 0;                   // UART tx is never busy
-    case 3: return SPIresult;           // SPI result
+    case 3: return SPIresult ^ xorkey;  // SPI result
     case 4: return 0;                   // Jam status, not busy
     case 5: return 0;                   // DMA status, not busy
     case 6: return (uint32_t)chadCycles();

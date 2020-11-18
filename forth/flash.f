@@ -31,14 +31,14 @@ there hex
 : fabyte  ( df-addr shift -- df-addr )
    >r  2dup  r> drshift drop ispcmd
 ;
-: fcmd24  ( df-addr cmd -- )    \ set start address and set command
-   0 _isp  3 _isp  82 _isp      \ 4 bytes to send
+: fcmd24  ( df-addr cmd len -- ) \ set start address and set command
+   0 _isp  _isp  82 _isp        \ len is 3 + extra chars
    ispcmd  10 fabyte  8 fabyte  0 fabyte
    2drop
 ;
 
 : c@f(  ( df-addr -- )          \ start 0B read command
-   0B fcmd24  82 _isp  0 ispcmd
+   0B 4 fcmd24  0 ispcmd
 ;
 : _c@f  ( -- c )                \ read byte from flash
    60 ispcmd                    \ trigger SPI transfer
@@ -63,12 +63,13 @@ there hex
       for  fcount emit  next
    then  2drop
 ;
-\ to do: roll together fcount and ftype so decryption will work
-: f$type  ( f-addr -- )         \ emit the "flash string"
-\   tkey gkey gkey dup gkey )gkey \ set the decryption key
-   0  fcount  ftype
+: /text  ( f-addr -- f-addr )   \ synchronize keystream
+   tkey 2dup or 0= if 2drop exit then
+   gkey gkey dup gkey )gkey
 ;
-
+: f$type  ( f-addr -- )         \ emit the "flash string"
+   /text  0  fcount  ftype
+;
 : fdump  ( f-addr len -- )      \ only useful if tkey is 0
    over 5 h.x  0 swap
    for
@@ -80,6 +81,7 @@ there hex
 \ Header structures are in flash. Up to 8 wordlists may be in the
 \ search order. WIDs are indices into `wids`, an array in data space.
 \ The name of the wordlist is just before the first link.
+\ The count is after the name instead of before it so it's stored as plaintext.
 
 : (.wid)  \ f-addr --                   \ f-addr points to the link that's 0
    1-  dup 0 c@f  tuck - 0 rot          \ daddr-f len
@@ -92,9 +94,10 @@ there hex
 : wid    [wid] @ ;                      \ wid -- f-addr
 
 : .wid   \ wid --                       \ display WID identifier (for order)
-   wid  dup                             \ get the pointer
-   begin nip dup 0 @f dup 0= until drop \ skip to beginning
-   (.wid) space
+   wid    dup                           \ get the pointer
+   begin  nip dup /text 0 @f            \ skip to beginning
+   dup 0= until  drop
+   )gkey (.wid) space                   \ use plaintext
 ;
 
 \ | Length  | Name  | Usage                |
@@ -126,7 +129,8 @@ there hex
    wid  over 31 u> -19 and exception    \ name too long
    over 0= if dup xor exit then         \ addr 0 0   zero length string
    begin
-      dup>r  0 c@f(  _@f >r  _c@f       \ addr len1 len2 | head link
+      dup>r  /text
+      0 c@f(  _@f >r  _c@f              \ addr len1 len2 | head link
       over = if
          2dup match if                  \ found
             rdrop dup r> +
