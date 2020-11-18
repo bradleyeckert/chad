@@ -28,6 +28,11 @@ memory decryption, in-system-programming, and boot-from-flash. Chad is:
 - Extensible. Really easy to customize.
 - Inexpensive. $0 up-front license cost, $0 per chip, $0 maintenance fee.
 
+The sample MCU uses an external SPI flash and external USB UART.
+Green data is plaintext, red data is encrypted.
+
+![MCU Image](verilog/doc/mcu.png)
+
 ## A self-hosting Forth for J1-style CPUs
 
 James Bowman's seminal paper on the 
@@ -103,9 +108,9 @@ ok>25 fib .
 ok>
 ```
 
-## And a documentation standard.
+## It's also a documentation standard.
 
-`chad` presents a documentation system for Forth systems.
+`chad` provides a documentation system for Forth systems.
 It doesn't need the ANS Forth standard, it generates a standard from source.
 
 Your project folder has a `html` folder that contains documentation.

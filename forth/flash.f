@@ -4,7 +4,7 @@
 \ Compiled strings (for `type` etc.) are assumed to have 0 for the upper cell
 \ of the address. Those strings must be below flash address 2^cellsize.
 
-\ Single-byte reads from flash close the SPI flash after reading.
+\ Byte and cell reads from flash close the SPI flash after reading.
 \ There is no assumption of continuity: Font bitmaps may be read between bytes.
 \ So, c@f is slow. If you need speed, read flash in chunks.
 
@@ -37,6 +37,8 @@ there hex
    2drop
 ;
 
+\ Read from SPI flash
+
 : @f(  ( df-addr -- )           \ start 0B read command
    0B  4 fcmd24  0 ispcmd
 ;
@@ -63,12 +65,13 @@ there hex
       for  fcount emit  next
    then  2drop
 ;
-: /text  ( f-addr -- f-addr )   \ synchronize keystream
+: /text  ( f-addr -- df-addr )  \ synchronize keystream
    tkey 2dup or 0= if 2drop exit then
    gkey gkey dup gkey )gkey
+   0
 ;
 : f$type  ( f-addr -- )         \ emit the "flash string"
-   /text  0  fcount  ftype
+   /text  fcount  ftype
 ;
 : fdump  ( f-addr len -- )      \ only useful if tkey is 0
    over 5 h.x  0 swap
@@ -95,14 +98,14 @@ there hex
 
 : .wid   \ wid --                       \ display WID identifier (for order)
    wid    dup                           \ get the pointer
-   begin  nip dup /text 0 @f            \ skip to beginning
+   begin  nip dup /text @f              \ skip to beginning
    dup 0= until  drop
    )gkey (.wid) space                   \ use plaintext
 ;
 
 \ | Length  | Name  | Usage                |
 \ | ------- |:-----:| --------------------:|
-\ | M bytes | link  | Link to next header  |
+\ | M bytes | link  | Link to next header  | <-- keystream
 \ | 1 byte  | N     | Length of `name`     |
 \ | N bytes | name  | Name string          |
 \ | M bytes | xte   | *xt* for Execution   | <-- ht
@@ -130,7 +133,7 @@ there hex
    over 0= if dup xor exit then         \ addr 0 0   zero length string
    begin
       dup>r  /text
-      0 @f(  _@f >r  _c@f              \ addr len1 len2 | head link
+      @f(  _@f >r  _c@f                 \ addr len1 len2 | head link
       over = if
          2dup match if                  \ found
             rdrop dup r> +
@@ -141,6 +144,7 @@ there hex
    dup 0= until                         \ not found
 ;
 
+\ A primitive for `find` that returns a ht.
 : hfind  \ addr len -- addr len | 0 ht  \ search the search order
    #order @  begin  dup  while  1-      \ addr len idx
       dup>r  cells orders + @ _hfind    \ addr len 0/ht

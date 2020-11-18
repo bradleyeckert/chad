@@ -1,12 +1,4 @@
-\ SPI flash access
-
-\ Flash addresses are doubles to support 16-bit and 18-bit cell size.
-\ Compiled strings (for `type` etc.) are assumed to have 0 for the upper cell
-\ of the address. Those strings must be below flash address 2^cellsize.
-
-\ Single-byte reads from flash close the SPI flash after reading.
-\ There is no assumption of continuity: Font bitmaps may be read between bytes.
-\ So, c@f is slow. If you need speed, read flash in chunks.
+\ Search order
 
 there
 
@@ -52,6 +44,20 @@ there
 : order  \ --                           \ 16.6.2.1985
    ."  Context: "    orders  #order @  literal times  drop
    cr ."  Current: " current @ .wid  cr
+;
+
+\ `words` overrides the host version, which is in `root` so you can still use
+\ it if you don't have `forth` (forth-wordlist) in the search order.
+
+: _words  ( wordlist -- )
+   begin dup while
+      dup /text @f  swap                ( link ht )
+      [ cellbits 8 / ] literal +
+      0 fcount ftype space
+   repeat drop
+;
+: words  ( -- )
+   context _words
 ;
 
 there swap - . .( instructions used by order) cr
