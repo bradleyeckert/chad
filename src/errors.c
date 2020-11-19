@@ -90,11 +90,11 @@ void ErrorMessage (int error, char *s) {
        case  -75: msg = "Too many WORDLISTs used";                      break;
        case  -76: msg = "Internal API calls are blocked";               break;
        case  -77: msg = "Invalid CREATE DOES> usage";                   break;
+       case  -78: msg = "Nesting overflow during include";              break;
+       case  -79: msg = "Compiling an execute-only word";               break;
        case  -80: msg = "Dictionary full";                              break;
        case  -81: msg = "Writing to invalid flash sector";              break;
        case  -82: msg = "Flash string space overflow";                  break;
-       case  -98: msg = "Compiling an execute-only word";               break;
-       case  -99: msg = "Nesting overflow during include";              break;
        case -100: msg = "ALLOCATE failed";                              break;
        case -101: msg = "RESIZE failed";                                break;
        case -102: msg = "FREE failed";                                  break;

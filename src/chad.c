@@ -1109,26 +1109,39 @@ SI OpenNewFile(char *name) {            // Push a new file onto the file stack
 
 static char tok[LineBufferSize+1];      // blank-delimited token
 
+// the quick brown" fox" jumped
+// >in before -----^    ^--- after, tok = fox\0
+
 SI parseword(char delimiter) {
-    while (buf[TOIN] == delimiter) {
-        Log(" ");
-        TOIN++;
-    }
-    int length = 0;  char c;
-    while ((c = buf[TOIN++]) != delimiter) {
-        if (!c) {                       // hit EOL
-            TOIN--;  break;       // step back to terminator
+    if (delimiter == ' ')
+        while (buf[TOIN] == ' ') {      // skip leading blanks
+            Log(" ");
+            TOIN++;
         }
+
+    int length = 0;
+    while (1) {
+        char c = buf[TOIN];
+        if (c == 0) break;              // hit EOL
+        if (c == delimiter) {           // stop at delimiter
+            if (delimiter != ' ') TOIN++;
+            break;                      // skip non-blank delimiter
+        }
+        TOIN++;
         tok[length++] = c;
     }
     tok[length] = 0;                    // tok is zero-delimited
     return length;
 }
 
+SV SkipBl(void) {
+    if (buf[TOIN++] != ' ') printf("~");
+}
+
 SV ParseFilename(void) {
     while (buf[TOIN] == ' ') TOIN++;
     if (buf[TOIN] == '"') {
-        TOIN++;  parseword('"');  // allow filename in quotes
+        SkipBl();  parseword('"');        // allow filename in quotes
     }
     else {
         parseword(' ');                 // or a filename with no spaces
@@ -1286,9 +1299,14 @@ SI tick (void) {                        // get the w field of the word
     return xt;
 }
 
+SI isImmediate(void) {                  // ticked word is immediate?
+    return (Header[me].CompFn == Header[me].ExecFn);
+}
+
 SV See (void) {                         // ( <name> -- )
     int addr;
     if ((addr = tick())) {
+        if (isImmediate()) printf("immediate ");
         Dpush(addr);  Dpush(Header[me].length);  Dasm();
     }
 }
@@ -1330,7 +1348,7 @@ SV Resolves(void) {                     // ( xt <name> -- )
 }
 
 SV SkipToPar(void) {
-    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");  TOIN++;
+    SkipBl();  parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");
 }
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
@@ -1351,6 +1369,16 @@ SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
 #ifdef HASFLOATS
 SV SetFPexpbits(void) { FPexpbits = Dpop(); }
 #endif
+
+SV Postpone(void) {
+    cell xte = tick();
+    if (isImmediate())
+        CompCall(xte);
+    else {
+        Literal(xte);
+        CompCall(Ctick("compile,"));
+    }
+}
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
     char* src = &buf[TOIN];
@@ -1592,6 +1620,7 @@ endparagraph:               if (found > 1)
 static uint32_t flashPtr;
 SV AddBootKey(void)     { ChadBootKey = (ChadBootKey << CELLBITS) + Dpop(); }
 SV forg(void)           { flashPtr = Dpop(); }
+SV fhere(void)          { Dpush(flashPtr); }
 SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c ^ GeckoByte()); }
 SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
 SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
@@ -1613,15 +1642,15 @@ SV NewTextKey(void) {
 
 SV fcQuote(void) {
     NewTextKey();
-    Literal(flashPtr);
     if (flashPtr > CELLMASK)
         error = BAD_FSOVERFLOW;
-    parseword('"');
+    SkipBl();  parseword('"');
     flashC8((uint8_t)strlen(tok));  
     flashStr(tok);
 }
 SV dotQuote(void) { 
-    fcQuote();  CompCall(Ctick("f$type"));
+    Literal(flashPtr);  fcQuote();
+    CompCall(Ctick("f$type"));
 }
 SV AddTextKey(void) {
     ChadTextKey = (ChadTextKey << CELLBITS) + Dpop();
@@ -1835,6 +1864,7 @@ SV LoadKeywords(void) {
     AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
     AddKeyword(".(",          "1.1030 ccc> --",       EchoToPar,     noCompile);
     AddKeyword(".\"",         "1.1035 ccc> --",       noExecute,     dotQuote);
+    AddKeyword(",\"",         "1.1036 ccc> --",       fcQuote,       noExecute);
     AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
     AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
     AddKeyword("align",       "1.1060 --",            Align,         noCompile);
@@ -1861,8 +1891,10 @@ SV LoadKeywords(void) {
     AddKeyword("literal",     "1.1260 x --",          noExecute,     doLITERAL);
     AddKeyword("immediate",   "1.1270 --",            Immediate,     noCompile);
     AddKeyword("marker",      "1.1280 <name> --",     Marker,        noCompile);
+    AddKeyword("postpone",    "1.1285 <name> --",     Postpone,      Postpone);
     AddKeyword("there",       "1.1290 -- taddr",      There,         noCompile);
     AddKeyword("forg",        "1.1300 faddr --",      forg,          noCompile);
+    AddKeyword("fhere",       "1.1305 -- faddr",      fhere,         noCompile);
     AddKeyword("later",       "1.1310 <name> --",     Later,         noCompile);
     AddKeyword("resolves",    "1.1320 xt <name> --",  Resolves,      noCompile);
     AddKeyword("macro",       "1.1330 --",            Macro,         noCompile);

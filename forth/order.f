@@ -1,4 +1,4 @@
-\ Search order
+\ Search order and interpreter
 
 there
 
@@ -58,6 +58,31 @@ there
 ;
 : words  ( -- )
    context _words
+;
+
+\ Text input uses shared data so >in can be manipulated here
+
+: \                                     \ 1.1020 ccc<EOL> --
+   #tib @ >in !
+; immediate
+
+: source   #tib 2@ ;                    \ 3.0000 -- c-addr len
+: /source  source >in @ /string ;       \ 3.0010 -- c-addr len
+: [        0 state ! ;  immediate       \ 3.0020 --
+: ]        1 state ! ;                  \ 3.0030 --
+
+\ The QUIT loop avoids CATCH and THROW for stack depth reasons.
+\ If an error occurs, `exception` restarts `quit`.
+
+: quit  ( error_id -- )
+   hld !
+   begin  spstat  $1F00 and  while  rdrop  repeat  \ empty R
+   begin  spstat  $1F and  while  drop  repeat     \ empty S
+   decimal  postpone [
+   hld @ .error
+   begin
+      noop \ put interpret loop here
+   again
 ;
 
 there swap - . .( instructions used by order) cr

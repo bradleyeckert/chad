@@ -482,6 +482,8 @@ will be resolved later by <tok>resolves</tok>. For example:
 control stack hack if you span a lot of code before resolving the
 reference.
 </p>
+<a name="1.1305"></a>
+<h3><ref>1.1305:</ref> <chad>fhere</chad> <com><i>( -- faddr )</i></com></h3>
 <a name="1.1300"></a>
 <h3><ref>1.1300:</ref> <chad>forg</chad> <com><i>( faddr -- )</i></com></h3>
 
@@ -492,6 +494,8 @@ reference.
 
 <p>Push the code pointer onto the stack.
 </p>
+<a name="1.1285"></a>
+<h3><ref>1.1285:</ref> <chad>postpone</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
 <a name="1.1280"></a>
 <h3><ref>1.1280:</ref> <chad>marker</chad> <com><i>( &lt;name&gt; -- )</i></com></h3>
 
@@ -698,6 +702,12 @@ character onto the stack.
 <h3><ref>1.1040:</ref> <chad>constant</chad> <com><i>( x &lt;name&gt; -- )</i></com></h3>
 
 <p>Create a word that pushes <tok>x</tok> onto the stack. Same as <tok>equ</tok>.
+</p>
+<a name="1.1036"></a>
+<h3><ref>1.1036:</ref> <chad>,&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
+
+<p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
+At run time, push its address to the stack.
 </p>
 <a name="1.1035"></a>
 <h3><ref>1.1035:</ref> <chad>.&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
