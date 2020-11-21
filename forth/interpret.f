@@ -32,28 +32,21 @@ there
 : char?    /source drop c@ ;            \ -- c  get source char
 : in++     1 >in +! ;                   \ --
 
-: skipbl                                \ 2.6050 --
-   begin  source?  while                \ skip leading blanks
-      char? bl xor ?exit  in++
-   repeat
-;
 : _parse  ( c -- addr1 addr2 )          \ parse token from input
-   dup>r bl = if skipbl then            \ if ' ', skip leading blanks
-   /source drop dup                     ( addr1 addr1 )
+   begin  dup char? =  source? and
+   while  in++  repeat                  \ skip leading delimiters
+   /source drop swap over               ( addr1 c addr1 )
    begin  source?  while
-      char? r@ <> if   in++  1+         \ not delimiter
-      else r> bl <> if in++ then exit   \ if not ' ', skip delimiter
-      then
-   repeat rdrop                         \ end of input
+      over char? =  in++
+      if  nip exit  then  1+
+   repeat nip                           \ end of input
 ;
 : parse-name  bl [ ;                    \ 2.6060 <name> -- addr len
 : parse-word  _parse over - ;           \ 2.6070 delimiter -- addr len
 
-\ Text input uses shared data so >in can be manipulated here
+\ Text input uses shared data so >in can be manipulated here.
 
-: \                                     \ 2.6080 ccc<EOL> --
-   #tib @ >in !
-; immediate
+: \   #tib @ >in ! ; immediate          \ 2.6080 ccc<EOL> --
 
 \ Cooked terminal input doesn't need echoing. It lets you edit the line before
 \ sending it, at which point it sends the string all at once with an ending LF.
@@ -124,7 +117,7 @@ variable dpl
     then  (number)
 ;
 
-: num  skipbl /source (xnumber)
+: num   /source (xnumber)
    if d. else . then ." dpl=" dpl ?
    postpone \ ;
 

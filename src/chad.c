@@ -554,24 +554,25 @@ SV FlushBlanks(void) {
     leadingblanks = 0;
 }
 
-SV Log(char* s) {
+SV LogChar(char c) {
     FILE* fp = File.hfp;
     if (fp) {
-        char c;
-        while ((c = *s++)) {
-            if (' ' != c)
-                FlushBlanks();
-            switch (c) {
-            case '"':  fprintf(fp, "&quot;");  break;
-            case '\'': fprintf(fp, "&apos;");  break;
-            case '<':  fprintf(fp, "&lt;");    break;
-            case '>':  fprintf(fp, "&gt;");    break;
-            case '&':  fprintf(fp, "&amp;");   break;
-            case ' ':  leadingblanks++;        break;
-            default:   fprintf(fp, "%c", c);
-            }
+        if (' ' != c)  FlushBlanks();
+        switch (c) {
+        case '"':  fprintf(fp, "&quot;");  break;
+        case '\'': fprintf(fp, "&apos;");  break;
+        case '<':  fprintf(fp, "&lt;");    break;
+        case '>':  fprintf(fp, "&gt;");    break;
+        case '&':  fprintf(fp, "&amp;");   break;
+        case ' ':  leadingblanks++;        break;
+        default:   fprintf(fp, "%c", c);
         }
     }
+}
+
+SV Log(char* s) {
+    char c;
+    while ((c = *s++)) LogChar(c);
 }
 
 SV LogBegin(char* title) {
@@ -1106,42 +1107,30 @@ SI OpenNewFile(char *name) {            // Push a new file onto the file stack
 
 static char tok[LineBufferSize+1];      // blank-delimited token
 
-// the quick brown" fox" jumped
-// >in before -----^    ^--- after, tok = fox\0
+// the quick brown fox jumped
+// >in before -----^   ^--- after, tok = fox\0
 
 SI parseword(char delimiter) {
-    if (delimiter == ' ')
-        while (buf[TOIN] == ' ') {      // skip leading blanks
-            Log(" ");
-            TOIN++;
-        }
-
+    while (buf[TOIN] == delimiter) {    // skip leading delimiters
+        LogChar(delimiter);
+        TOIN++;
+    }
     int length = 0;
     while (1) {
         char c = buf[TOIN];
         if (c == 0) break;              // hit EOL
-        if (c == delimiter) {           // stop at delimiter
-            if (delimiter != ' ') TOIN++;
-            break;                      // skip non-blank delimiter
-        }
         TOIN++;
+        if (c == delimiter)  break;
         tok[length++] = c;
     }
     tok[length] = 0;                    // tok is zero-delimited
     return length;
 }
 
-SV SkipBl(void) {
-    if (buf[TOIN] == ' ') {
-        Log(" ");
-        TOIN++;
-    }
-}
-
 SV ParseFilename(void) {
     while (buf[TOIN] == ' ') TOIN++;
     if (buf[TOIN] == '"') {
-        SkipBl();  parseword('"');        // allow filename in quotes
+        parseword('"');                 // allow filename in quotes
     }
     else {
         parseword(' ');                 // or a filename with no spaces
@@ -1359,7 +1348,7 @@ SV Resolves(void) {                     // ( xt <name> -- )
 }
 
 SV SkipToPar(void) {
-    SkipBl();  parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");
+    parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");
 }
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
@@ -1392,7 +1381,6 @@ SV Postpone(void) {
 }
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
-    SkipBl();
     char* src = &buf[TOIN];
     char* p = src;
     char* dest = Header[DefMarkID].help;
@@ -1700,7 +1688,7 @@ SV xfcQuote(int escaped) {
     NewTextKey();
     if (flashPtr > CELLMASK)
         error = BAD_FSOVERFLOW;
-    SkipBl();  parseword('"');
+    parseword('"');
     flashC8((uint8_t)strlen(tok));      // string length 
     flashStr(tok, escaped);             // string
 }

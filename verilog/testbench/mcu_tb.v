@@ -84,22 +84,22 @@ module mcu_tb();
       $display("Finished booting at %0t", $time);
       $display("Time is in units of ns/10 or us/10000");
       repeat (20000) @(posedge clk);
-//      $display("Sending line of text to UART RXD");
-//      UART_TX(8'h35); // 5 .s
-//      UART_TX(8'h20);
-//      UART_TX(8'h2E);
-//      UART_TX(8'h73);
-//      UART_TX(8'h0A);
-//      repeat (400000) @(posedge clk);
-//      // Demonstrate ISP by reading the 3-byte JDID (9F command).
-//      // A more modern method of getting flash characteristics is with the
-//      // SFDP (5A command), which fixes the mess created by the JDID scheme.
+      $display("Sending line of text to UART RXD");
+      UART_TX(8'h35); // 5 .s
+      UART_TX(8'h20);
+      UART_TX(8'h2E);
+      UART_TX(8'h73);
+      UART_TX(8'h0A);
+      repeat (400000) @(posedge clk);
+      // Demonstrate ISP by reading the 3-byte JDID (9F command).
+      // A more modern method of getting flash characteristics is with the
+      // SFDP (5A command), which fixes the mess created by the JDID scheme.
       $display("Activating ISP, trigger ping");
       UART_TX(8'h12);           // activate ISP
       UART_TX(8'hA5);
       UART_TX(8'h5A);
-      UART_TX(8'h42);           // ping (7 bytes)
-      repeat (30000) @(posedge clk);
+      UART_TX(8'h42);           // ping (4 bytes)
+      repeat (20000) @(posedge clk);
       $display("Get SPI flash JDID");
       UART_TX(8'h00);
       UART_TX(8'h00);
