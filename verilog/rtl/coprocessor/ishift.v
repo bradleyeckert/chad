@@ -10,7 +10,7 @@ module ishift
   output reg                busy,     	// 0 = ready, 1 = busy
   input wire                go,        	// trigger a shift
   input wire  [1:0]         fmt,     	// 2-bit shift format
-  input wire  [4:0]         cnt,     	// 5-bit shift count
+  input wire  [5:0]         cnt,     	// 5-bit shift count
   input wire  [WIDTH-1:0]   a,     	// shifter in
   output reg  [WIDTH-1:0]   y     	// shifter out
 );
@@ -21,7 +21,7 @@ module ishift
 // 10 = arithmetic right shift
 
   wire msb = (fmt[1]) ? y[WIDTH-1] : 1'b0;
-  reg [4:0] count;
+  reg [5:0] count;
 
   always @(posedge clk or negedge arstn)
   if (!arstn) begin

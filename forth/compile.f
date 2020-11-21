@@ -28,7 +28,7 @@ variable lastinst \ load with $100 to inhibit exit change
 ;
 
 cellbits 22 > [if]
-: lit,  ( u -- )
+: lit,                                  \ 2.5000 u --
    dup $FFC00000 and if
       dup 11 rshift extended_lit
       dup extended_lit
@@ -41,7 +41,7 @@ cellbits 22 > [if]
    $F000 + ,c
 ;
 [else]
-: lit,  ( u -- )
+: lit,                                  \ 2.5000 u --
    dup $3FF800 and if
       dup extended_lit
    then  $7FF and
@@ -50,7 +50,7 @@ cellbits 22 > [if]
 ;
 [then]
 
-: compile,  ( xt -- )
+: compile,                              \ 2.5010 xt --
    dup $FFE000 and if
       dup 13 rshift  $E000 + ,c         \ litx
    then  $1FFF and   $C000 + ,c         \ call
@@ -59,7 +59,7 @@ cellbits 22 > [if]
    [char] r emit
    0 invert cp +! ,c                    \ recompile the last instruction
 ;
-: exit,  ( -- )
+: exit,                                 \ 2.5020 --
    lastinst @ dup $810C and 0= if       \ last ALU can accept return?
       $10C + relast exit  then          \ change to include a return
    $F000 2dup and  =                    \ last literal?
@@ -71,6 +71,12 @@ cellbits 22 > [if]
    or ,c 0
 ;
 : noCompile  ( -- )
-   -98 exception
+   -98 throw
 ;
+: InstExec  ( inst -- )
+   [ cm-size 2 - ] literal tuck !c      \ compile the instruction to end of
+   $010C over 1+ !c  execute            \ code space and run it
+;
+
+
 there swap - . .( instructions used by compiler) cr

@@ -6,7 +6,7 @@
 
 int LoadFlashMem(char *filename);
 int SaveFlashMem(char* filename, uint32_t pid);
-int SaveFlashMemHex(char* filename);
+int SaveFlashMemHex(char* filename, int baseblock);
 
 // Write byte to flash directly, used to build boot list
 void FlashMemStore(uint32_t addr, uint8_t c);
@@ -36,5 +36,6 @@ int FlashMemSPI8(uint8_t cin);
 #define BAD_NOTBLANK   -60
 #define BAD_PAGEFAULT  -69
 #define BAD_NOTENABLED -71
+#define BAD_FLASHADDR  -83
 
 #endif // __FLASH_H__

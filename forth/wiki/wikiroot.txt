@@ -33,10 +33,8 @@ So, we don't do it.
  chad's built-in words (defined in `chad.c`) use this wordlist.
 =1.0010: _forth ( -- wid )
  The wordlist used by most Forth definitions.
-=1.0020: cm-writable ( -- addr )
- The first writable address in code memory.
- This is usually 0 when the ROM is being built.
- Use the write-protect command to end access to ROM.
+=1.0020: save-dump ( <filename> -- )
+ Dumps internal state to a text file in human-readable format.
 =1.0030: cm-size ( -- n )
  Size of code memory space in bytes
 =1.0040: dm-size ( -- n )
@@ -46,6 +44,8 @@ So, we don't do it.
 =1.0060: cell ( -- n )
  Number of bytes in a cell.
  Used for addressing cells when address units are in bytes.
+=1.0065: |tib| ( -- n )
+ Size in bytes of the text input buffer.
 =1.0070: >in ( -- addr )
  An index to the next byte in the input buffer.
 =1.0071: #tib ( -- addr )
@@ -76,7 +76,7 @@ So, we don't do it.
 =1.0092: verbosity ( flags -- )
  There are four bit flags in the verbosity setting that control what the
  interpreter prints out.
-
+#
 H<ul>
 -`1` enables line printing. Each line of input text is echoed.
 -`2` enables printing of each blank delimited token and its stack effects.
@@ -119,18 +119,21 @@ H</ul>
  bytes 0 to 3 are {bootsector, keyID, productID[15:8], productID[7:0]}.
  Bootsector = 0 if SPI flash doesn't hold the FPGA bitstream.
  keyID = 0 if the saved boot data is in plaintext format.
-=1.0137: make-boot ( -- )
- Create a boot data structure in flash memory.
 =1.0138: boot ( <filename> -- )
  Load a boot file into flash, interpret the boot data to load memory, and run
  the processor at address 0.
-=1.0139: make-heads ( addr -- )
- Create a header list data structure in flash memory at a given base address.
+=1.0139: boot-test ( <filename> -- )
+ Load a boot file into flash, interpret the boot data to load memory.
+ It's like `boot` without `cold`.
+=1.0140: make-heads ( -- )
+ Create a header list data structure in flash memory at `fhere`.
  `forth-wordlist` must be in the search order.
-=1.0140: equ ( x <name> -- )
+=1.0145: make-boot ( -- )
+ Create a boot data structure in flash memory at `fhere`.
+=1.0150: equ ( x <name> -- )
  A synonym of constant that's guaranteed to not use any target resources
  for its definition. It creates a word that pushes x onto the stack.
-=1.0150: assert ( n1 n2 -- )
+=1.0160: assert ( n1 n2 -- )
  Displays an error message if n1 <> n2. n1 is actual, n2 is expected.
 =1.0200: .s ( ? -- ? )
  Copy and display the values currently on the data stack.
@@ -268,9 +271,27 @@ H</ul>
 =1.1035: ." ( ccc> -- )
  Parse ccc delimited by `)` (right parenthesis) and compile it to flash.
  At run time, read the string from flash and print it.
-=1.1036: c" ( ccc> -- faddr )
+=1.1036: ," ( ccc> -- faddr )
  Parse ccc delimited by `)` (right parenthesis) and compile it to flash.
- At run time, push its address to the stack.
+=1.1037: .\" ( ccc> -- )
+ Parse ccc delimited by `)` (right parenthesis) and compile it to flash.
+ At run time, read the string from flash and print it.
+ Escape sequences are supported. They are:
+
+#
+H<ul>
+- '\e'  ESC (not in C99)
+- '\l'  LF
+- '\n'  newline
+- '\r'  CR
+- '\xNN'  hex byte, 2-digit
+- '\0'  NUL
+- '\"'  double-quote
+H</ul>
+
+=1.1038: ,\" ( ccc> -- faddr )
+ Parse ccc delimited by `)` (right parenthesis) and compile it to flash.
+ Escape sequences are supported.
 =1.1040: constant ( x <name> -- )
  Create a word that pushes `x` onto the stack. Same as `equ`.
 =1.1050: aligned ( addr -- a-addr )
@@ -393,6 +414,8 @@ H</ul>
  Push the code pointer onto the stack.
 =1.1300: forg ( faddr -- )
  Set the flash pointer. Text strings will be compiled here.
+=1.1305: fhere ( -- faddr )
+ Get the flash pointer.
 =1.1310: later ( <name> -- )
  Define a forward reference. Compile a jump instruction whose address
  will be resolved later by `resolves`. For example:

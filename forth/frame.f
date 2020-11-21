@@ -65,7 +65,7 @@ variable frp1                           \ temporary frame pointer
         r> frp @ ds>mem  frp !          \ move bottom of data stack to frame
         frp1 @  mem>ds  drop            \ restore top of stack
     else
-        -4 exception                    \ not enough data on the stack
+        -4 throw                        \ not enough data on the stack
     then
 ;
 

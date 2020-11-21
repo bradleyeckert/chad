@@ -167,6 +167,7 @@
 H<ul>
 -bit 0: Hardware multiplier (um*) is included.
 -bit 1: Hardware divider (um/mod) is included.
+-bit 2: Hardware shifter (drshift, dlshift) is included.
 -bit 8: Overflow flag from last divide operation. Next good divide clears it.
 H</ul>
 =2.1000: false ( -- false )
@@ -368,4 +369,158 @@ H</ul>
  Remove `u`. Rotate `u+1` items on the top of the stack.
  An ambiguous condition exists if there are less than u+2 items
  on the stack before `roll` is executed.
+=2.4000: @f( ( df-addr -- )
+ Start reading SPI flash using a `0B` "fast read" command at the double address
+ `df-addr`. The constant `BASEBLOCK` is added to address[23:16] to allow the
+ SPI flash to contain an FPGA bitstream at location 0.
+=2.4010: _c@f ( -- c )
+ Read the next byte from SPI flash.
+=2.4020: _@f ( -- c )
+ Read the next cell from SPI flash using enough byte reads for a complete cell.
+ The byte-order is big-endian.
+=2.4030: )@f ( -- )
+ End the SPI bus sequence (raise CS#)
+=2.4040: c@f ( df-addr -- c )
+ Read a byte from SPI flash at the double address `df-addr`.
+ The data is expected to be synchronized with the keystream, if used.
+=2.4050: @f ( df-addr -- n )
+ Read a cell from SPI flash at the double address `df-addr`.
+ The data is expected to be synchronized with the keystream, if used.
+=2.4060: fcount ( df-addr -- df-addr+1 c )
+ SPI flash version of `count`. Read the byte and bump the double address.
+=2.4070: ftype ( df-addr u -- )
+ SPI flash version of `type`. Type the string at the double address.
+=2.4080: f$type ( f-addr -- )
+ Run-time action of `."`, types the counted string in flash with the upper half
+ of the address zeroed. Text space must be addressable by one cell.
+=2.4100: _hfind ( addr len wid -- addr len 0 | addr len ht )
+ Search a wordlist given its `wid` and a string.
+ If it's not found, return 0.
+ If it is found, leave the SPI flash open and return `ht`.
+=2.4110: hfind ( addr len -- addr len | 0 ht )
+ Search the search order for a string.
+ If it's not found, return the string.
+ If it is found, leave the SPI flash open and return `ht`.
+=2.4120: msg ( idx f-addr -- )
+ Type counted string `idx` of a list of counted strings that's terminated by
+ a zero length string. If `idx` points past the end of the list, use the
+ first string (message[0]).
+=2.5000: lit, ( u -- )
+ Compile a literal `u`.
+=2.5010: compile, ( xt -- )
+ Compile a call to `xt`.
+=2.5020: exit, ( -- )
+ Convert the previous call to a jump,
+ add a RET bit to the previous literal, or compile an exit.
+=2.6000: toupper ( c -- C )
+ Convert `c` to uppercase.
+=2.6010: digit? ( c base -- n flag )
+ Convert ASCII alphanumeric character `c` to numeric digit `n`.
+ If `c` is valid and `n` is within the specified base, return true.
+ Otherwise, return false.
+=2.6020: >number ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 )
+ `ud2` is the unsigned result of converting the characters within the string
+ specified by `c-addr1 u1` into digits, using the number in `base`,
+ and adding each into `ud1` after multiplying `ud1` by the number in `base`.
+ Conversion continues left-to-right until a character that is not convertible,
+ including any `+` or `-`, is encountered or the string is entirely converted.
+ `c-addr2` is the location of the first unconverted character or the first character
+ past the end of the string if the string was entirely converted.
+ `u2` is the number of unconverted characters in the string.
+ An ambiguous condition exists if `ud2` overflows during the conversion.
+=2.6030: source ( -- c-addr len )
+ `c-addr` is the address of, and `len` is the number of characters in, the input buffer.
+=2.6040: /source ( -- c-addr len )
+ `source` indexed by `>in`: Input line remaining after `>in`.
+=2.6050: skipbl  ( -- )
+ Skip blanks (leading spaces) in the input stream.
+=2.6060: parse-name ( <name> -- addr len )
+ Skip leading space delimiters. Parse name delimited by a space.
+ `addr` is the address of the selected string within the input buffer and `len` is
+ its length in bytes. If the parse area is empty or contains only white space,
+ the resulting string has length zero.
+=2.6070: parse-word ( delimiter -- addr len )
+ If `delimiter` is a blank, skip leading spaces.
+ Parse name delimited by `delimiter`.
+ If `delimiter` is non-blank, advance `>in` one position so it's just past the delimiter.
+=2.6080: \ ( ccc<EOL> -- )
+ Skip text input until end-of-line.
+=2.6100: key? ( -- n )
+ Return the numbers of characters in the UART input buffer.
+=2.6110: key ( -- c )
+ Read a character from the UART input buffer.
+ If the buffer is empty, wait for a character.
+=2.6130: echoing ( -- a-addr )
+ A variable used by `accept`. Set to `true` if the terminal is in `raw mode`.
+ The usual case is `cooked mode`, where the terminal allows local line editing and sends
+ the entire line at once when you hit <enter>.
+=2.6140: accept ( c-addr +n1 -- +n2 )
+ Receive a string of at most `+n1` characters.
+ Display graphic characters as they are received.
+ Input terminates when either CR or LF is received.
+ When input terminates, nothing is appended to the string.
+ `+n2` is the length of the string stored at `c-addr`.
+=2.6150: refill ( -- okay? )
+ Attempt to fill the input buffer from the input source, returning a true flag if successful.
+ When the input source is the user input device, attempt to receive input into the
+ terminal input buffer.
+ If successful, make the result the input buffer, set `>in` to zero, and return true.
+ Receipt of a line containing no characters is considered successful.
+ If there is no input available from the current input source, return false.
+ When the input source is a string from `evaluate`, return false and perform no other action.
+=2.6160: context ( -- f-addr )
+ The head of the wordlist at the top of the search order. `f-addr` is in SPI flash.
+=2.6170: get-order ( -- widn ... wid1 n )
+ Returns the number of word lists `n` in the search order and the word list identifiers
+ `widn ... wid1` identifying these word lists.
+ `wid1` identifies the word list that is searched first,
+ and `widn` the word list that is searched last. The search order is unaffected.
+=2.6180: set-order ( widn .. wid1 n -- )
+ Set the search order to the word lists identified by `widn ... wid1`.
+ Subsequently, word list `wid1` will be searched first, and word list `widn` searched last.
+ If `n` is zero, empty the search order.
+ If `n` is `-1`, set the search order to `root forth-wordlist`.
+ A system shall allow `n` to be at least eight.
+=2.6200: set-current ( wid -- )
+ Set the compilation word list to the word list identified by `wid`.
+=2.6210: get-current ( -- wid )
+ Return `wid`, the identifier of the compilation word list.
+=2.6220: only        ( -- )
+ Set the search order to the minimum search order.
+ The minimum search order shall include the words `forth-wordlist` and `set-order`.
+=2.6230: also        ( -- )
+ Transform the search order consisting of `widn, ... wid2, wid1`
+ (where wid1 is searched first) into `widn, ... wid2, wid1, wid1`.
+ An error occurs if there are more than eight word lists in the search order.
+=2.6240: previous    ( -- )
+ Transform the search order consisting of `widn, ... wid2, wid1`
+ (where wid1 is searched first) into `widn, ... wid2`.
+ An ambiguous condition exists if the search order was empty before `previous` was executed.
+=2.6250: definitions ( -- )
+ Make the compilation word list the same as the first word list in the search order.
+ Specifies that the names of subsequent definitions will be placed in the compilation word list.
+ Subsequent changes in the search order will not affect the compilation word list.
+=2.6260: forth       ( -- )
+ Transform the search order consisting of 'widn, . . . wid2, wid1'
+ (where wid1 is searched first) into 'widn, . . . wid2, `forth-wordlist`.
+=2.6270: order       ( -- )
+ Display the word lists in the search order in their search order sequence,
+ from last searched to first searched, just like `.s`.
+ Also display the word list into which new definitions will be placed.
+ `order` may be implemented using pictured numeric output words.
+ Consequently, its use may corrupt the transient region identified by `#>`.
+=2.6280: words ( -- )
+ List the definition names in the first word list of the search order.
+=2.6290: .s ( ? -- ? )
+ Copy and display the values currently on the data stack.
+=2.6300: [ ( -- )
+ Enter interpretation state. `[` is an immediate word.
+=2.6310: ] ( -- )
+ Enter compilation state.
+=2.6320: quit ( error_id -- )
+ `quit` is a replacement for ANS Forth's `THROW`.
+ Due to hardware stack limitations, `CATCH` is not implemented.
+ Any call or jump to `quit` restarts the interpreter with stacks cleared.
+ If `error_id` is non-zero, an error message is printed and the data and return
+ stacks are printed ans cleared.
 =

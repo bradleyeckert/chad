@@ -1,9 +1,6 @@
+\ Extra words that I don't really use
 
-: d2*   swap 2* swap 2*c ;
-: d2/   2/ swap 2/c swap ;
 : -rot  swap >r swap r> ;
-: 2swap rot >r rot r> ;
-: 2over >r >r 2dup r> r> 2swap ;
 
 : sm/rem  \ d n -- rem quot             \ 6.1.2214
    2dup xor >r  over >r  abs >r dabs r> um/mod
@@ -19,7 +16,6 @@
 : (umin)  over over- drop carry ;
 : umin   (umin) if swap drop exit then  drop ;
 : umax   (umin) if drop exit then  swap drop ;
-: /string >r swap r@ + swap r> - ;      \ 17.6.1.0245  a u -- a+1 u-1
 
 : roll                                  \ 2.2980 xu..x0 u -- xu-1..x0 xu
     ?dup if
@@ -30,9 +26,25 @@
     then
 ;
 
-
-
-depth 0 assert
-2 3 d2* 6 assert 4 assert
--1 5 d2* 11 assert -2 assert
--5 -7 d2/ -4 assert -3 assert
+hex
+\ Attempt to convert utf-8 code point
+: nextutf8  \ n a -- n' a'              \ add to utf-8 xchar
+   >r 6 lshift r> count                 \ expect 80..BF
+   dup 0C0 and 80 <> -0D and throw  \ n' a c
+   3F and  swap >r  +  r>
+;
+: isutf8  \ addr len -- xchar
+   over c@ 0F0 <  over 1 = and  if      \ plain ASCII
+      drop c@ exit
+   then
+   over c@ 0E0 <  over 2 = and  if      \ 2-byte utf-8
+      drop count 1F and  swap  nextutf8
+      drop exit
+   then
+   over c@ 0F0 <  over 3 = and  if      \ 3-byte utf-8
+      drop count 1F and  swap  nextutf8  nextutf8
+      drop exit
+   then
+   -0D throw
+;
+decimal

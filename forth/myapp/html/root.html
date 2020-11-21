@@ -484,6 +484,9 @@ reference.
 </p>
 <a name="1.1305"></a>
 <h3><ref>1.1305:</ref> <chad>fhere</chad> <com><i>( -- faddr )</i></com></h3>
+
+<p>Get the flash pointer.
+</p>
 <a name="1.1300"></a>
 <h3><ref>1.1300:</ref> <chad>forg</chad> <com><i>( faddr -- )</i></com></h3>
 
@@ -703,11 +706,25 @@ character onto the stack.
 
 <p>Create a word that pushes <tok>x</tok> onto the stack. Same as <tok>equ</tok>.
 </p>
+<a name="1.1038"></a>
+<h3><ref>1.1038:</ref> <chad>,\&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
+
+<p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
+Escape sequences are supported.
+</p>
+<a name="1.1037"></a>
+<h3><ref>1.1037:</ref> <chad>.\&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
+
+<p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
+At run time, read the string from flash and print it.
+Escape sequences are supported. They are:
+</p>
+<ul>
+<li> &apos;\e&apos;  ESC (not in C99)</li><li> &apos;\l&apos;  LF</li><li> &apos;\n&apos;  newline</li><li> &apos;\r&apos;  CR</li><li> &apos;\xNN&apos;  hex byte, 2-digit</li><li> &apos;\0&apos;  NUL</li><li> &apos;\&quot;&apos;  double-quote</li></ul>
 <a name="1.1036"></a>
 <h3><ref>1.1036:</ref> <chad>,&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
 
 <p>Parse ccc delimited by <tok>)</tok> (right parenthesis) and compile it to flash.
-At run time, push its address to the stack.
 </p>
 <a name="1.1035"></a>
 <h3><ref>1.1035:</ref> <chad>.&quot;</chad> <com><i>( ccc&gt; -- )</i></com></h3>
@@ -927,22 +944,33 @@ to trigger a lot more data than you want.
 The interpreter does this for you if the stack is not empty:
 The stack is printed between <tok>\</tok> and <tok>ok&gt;</tok>.
 </p>
-<a name="1.0150"></a>
-<h3><ref>1.0150:</ref> <chad>assert</chad> <com><i>( n1 n2 -- )</i></com></h3>
+<a name="1.0160"></a>
+<h3><ref>1.0160:</ref> <chad>assert</chad> <com><i>( n1 n2 -- )</i></com></h3>
 
 <p>Displays an error message if n1 &lt;&gt; n2. n1 is actual, n2 is expected.
 </p>
-<a name="1.0140"></a>
-<h3><ref>1.0140:</ref> <chad>equ</chad> <com><i>( x &lt;name&gt; -- )</i></com></h3>
+<a name="1.0150"></a>
+<h3><ref>1.0150:</ref> <chad>equ</chad> <com><i>( x &lt;name&gt; -- )</i></com></h3>
 
 <p>A synonym of constant that&apos;s guaranteed to not use any target resources
 for its definition. It creates a word that pushes x onto the stack.
 </p>
-<a name="1.0139"></a>
-<h3><ref>1.0139:</ref> <chad>make-heads</chad> <com><i>( addr -- )</i></com></h3>
+<a name="1.0145"></a>
+<h3><ref>1.0145:</ref> <chad>make-boot</chad> <com><i>( -- )</i></com></h3>
 
-<p>Create a header list data structure in flash memory at a given base address.
+<p>Create a boot data structure in flash memory at <tok>fhere</tok>.
+</p>
+<a name="1.0140"></a>
+<h3><ref>1.0140:</ref> <chad>make-heads</chad> <com><i>( -- )</i></com></h3>
+
+<p>Create a header list data structure in flash memory at <tok>fhere</tok>.
 <tok>forth-wordlist</tok> must be in the search order.
+</p>
+<a name="1.0139"></a>
+<h3><ref>1.0139:</ref> <chad>boot-test</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
+
+<p>Load a boot file into flash, interpret the boot data to load memory.
+It&apos;s like <tok>boot</tok> without <tok>cold</tok>.
 </p>
 <a name="1.0138"></a>
 <h3><ref>1.0138:</ref> <chad>boot</chad> <com><i>( &lt;filename&gt; -- )</i></com></h3>
@@ -950,13 +978,8 @@ for its definition. It creates a word that pushes x onto the stack.
 <p>Load a boot file into flash, interpret the boot data to load memory, and run
 the processor at address 0.
 </p>
-<a name="1.0137"></a>
-<h3><ref>1.0137:</ref> <chad>make-boot</chad> <com><i>( -- )</i></com></h3>
-
-<p>Create a boot data structure in flash memory.
-</p>
 <a name="1.0136"></a>
-<h3><ref>1.0136:</ref> <chad>save-flash</chad> <com><i>( pid &lt;filename&gt; -- )</i></com></h3>
+<h3><ref>1.0136:</ref> <chad>save-flash</chad> <com><i>( pid bit &lt;filename&gt; -- )</i></com></h3>
 
 <p>Saves a boot format file. It&apos;s a 16-byte boilerplate followed by flash data.
 pid = product id: 
@@ -1064,6 +1087,11 @@ If the file can&apos;t be opened, display the line number.
 
 <p>An index to the next byte in the input buffer.
 </p>
+<a name="1.0065"></a>
+<h3><ref>1.0065:</ref> <chad>|tib|</chad> <com><i>( -- n )</i></com></h3>
+
+<p>Size in bytes of the text input buffer.
+</p>
 <a name="1.0060"></a>
 <h3><ref>1.0060:</ref> <chad>cell</chad> <com><i>( -- n )</i></com></h3>
 
@@ -1086,11 +1114,9 @@ Used for addressing cells when address units are in bytes.
 <p>Size of code memory space in bytes
 </p>
 <a name="1.0020"></a>
-<h3><ref>1.0020:</ref> <chad>cm-writable</chad> <com><i>( -- addr )</i></com></h3>
+<h3><ref>1.0020:</ref> <chad>save-dump</chad> <com><i>( &lt;filename&gt; --  )</i></com></h3>
 
-<p>The first writable address in code memory.
-This is usually 0 when the ROM is being built.
-Use the write-protect command to end access to ROM.
+<p>Dumps internal state to a text file in human-readable format.
 </p>
 <a name="1.0010"></a>
 <h3><ref>1.0010:</ref> <chad>forth-wordlist</chad> <com><i>( -- wid )</i></com></h3>

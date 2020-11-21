@@ -49,6 +49,12 @@ there
 
 : 2swap  rot >r rot r> ;                \ 2.1190 abcd -- cdab
 : 2nip   >carry nip nip w ;
+: 2over  >r >r 2dup r> r> 2swap ;
+
+\ fixed left shifts
+
+: 16*   2* 2* 2* 2* ;
+: 256*  16* 16* ;
 
 there swap - . .( instructions used by core ext) cr
 

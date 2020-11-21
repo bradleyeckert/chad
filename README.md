@@ -158,4 +158,4 @@ performs the following:
 - `spif` clears the code and data RAMs
 - `spif` loads RAMs from SPI flash (S25FL064L) using FMF model
 - `chad` starts running the "myapp" demo after bootup
-- The demo sends a series of numbers out the UART
+- The demo runs a Forth interpreter (ok> prompt) via the UART.

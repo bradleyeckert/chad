@@ -95,6 +95,7 @@ void ErrorMessage (int error, char *s) {
        case  -80: msg = "Dictionary full";                              break;
        case  -81: msg = "Writing to invalid flash sector";              break;
        case  -82: msg = "Flash string space overflow";                  break;
+       case  -83: msg = "Invalid SPI flash address";                    break;
        case -100: msg = "ALLOCATE failed";                              break;
        case -101: msg = "RESIZE failed";                                break;
        case -102: msg = "FREE failed";                                  break;

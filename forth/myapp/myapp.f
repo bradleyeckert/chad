@@ -9,10 +9,11 @@
 \ Put text high enough in flash memory that it won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
 
-$4000 forg                      \ strings in flash start here
+$4000 forg                              \ strings in flash start here
 
-1 +bkey                         \ encrypt boot record if not zero
-2 +tkey                         \ encrypt text if not zero
+1 +bkey                                 \ encrypt boot record if not zero
+2 +tkey                                 \ encrypt text if not zero
+0 equ BASEBLOCK                         \ space reserved for FPGA bitstream
 
 include ../core.f
 include ../coreext.f
@@ -21,15 +22,9 @@ include ../frame.f
 include ../numout.f
 include ../flash.f
 include ../compile.f
-include ../ctea.f
-include ../bignum.f
-include ../order.f
-
-\ iomap.c sends errors to the Chad interpreter
-\ A QUIT loop running on the CPU would do something different.
-
-:noname  ( error -- )  ?dup if  [ $4000 cells ] literal io!  then
-; resolves exception
+include ../interpret.f
+\ include ../ctea.f
+\ include ../bignum.f
 
 variable hicycles
 
@@ -49,16 +44,12 @@ variable hicycles
 \ Hardware loads code and data RAMs from flash. Upon coming out of reset,
 \ both are initialized. The PC can launch from 0 (cold).
 
-\ A very simple app would output some numbers and then hang.
-
 : myapp  ( -- )
-\    42 512 io!  512 io@ emit  \ Wishbone bus test
-    cr ." Hello World!" cr
-    10 for r@ . next
-    begin noop again
+    ." May the Forth be with you."
+    0 quit
 ;
 
-' myapp resolves cold
+' myapp resolves coldboot
 
 \ You can now run the app with "cold"
 
@@ -72,15 +63,15 @@ variable hicycles
     swap 2 - recurse  + ;
 
 \ Try 25 fib, then stats
-
-make-boot                       \ create a boot record in flash
-make-heads                      \ append headers to flash
-0 save-flash myapp.bin          \ save to a 'chad' file you can boot from
-save-flash-h myapp.txt          \ also save in hex for flash memory model
-
-\ You can now run the app with "boot myapp.bin".
-
 .( Total instructions: ) there . cr
+
+\ Save to a flash memory image
+$1C00 forg  make-heads                  \ append headers to flash
+$0000 forg  make-boot                   \ create a boot record in flash
+0. BASEBLOCK save-flash myapp.bin       \ save to a 'chad' file you can boot
+BASEBLOCK save-flash-h myapp.txt        \ save in hex for flash memory model
+
+\ You can now run the app with "boot myapp.bin" or a Verilog simulator.
 
 \ Now let's generate a language standard
 only forth

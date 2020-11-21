@@ -12,9 +12,9 @@ module coproc
   input wire  [10:0] sel,
   input wire  go,
   output reg  [WIDTH-1:0] y,
-  input wire  [WIDTH-1:0] a,
-  input wire  [WIDTH-1:0] b,
-  input wire  [WIDTH-1:0] c
+  input wire  [WIDTH-1:0] a,    // tos
+  input wire  [WIDTH-1:0] b,    // nos
+  input wire  [WIDTH-1:0] c     // w
 );
 
   wire mbusy, dbusy, overflow, sbusy;
@@ -56,7 +56,7 @@ module coproc
     .busy     (sbusy),
     .go	      (strig),
     .fmt      (sel[7:6]),
-    .cnt      (c[4:0]),
+    .cnt      (c[5:0]),
     .a        ({a,b}),
     .y        (shifter)
   );

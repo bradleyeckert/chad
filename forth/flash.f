@@ -16,51 +16,50 @@ there hex
 : ispwait  ( -- )               \ wait for ISP command to finish
    begin  [ 4 cells ] literal io@  while  noop  repeat
 ;
-: ispcmd  ( c -- )              \ write ISP command
-   _isp ispwait
+: ispcmd  ( c -- )              \ c --
+   _isp ispwait                 \ write ISP command
 ;
 
 \ The gecko key is loaded by writing to a register and then triggering a load.
 
-: gkey  ( n -- )                \ shift in a new key
-   [ 5 cells ] literal io!
+: gkey                          \ n --
+   [ 5 cells ] literal io!      \ shift in a new key
 ;
-: )gkey  ( n -- )               \ re-key the gecko keystream
-   48 ispcmd
-;
-: fabyte  ( df-addr shift -- df-addr )
-   >r  2dup  r> drshift drop ispcmd
+: )gkey  ( -- )                 \ --
+   48 ispcmd                    \ re-key the gecko keystream
 ;
 : fcmd24  ( df-addr cmd len --) \ set start address and set command
-   0 _isp  _isp  82 _isp        \ len is 3 + extra chars
-   ispcmd  10 fabyte  8 fabyte  0 fabyte
-   2drop
+   0 _isp _isp  82 _isp  ispcmd \ len is 3 + extra chars ( df-addr )
+   2dup 10 drshift drop
+   BASEBLOCK +   ispcmd         \ addr[23:16]
+   over swapb ispcmd            \ addr[15:8]
+   drop ispcmd                  \ addr[7:0]
 ;
 
 \ Read from SPI flash
 
-: @f(  ( df-addr -- )           \ start 0B read command
-   0B  4 fcmd24  0 ispcmd
+: @f(                           \ 2.4000 df-addr --
+   0B  4 fcmd24  0 ispcmd       \ start 0B read command
 ;
-: _c@f  ( -- c )                \ read byte from flash
+: _c@f                          \ 2.4010 -- c
    60 ispcmd                    \ trigger SPI transfer
    [ 3 cells ] literal io@      \ read SPI result
 ;
-: _@f  ( -- n )                 \ read cell from flash
-   0 [ cellbits 8 / ] literal for
-      8 lshift _c@f +
+: _@f                           \ 2.4020 -- n
+   0 [ cellbits 7 + 8 / ] literal for
+      256* _c@f +               \ read cell from flash
    next
 ;
-: )@f  ( -- )                   \ end read
-   80 _isp
+: )@f  ( -- )                   \ 2.4030 --
+   80 _isp                      \ end read (raise CS#)
 ;
-: c@f  ( df-addr -- c )  @f( _c@f )@f ;
-: @f   ( df-addr -- c )  @f( _@f  )@f ;
+: c@f    @f( _c@f )@f ;         \ 2.4040 df-addr -- c
+: @f     @f( _@f  )@f ;         \ 2.4050 df-addr -- n
 
-: fcount  ( df-addr -- df-addr+1 c )
+: fcount                        \ 2.4060 df-addr -- df-addr+1 c
    2dup 1 0 d+  2swap c@f
 ;
-: ftype  ( df-addr u -- )       \ emit string in flash
+: ftype                         \ 2.4070 df-addr u --
    ?dup if
       for  fcount emit  next
    then  2drop
@@ -70,8 +69,8 @@ there hex
    gkey gkey dup gkey )gkey
    0
 ;
-: f$type  ( f-addr -- )         \ emit the "flash string"
-   /text  fcount  ftype
+: f$type                        \ 2.4080 f-addr --
+   /text  fcount  ftype         \ emit the "flash string"
 ;
 : fdump  ( f-addr len -- )      \ only useful if tkey is 0
    over 5 h.x  0 swap
@@ -124,28 +123,28 @@ there hex
       count ( tolower ) _c@f xor if
          rdrop dup xor exit             \ mismatch in string
       then
-   next  drop 1
+   next  drop 1                         \ all bytes have been read
 ;
 
 \ Search one wordlist, returning the address of header data.
-: _hfind  \ addr len wid -- addr len 0 | addr len ht
-   wid  over 31 u> -19 and exception    \ name too long
+: _hfind  \ 2.4100 addr len wid -- addr len 0 | addr len ht
+   wid  over 31 u> -19 and throw        \ name too long
    over 0= if dup xor exit then         \ addr 0 0   zero length string
    begin
       dup>r  /text
       @f(  _@f >r  _c@f                 \ addr len1 len2 | head link
       over = if
          2dup match if                  \ found
-            rdrop dup r> +
-            [ cellbits 8 / 1 + ] literal +
-            )@f exit
+            rdrop dup r> +              \ 'link + NameLength + 1 + cellbytes
+            [ cellbits 7 + 8 /  1 + ] literal +
+            exit                        \ don't end the read yet
          then
-      then )@f r>  rdrop               \ end flash read
+      then )@f r>  rdrop                \ end flash read
    dup 0= until                         \ not found
 ;
 
 \ A primitive for `find` that returns a ht.
-: hfind  \ addr len -- addr len | 0 ht  \ search the search order
+: hfind  \ 2.4110 addr len -- addr len | 0 ht  \ search the search order
    #order @  begin  dup  while  1-      \ addr len idx
       dup>r  cells orders + @ _hfind    \ addr len 0/ht
       ?dup if
@@ -166,7 +165,7 @@ there hex
       then  +
    repeat  nip
 ;
-: msg  ( idx f-addr )
+: msg  \ 2.4120 idx f-addr --
    dup>r msg_seek
    ?dup if rdrop else r> then  f$type
 ;
@@ -183,7 +182,7 @@ fhere equ errorMsgs \ starting at -2 and going negative
    ( -10 ) ," Division by zero"
    ( -11 ) ," Result out of range"
    ( -12 ) ," Argument type mismatch"
-   ( -13 ) ," ?"
+   ( -13 ) ," Word not found"
    ( -14 ) ," Interpreting a compile-only word"
    ( -15 ) ," Invalid FORGET"
    ( -16 ) ," Attempt to use zero-length string as a name"
@@ -254,13 +253,5 @@ fhere equ errorMsgs \ starting at -2 and going negative
    ( -81 ) ," Writing to invalid flash sector"
    ( -82 ) ," Flash string space overflow"
    ," " \ empty string = end of list
-
-: .error  ( error -- )
-   dup if
-      dup -82 -2 within if
-         invert 1- errorMsgs msg space exit
-      then  ." Error " . exit
-   then  drop
-;
 
 decimal there swap - . .( instructions used by flash) cr

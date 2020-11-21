@@ -5,7 +5,7 @@
 #define __IOMAP_H__
 
 uint32_t readIOmap (uint32_t addr);
-void writeIOmap (uint32_t addr, uint32_t x);
+int writeIOmap (uint32_t addr, uint32_t x);
 void killHostIO(void);
 
 // Load memory spaces from the boot stream

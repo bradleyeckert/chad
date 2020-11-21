@@ -57,7 +57,6 @@ module mcu
   wire [3:0]          ivec;             // Interrupt vector for irq       i
   wire                iack;             // Interrupt acknowledge          o
 
-
 // chad processor
   chad #(WIDTH) CPU (
     .clk      (clk      ),
@@ -119,9 +118,9 @@ module mcu
   assign io_dout = s_io_dout;           // spif is the only I/O device
 
 // spif is the SPI flash controller for the chad processor
-// 2048 words of code, 2048 words of data
-//  spif #(11, WIDTH, 11, 0, 0, 0) bridge (
-  spif #(11, WIDTH, 11, 0, 1, 0, 9, 0, 1) bridge (
+// 4096 words of code, 2048 words of data (see config.h)
+//  spif #(12, WIDTH, 11, 0, 0, 0) bridge (
+  spif #(12, WIDTH, 11, 0, 1, 0, 9, 0, 1) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),

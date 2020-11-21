@@ -1,8 +1,8 @@
-// MCU testbench                                     11/12/2020 BNE
+// MCU testbench                                     11/20/2020 BNE
 // License: This code is a gift to the divine.
 
 // The MCU connects to a SPI flash model from FMF.
-// Run this for 700 usec.
+// Run this for 8 msec to exercise the interpreter and wait for ISP.
 
 `timescale 100ps/10ps
 
@@ -78,11 +78,19 @@ module mcu_tb();
   // Main Testing:
   initial
     begin
-      #123
-      rst_n <= 1'b1;
+      #1 rst_n <= 1'b1;
+      $display("Began booting at %t", $time);
       @(posedge cs_n);
-      $display("Finished booting");
-      repeat (15000) @(posedge clk);
+      $display("Finished booting at %t", $time);
+      $display("Time is in units of ns/10 or us/10000");
+      repeat (20000) @(posedge clk);
+      $display("Sending line of text to UART RXD");
+      UART_TX(8'h35); // 5 .s
+      UART_TX(8'h20);
+      UART_TX(8'h2E);
+      UART_TX(8'h73);
+      UART_TX(8'h0A);
+      repeat (400000) @(posedge clk);
       // Demonstrate ISP by reading the 3-byte JDID (9F command).
       // A more modern method of getting flash characteristics is with the
       // SFDP (5A command), which fixes the mess created by the JDID scheme.
@@ -91,7 +99,7 @@ module mcu_tb();
       UART_TX(8'hA5);
       UART_TX(8'h5A);
       UART_TX(8'h42);           // ping (4 bytes)
-      repeat (2000) @(posedge clk);
+      repeat (20000) @(posedge clk);
       $display("Get SPI flash JDID");
       UART_TX(8'h00);
       UART_TX(8'h00);
@@ -112,9 +120,6 @@ module mcu_tb();
       UART_TX(8'h12);           // deactivate ISP
       UART_TX(8'h00);
       repeat (2000) @(posedge clk);
-      $display("Sending test char to UART RXD");
-      UART_TX(8'h41);           // send char to the CPU to test urxirq
-      repeat (2000) @(posedge clk);
       $stop();
     end
 
@@ -128,7 +133,7 @@ module mcu_tb();
       uart_rxdata = {txd, uart_rxdata[7:1]};
     end
     #(CLKPERIOD * UBAUD)
-    $display("UART: %02Xh", uart_rxdata);
+    $display("UART: %02Xh = %c at %t", uart_rxdata, uart_rxdata, $time);
   end
 
   // Dump signals for EPWave, a free waveform viewer on Github.

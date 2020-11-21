@@ -256,8 +256,9 @@ uint32_t readIOmap (uint32_t addr) {
 
 // The `iow` field in an ALU instruction strobes io_wr.
 // In the J1, output devices sit on (mem_addr,dout)
+// Result is error code
 
-void writeIOmap (uint32_t addr, uint32_t x) {
+int writeIOmap (uint32_t addr, uint32_t x) {
     static uint32_t codeAddr = 0;
     if ((addr & 0xFFFFC000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
@@ -276,11 +277,13 @@ void writeIOmap (uint32_t addr, uint32_t x) {
     case 5: gkey = (gkey << CELLBITS) + x;
     case 6: TFTLCDwrite(x);  break;
     case 7: WishboneUpperTx = x;  break;
+    case 8: break; // reserved
     case 15: nohostAPI = x;  break;
     case 0x4000:                        // trigger an error
         chadError(x);  break;
-    default: chadError(BAD_IOADDR);
+    default: return BAD_IOADDR;
     }
+    return 0;
 }
 
 /*

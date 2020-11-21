@@ -182,9 +182,9 @@ A header contains:
 | M bytes | link  | Link to next header  |
 | 1 byte  | N     | Length of `name`     |
 | N bytes | name  | Name string          |
+| M bytes | w     | Optional data        |
 | M bytes | xte   | *xt* for Execution   |
 | M bytes | xtc   | *xt* for Compilation |
-| M bytes | w     | Optional data        |
 | 1 byte  | app   | Applet data          |
 | 1 byte  | flags | Packed flags (0=on)  |
 | 1 byte  | len   | Length of definition |

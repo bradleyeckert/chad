@@ -43,7 +43,7 @@ CELL Rstack[StackSize];                 // return stack
 CELL Raddr;                             // data memory read address
 SI error;                               // simulator and interpreter error code
 
-// Shared variables
+// Shared variables: The first three must be grouped together in this order.
 #define toin    0                       // pointer to next character
 #define tibs    (toin + 1)              // chars in input buffer
 #define atib    (tibs + 1)              // address of input buffer
@@ -138,7 +138,6 @@ SV TraceLine(cell pc, uint16_t insn) {
 
 static uint16_t Code[CodeSize];         // code memory
 static uint8_t spMax, rpMax;            // stack depth tracking
-static uint32_t writeprotect = 0;       // highest writable code address
 static uint64_t cycles = 0;             // cycle counter
 static uint32_t latency = 0;            // maximum cycles between return
 
@@ -148,9 +147,6 @@ static uint32_t latency = 0;            // maximum cycles between return
 void chadToCode (uint32_t addr, uint32_t x) {
     if (addr >= CodeSize) {
         error = BAD_CODE_WRITE;  return;
-    }
-    if (addr < writeprotect) {
-        error = BAD_ROMWRITE;  return;
     }
     Code[addr & (CodeSize-1)] = (uint16_t)x;
 }
@@ -191,6 +187,7 @@ SV Rpush(cell v)                        // push to the return stack
 
 // The simulator used https://github.com/samawati/j1eforth as a template.
 // single = 0: Run until the return stack empties, returns 2 if ok else error.
+// single = -1: Run until error, returns error code.
 // single = 1: Execute one instruction (single step) from Code[PC].
 // single = 10000h + instruction: Execute instruction. Returns the instruction.
 // MoreInstrumentation slows down the code by 40%.
@@ -206,6 +203,10 @@ SI CPUsim(int single) {
     uint16_t retMark = (uint16_t)cycles;
 #endif
     uint8_t mark = RDEPTH;
+    if (single == -1) {                 // run until error
+        single = 0;
+        mark = 0xFF;
+    }
     if (single & 0x10000) {             // execute one instruction directly
         insn = single & 0xFFFF;
         goto once;
@@ -227,7 +228,7 @@ SI CPUsim(int single) {
             case 4:                                                 /*   jump */
                 _pc = target;  break;
             case 5:                                                 /*  zjump */
-                if (!Dpop()) {_pc = target;}  break;
+                if (!Dpop()) { _pc = target; }  break;
             case 6:                                                 /*   call */
                 RP = RPMASK & (RP + 1);
                 Rstack[RP & RPMASK] = _pc << 1;
@@ -323,7 +324,8 @@ SI CPUsim(int single) {
                 } Data[temp & (DataSize - 1)] = s;           break; /* N->[T] */
             case  4: Raddr = CELL_ADDR(t);                         /* _MEMRD_ */
                 if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
-            case  5: writeIOmap(CELL_ADDR(t), s);          break; /* N->io[T] */
+            case  5: temp = writeIOmap(CELL_ADDR(t), s);          /* N->io[T] */
+                if (temp) { single = temp; }   break;
                // 6 = IORD strobe
             case  7: cy = _c;  w = t;                        break;   /*   co */
             default: break;
@@ -346,11 +348,6 @@ SV Simulate(cell xt) {
     Rpush(0);  pc = xt;
     int result = CPUsim(0);             // run until last RET or error
     if (result < 0) error = result;
-}
-
-SV Cold(void) {                         // cold boot and run until error
-    t = sp = rp = w = lex = cy = 0;
-    Simulate(0);
 }
 
 //##############################################################################
@@ -1135,7 +1132,10 @@ SI parseword(char delimiter) {
 }
 
 SV SkipBl(void) {
-    if (buf[TOIN++] != ' ') printf("~");
+    if (buf[TOIN] == ' ') {
+        Log(" ");
+        TOIN++;
+    }
 }
 
 SV ParseFilename(void) {
@@ -1159,14 +1159,17 @@ SV LoadFlash(void) {
     error = LoadFlashMem(tok);
 }
 
-SV SaveFlash(void) {                    // chad format ( pid -- )
+SV SaveFlash(void) {                    // chad format ( d_pid baseblock -- )
     ParseFilename();
-    error = SaveFlashMem(tok, Dpop());
+    int baseblock = Dpop();
+    uint64_t d = (uint64_t)Dpop() << CELLBITS;   d += Dpop();
+    d = (d << 8) + baseblock;           // lowest byte = BASEBLOCK
+    error = SaveFlashMem(tok, d);       // {BASEBLOCK, KeyID, PIDlo, PIDhi}
 }
 
 SV SaveFlashHex(void) {                 // format for SPI flash Verilog model
-    ParseFilename();
-    error = SaveFlashMemHex(tok);
+    ParseFilename();                    // ( -- baseblock )
+    error = SaveFlashMemHex(tok, Dpop());
 }
 
 // Start a new definition at the code boundary specified by CodeAlignment.
@@ -1311,6 +1314,14 @@ SV See (void) {                         // ( <name> -- )
     }
 }
 
+SV Cold(void) {                         // cold boot and run forever
+    pc = t = sp = rp = w = lex = cy = 0;
+    while (1) {
+        Dpush(CPUsim(-1));
+        pc = Ctick("throw");
+    }
+}
+
 SV Locate(void) {
     if (tick()) {
         uint8_t i = Header[me].srcFile;
@@ -1360,7 +1371,7 @@ SV Cr        (void) { printf("\n"); }
 SV Tick      (void) { Dpush(tick()); }
 SV BrackTick (void) { Literal(tick()); }
 SV There     (void) { Dpush(CP); }
-SV WrProtect (void) { writeprotect = CodeFence;  killHostIO(); }
+SV WrProtect (void) { killHostIO(); }
 SV SemiComp  (void) { CompExit();  EndDefinition();  toImmediate();  sane();}
 SV Semicolon (void) { EndDefinition();  sane(); }
 SV Verbosity (void) { verbose = Dpop(); }
@@ -1381,11 +1392,13 @@ SV Postpone(void) {
 }
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
+    SkipBl();
     char* src = &buf[TOIN];
     char* p = src;
     char* dest = Header[DefMarkID].help;
     LogColor(COLOR_COM, 0, src);
-    int digits = 0;  int decimals = 0;
+    int digits = 0;
+    int decimals = 0;
     for (int i = 0; i < 6; i++) {
         char c = *p++;
         if (isdigit(c))
@@ -1532,7 +1545,7 @@ SV GenerateDoc(void) {
                 org = ftell(fpr);       // origin of wiki
                 break;
             }
-            if (command != '#')
+            if (command != '#')         // copy non-comment to new HTML
                 fprintf(fpw, "%s\n", wikiline);
         }
     } else
@@ -1614,6 +1627,9 @@ endparagraph:               if (found > 1)
     if (fpr) fclose(fpr);
 }
 
+//##############################################################################
+// Compile to SPI flash memory image
+
 // The gecko key must be set up before calling GeckoByte.
 // MakeBootList uses all the same key, to be the key's reset value on the target.
 
@@ -1624,7 +1640,47 @@ SV fhere(void)          { Dpush(flashPtr); }
 SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c ^ GeckoByte()); }
 SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
 SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
-SV flashStr(char* s)    { char c;  while ((c = *s++)) flashC8(c); }
+
+SV flashCC(uint32_t w) {                // append big endian cell with bytes
+    if (CELLBITS == 16)                 // 2 bytes
+        flashC16(w);
+    else if (CELLBITS > 24) {           // 4 bytes
+        flashC16(w >> 16);  flashC16(w);
+    }
+    else {                              // 3 bytes
+        flashC16(w >> 8);  flashC8(w);
+    }
+}
+
+SV flashStr(char* s, int escaped) {     // compile string to flash
+    size_t length = strlen(s);
+    char hex[4];
+    int cnt = 0;
+    for (size_t i = 0; i < length; i++) {
+        char c = *s++;
+        if (escaped) {                  // handle escape sequences
+            if (c == '\\') {
+                c = *s++;
+                length--;
+                switch (c) {
+                case 'e': c = 27;  break;  // ESC
+                case 'l': c = 10;  break;  // LF
+                case 'n': c = 10;  break;  // newline
+                case 'r': c = 13;  break;  // CR
+                case 'x': hex[2] = 0;  	   // hex byte
+                    hex[0] = *s++;
+                    hex[1] = *s++;
+                    c = (char)strtol(hex, (char**)NULL, 16); break;
+                case '0': c = 0;   break;  // NUL
+                case '"': c = '"'; break;  // double-quote
+                default: break;
+                }
+            }
+        }
+        flashC8(c);
+        cnt++;
+    }
+}
 
 // Strings in flash use a text encryption key in combination with the 
 // flash address to set the key. f$type needs to load this key.
@@ -1640,18 +1696,21 @@ SV NewTextKey(void) {
         GeckoLoad(0);
 }
 
-SV fcQuote(void) {
+SV xfcQuote(int escaped) {
     NewTextKey();
     if (flashPtr > CELLMASK)
         error = BAD_FSOVERFLOW;
     SkipBl();  parseword('"');
-    flashC8((uint8_t)strlen(tok));  
-    flashStr(tok);
+    flashC8((uint8_t)strlen(tok));      // string length 
+    flashStr(tok, escaped);             // string
 }
-SV dotQuote(void) { 
-    Literal(flashPtr);  fcQuote();
-    CompCall(Ctick("f$type"));
-}
+SV fcQuote(void) { xfcQuote(0); }
+SV feQuote(void) { xfcQuote(1); }
+SV CfcQuote(void) { Literal(flashPtr);  fcQuote(); }
+SV CfeQuote(void) { Literal(flashPtr);  feQuote(); }
+SV dotQuote(void) { Literal(flashPtr);  fcQuote();  CompCall(Ctick("f$type")); }
+SV desQuote(void) { Literal(flashPtr);  feQuote();  CompCall(Ctick("f$type")); }
+
 SV AddTextKey(void) {
     ChadTextKey = (ChadTextKey << CELLBITS) + Dpop();
 }
@@ -1664,7 +1723,6 @@ SV CompTextKey(void) {
 
 // Write boot data to flash memory image in `flash.c`
 SV MakeBootList(void) {
-    flashPtr = 0;
     GeckoLoad(ChadBootKey);
     flashC8(0x80);                      // speed up SCLK
     flashAN(CP);
@@ -1685,31 +1743,26 @@ SV MakeBootList(void) {
     flashC8(0xE0);                      // end bootup
 }
 
-SV Boot(void) {
+SV BootNrun(void) {
     LoadFlash();                        // file --> "SPI flash"
     FlashMemBoot();                     // boot from flash
-    SkipToEOL();                        // don't trust >in anymore
     Cold();                             // run CPU
 }
 
-SV flashCC(uint32_t w) {                // append big endian cell with bytes
-    if (CELLBITS == 16)                 // 2 bytes
-        flashC16(w);
-    else if (CELLBITS == 32) {          // 4 bytes
-        flashC16(w >> 16);  flashC16(w);
-    }
-    else {                              // 3 bytes
-        flashC16(w >> 8);  flashC8(w);
-    }
+SV Boot(void) {
+    LoadFlash();                        // file --> "SPI flash"
+    FlashMemBoot();                     // boot from flash
+    SkipToEOL();
 }
 
+// Translate C function to its Forth word name
 static char* FnTargetName(void (*fn)()) { // target: ( w -- )
     if (fn == Def_Exec)  return "execute";
     if (fn == Def_Comp)  return "compile,";
     if (fn == Equ_Exec)  return "noop";
     if (fn == Equ_Comp)  return "lit,";
-//  if (fn == Prim_Exec) return "PrimExec";
-//  if (fn == Prim_Comp) return "PrimComp";
+    if (fn == Prim_Exec) return "InstExec";
+    if (fn == Prim_Comp) return ",c";
     if (fn == doInstMod) return "or";
     if (fn == doLitOp)   return "lit,";
     if (fn == noCompile) return "noCompile";
@@ -1717,7 +1770,11 @@ static char* FnTargetName(void (*fn)()) { // target: ( w -- )
 }
 
 // Build header data in flash memory image in `flash.c`
-SV MakeHeaders(void) {
+// Copying lists this way reverses the linked list: The newest definitions are
+// at the bottom, taking the longest to reach through traversal. This is good.
+// Common Forth primitives will be found sooner.
+
+SV MakeHeaders(void) { 
     for (uint8_t i = wordlists; i > 0; i--) {
         char* wname = &wordlistname[i][0];
         size_t len = strlen(wname);
@@ -1740,9 +1797,9 @@ SV MakeHeaders(void) {
                 flashC8((uint8_t)len);
                 for (size_t i = 0; i < len; i++)
                     flashC8(*wname++);
+                flashCC(Header[p].w);
                 flashCC(Ctick(exec));   // target versions of host fns
                 flashCC(Ctick(comp));
-                flashCC(Header[p].w);
                 uint8_t flags = 0xFF;
                 if (Header[p].smudge == 0) flags &= ~0x80;
                 if (Header[p].notail)      flags &= ~0x01;
@@ -1752,6 +1809,33 @@ SV MakeHeaders(void) {
             p = Header[p].link;
         }
         Data[wids + i - 1] = link;
+    }
+}
+
+// Dump internal state in text format for file comparison tools like WinMerge.
+
+SV SaveChadState(void) {
+    ParseFilename();
+    FILE* fp = fopenx(tok, "w");  
+    if (fp == NULL)
+        error = BAD_CREATEFILE;
+    else {
+        fprintf(fp, "Code Memory\n");
+        for (int i = 0; i < CodeSize; i++) {
+            if ((i & 15) == 0) fprintf(fp, "%03X: ", i);
+            fprintf(fp, "%04X", Code[i]);
+            if ((i & 15) == 15) fprintf(fp, "\n");
+            else fprintf(fp, " ");
+        }
+        fprintf(fp, "Data Memory\n");
+        for (int i = 0; i < DataSize; i++) {
+            if ((i & 7) == 0) fprintf(fp, "%03X: ", i);
+            fprintf(fp, "%s", itos(Data[i], 16, (CELLBITS + 3) / 4, 1));
+            if ((i & 7) == 7) fprintf(fp, "\n");
+            else fprintf(fp, " ");
+        }
+        fprintf(fp, "\n");
+        fclose(fp);
     }
 }
 
@@ -1799,11 +1883,12 @@ SV LoadKeywords(void) {
     CURRENT = root_wid;
     AddEquate("root",         "1.0000 -- wid",        root_wid);
     AddEquate("forth-wordlist", "1.0010 -- wid",      forth_wid);
-    AddEquate("cm-writable",  "1.0020 -- addr",       CodeFence);
+    AddKeyword("save-dump", "1.0020 <filename> -- ", SaveChadState, noCompile);
     AddEquate("cm-size",      "1.0030 -- n",          CodeSize);
     AddEquate("dm-size",      "1.0040 -- n",          BYTE_ADDR(DataSize));
     AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
     AddEquate("cell",         "1.0060 -- n",          CELLS);
+    AddEquate("|tib|",        "1.0065 -- n",          MaxLineLength);
     AddEquate(">in",          "1.0070 -- addr",       BYTE_ADDR(toin));
     AddEquate("#tib",         "1.0071 -- addr",       BYTE_ADDR(tibs));
     AddEquate("'tib",         "1.0072 -- addr",       BYTE_ADDR(atib));
@@ -1823,12 +1908,13 @@ SV LoadKeywords(void) {
     AddKeyword("tkey",        "1.0095 -- ud",         ExecTextKey, CompTextKey);
     AddKeyword("load-flash",  "1.0134 <filename> --", LoadFlash,     noCompile);
     AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
-    AddKeyword("save-flash",  "1.0136 pid <filename> --", SaveFlash, noCompile);
-    AddKeyword("make-boot",   "1.0137 --",            MakeBootList,  noCompile);    
-    AddKeyword("boot",        "1.0138 <filename> --", Boot,          noCompile);
-    AddKeyword("make-heads",  "1.0139 addr --",       MakeHeaders,   noCompile);
-    AddKeyword("equ",         "1.0140 x <name> --",   Constant,      noCompile);
-    AddKeyword("assert",      "1.0150 n1 n2 --",      Assert,        noCompile);
+    AddKeyword("save-flash", "1.0136 pid bit <filename> --", SaveFlash, noCompile);
+    AddKeyword("boot",        "1.0138 <filename> --", BootNrun,      noCompile);
+    AddKeyword("boot-test",   "1.0139 <filename> --", Boot,          noCompile);
+    AddKeyword("make-heads",  "1.0140 --",            MakeHeaders,   noCompile);
+    AddKeyword("make-boot",   "1.0145 --",            MakeBootList,  noCompile);    
+    AddKeyword("equ",         "1.0150 x <name> --",   Constant,      noCompile);
+    AddKeyword("assert",      "1.0160 n1 n2 --",      Assert,        noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
     AddKeyword("see",         "1.0210 <name> --",     See,           noCompile);
     AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          noCompile);
@@ -1864,7 +1950,9 @@ SV LoadKeywords(void) {
     AddKeyword("\\",          "1.1020 ccc<EOL> --",   SkipToEOL,     SkipToEOL);
     AddKeyword(".(",          "1.1030 ccc> --",       EchoToPar,     noCompile);
     AddKeyword(".\"",         "1.1035 ccc> --",       noExecute,     dotQuote);
-    AddKeyword(",\"",         "1.1036 ccc> --",       fcQuote,       noExecute);
+    AddKeyword(",\"",         "1.1036 ccc> --",       fcQuote,       CfcQuote);
+    AddKeyword(".\\\"",       "1.1037 ccc> --",       noExecute,     desQuote);
+    AddKeyword(",\\\"",       "1.1038 ccc> --",       feQuote,       CfeQuote);
     AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
     AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
     AddKeyword("align",       "1.1060 --",            Align,         noCompile);
@@ -2060,7 +2148,7 @@ int chad(char * line, int maxlength) {
         while (!error) {
             TOIN = 0;
             TIBS = strlen(buf);
-            if (TIBS >= MaxLineLength)
+            if (TIBS > MaxLineLength)
                 error = BAD_INPUT_LINE;
             else
                 CopyBuffer();
@@ -2194,7 +2282,6 @@ uint64_t chadCycles(void) {
 
 uint16_t chadReadCode(uint32_t addr) {
     uint16_t r = Code[addr & (CodeSize - 1)];
-    if (addr < CodeFence) r = 0;        // ROM is unreadable
     return r;
 }
 

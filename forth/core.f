@@ -7,10 +7,10 @@
 \ enable @, !, w@, and w! to check address alignment
 
 0 cp _! drop
-later cold                              \ 2.0010 -- \ boots here
+later coldboot                          \ 2.0010 -- \ boots here
 later irqtick
 :noname exit exit exit exit exit ; drop \ inactive interrupt vectors
-later exception                         \ 2.0020 n --
+later throw                             \ 2.0020 n --
 
 : noop  nop ;                           \ 2.0100 --
 
@@ -55,7 +55,7 @@ cell 4 = [if]
 
   check_alignment [if]
     : (ta)  ( a mask -- a )
-          over and if  22 invert exception  then ;
+          over and if  22 invert throw  then ;
     : @   3 (ta)  _@ _@_ ;              \ 2.0210 a-addr -- x
     : !   3 (ta)  _! drop ;             \ 2.0200 x a-addr --
     : w!  ( u w-addr -- )               \ 2.0190 w addr --
@@ -70,8 +70,8 @@ cell 4 = [if]
         $FFFF and
     ;
   [else]
-    : @   _@ _@_ ;   macro              \ 2.0210 a-addr -- x
-    : !   _! drop ;  macro              \ 2.0200 x a-addr --
+    : @   _@ _@_ ;  ( macro )           \ 2.0210 a-addr -- x
+    : !   _! drop ; ( macro )           \ 2.0200 x a-addr --
     : w! ( u c-addr -- )                \ 2.0190 w w-addr --
         dup>r 2 and if  swapw  $FFFF0000
         else  $FFFF  then
@@ -85,16 +85,16 @@ cell 4 = [if]
 [else] \ 16-bit or 18-bit cells
     : cells 2* ; macro                  \ 2.0170 n1 -- n2
   check_alignment [if]
-    : (ta)  over and if  22 invert exception  then ;
+    : (ta)  over and if  22 invert throw  then ;
 	: w@  [ ;
     : @   1 (ta)  _@ _@_ ;              \ 2.0210 a-addr -- x
 	: w!  [ ;
     : !   1 (ta)  _! drop ;             \ 2.0200 x a-addr --
   [else]
 	: w@  [ ;
-    : @   _@ _@_ ; macro                \ 2.0210 a-addr -- x
+    : @   _@ _@_ ; ( macro )            \ 2.0210 a-addr -- x
 	: w!  [ ;
-    : !   _! drop ; macro               \ 2.0200 x a-addr --
+    : !   _! drop ; ( macro )           \ 2.0200 x a-addr --
   [then]
     : c! ( u c-addr -- )                \ 2.0180 c c-addr --
         dup>r 1 and if  swapb  $FF00  else  $FF  then
@@ -125,6 +125,7 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 : negate invert 1+ ;                    \ 2.0380 n -- -n
 : tuck   swap over ; macro              \ 2.0390 n1 n2 -- n2 n1 n2
 : +!     tuck @ + swap ! ;              \ 2.0400 n a-addr --
+: ?exit  if rdrop then ; no-tail-recursion \ flag --
 
 \ This really comes in handy, although there is a small (9T) time penalty.
 : times                                 \ 2.0405 n xt --
@@ -302,7 +303,7 @@ CODE dlshift                            \ d1 u -- d2
 
 \ Paul Bennett's recommended minimum word set is mostly present.
 \ DO, I, J, and LOOP are not included. Use for next r@ instead.
-\ CATCH and THROW are not included. They use stack.
+\ CATCH is not included. THROW jumps directly to QUIT.
 \ DOES> needs a compilable CREATE.
 
 : u<     -c drop carry 0= 0= ;          \ 2.0700 u1 u2 -- flag

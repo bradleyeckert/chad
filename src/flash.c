@@ -17,20 +17,21 @@ Chad can call LoadFlashMem to initialize it from a file.
 //#define VERBOSE
 
 static uint8_t mem[FlashMemorySize];
+static uint8_t boilerplate[16];
 
 void FlashMemStore(uint32_t addr, uint8_t c) {
 	if (addr < FlashMemorySize)
 		mem[addr] = ~c;
 }
 
-static void invertMem(uint8_t* m, int n) {
+static void invertMem(uint8_t* m, uint32_t n) {
 	while (n--) {
 		uint8_t c = *m;
 		*m++ = ~c;
 	}
 }
 
-static uint32_t crc32b(uint8_t* message, int length) {
+static uint32_t crc32b(uint8_t* message, uint32_t length) {
 	uint32_t crc = 0xFFFFFFFF;			// compute CRC32
 	while (length--) {
 		crc = crc ^ (*message++);		// Get next byte.
@@ -51,19 +52,22 @@ int LoadFlashMem(char* filename) {      // load binary image
 	fp = fopen(filename, "rb");
 #endif
 	if (fp == NULL) return BAD_OPENFILE;
-	fread(mem, 1, 16, fp);				// skip boilerplate
-	int length = fread(mem, 1, FlashMemorySize, fp);
+	fread(boilerplate, 1, 16, fp);		// get boilerplate
+	uint32_t length = fread(mem, 1, FlashMemorySize, fp);
 	invertMem(mem, length);
 	fclose(fp);
 	return 0;
 }
 
-// save binary image
+// Save binary image
+// A little extra is saved in case the last byte(s) are unintentional 0xFF
+// caused by the PRNG xoring.
 int SaveFlashMem(char* filename, uint32_t pid) {
-	int i = FlashMemorySize;
+	uint32_t i = FlashMemorySize;
 	while ((i) && (mem[--i] == 0)) {}   // trim
-	if (!i) return 0;                   // nothing to save
-	i++;								// include both endpoints
+	i += 0x140;  
+	if (i > FlashMemorySize) i = FlashMemorySize;
+	i &= 0xFFFFFF00L;					// round to 256-byte page
 	FILE* fp;
 #ifdef MORESAFE
 	errno_t err = fopen_s(&fp, filename, "wb");
@@ -83,7 +87,7 @@ int SaveFlashMem(char* filename, uint32_t pid) {
 	return 0;
 };
 
-int SaveFlashMemHex(char* filename) {	// save hex image
+int SaveFlashMemHex(char* filename, int baseblock) {
 	int i = FlashMemorySize;
 	while ((i) && (mem[--i] == 0)) {}   // trim
 	if (!i) return 0;                   // nothing to save
@@ -96,7 +100,7 @@ int SaveFlashMemHex(char* filename) {	// save hex image
 #endif
 	if (fp == NULL) return BAD_CREATEFILE;
 	invertMem(mem, i);
-	fprintf(fp, "@000000\n");
+	fprintf(fp, "@%02X0000\n", baseblock);
 	for (int n = 0; n < i; n++)
 		fprintf(fp, "%02X\n", mem[n]);
 	invertMem(mem, i);
@@ -207,14 +211,14 @@ int FlashMemSPI8(uint8_t cin) {
 			case 0x32: // QDR page write
 				if (qe == 0) { goto notenabled; }
 			case 0x02: // page write
-				if (wen) { 
+				if (wen) {
 					mark = chadCycles() + (uint64_t)BYTE0_DELAY;
-					state = write;  break; 
+					state = write;  break;
 				}
 			notenabled:  wen = 0;
 				return BAD_NOTENABLED;
 			} break;
-		}
+		} return BAD_FLASHADDR;
 	case fastread: 
 		if (dummy) dummy--; else { state = read; }
 		break;

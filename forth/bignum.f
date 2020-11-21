@@ -6,7 +6,7 @@
 \
 \ DU/MOD Double Unsigned Division with Remainder.  Given an unsigned 2-
 \ cell dividend and an unsigned 2-cell divisor,  return a 2-cell
-\ remainder and a 2-cell quotient.  The algorithm is based on Knuth’s
+\ remainder and a 2-cell quotient.  The algorithm is based on Knuth's
 \ algorithm in volume 2 of his Art of Computer Programming, simplified
 \ for two-cell dividend and two-cell divisor.
 

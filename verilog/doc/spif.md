@@ -146,14 +146,15 @@ received by `spif`. `0x10 n` is interpreted as:
 ISP command bytes:
 
 - `00nnnnnn` set 12-bit run length N (use two of these)
-- `01sxgbpr` s=SPI, g=gecko, b=boot, p=ping, r=reset
+- `01sfgbpr` s=SPI, f=flashrate, g=gecko, b=boot, p=ping, r=reset
 - `10xxxfff` Write N+1 bytes to flash using format fff
 - `11xxxfff` Read N+1 bytes from flash using format fff
 
-`01sxgbpr` detail:
+`01sfgbpr` detail:
 
 - s = SPI cycle: write byte again, reading the result.
 - g = Load the cypher with the new key.
+- f = set flash bus rate from N.
 - b = Reboot from flash.
 - p = Trigger a ping. It will send boilerplate out the UART.
 - r = Reset the processor.
@@ -260,7 +261,7 @@ processor intervention. This could be used to load bitmaps onto the screen.
 
 ## I/O space
 
-The 3-bit address allows for 8 read and 8 write registers.
+The 4-bit address: Below 10h = registers, else Wishbone Bus.
 
 Read:
 
@@ -272,6 +273,7 @@ Read:
 - 5: Boot transfer status: 1 = loading memory from flash
 - 6: Raw clock cycle count
 - 7: Upper bits of a 32-bit Wishbone Bus read if cells are less than 32-bit 
+- 8: Read exception parameter
 
 Write:
 
@@ -283,6 +285,7 @@ Write:
 - 5: Write key: key = key<<cellbits + n
 - 6: Write raw data to user output stream
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
+- 8: Save exception parameter
 
 ### Jamming ISP bytes
 
@@ -302,6 +305,13 @@ registers handle the extra bits.
 
 There are no byte lanes in the bus, so `sel_o` is assumed high. 
 Since `cyc_o` is always the same as `stb_o`, it is not duplicated.
+
+### Exception parameter
+
+An exception occurs when there is an error.
+Exceptions are handled by issuing a hard reset to the CPU and rebooting.
+After cold boot, the exception register can be read to determine the reset source.
+0 means POR.
 
 ## Sample MCU
 
