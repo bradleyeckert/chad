@@ -38,7 +38,7 @@ module gecko
          ^ (b[15] & b[16]) ^ (b[25] & b[53]) ^ (b[35] & b[42])  ^  (b[55] & b[58]) ^ (b[60] & b[74])
          ^ (b[20] & b[22] & b[23])  ^  (b[62] & b[68] & b[72])  ^  (b[77] & b[80] & b[81] & b[83]);
 
-  wire a = b[7] ^ b[11] ^ b[30] ^ b[40] ^ b[45] ^ b[54] ^ b[71]
+  wire a = b[7] ^ b[11] ^ b[30] ^ b[40] ^ b[45] ^ b[54] ^ b[71]  // a is output bit
          ^ (b[4] & b[21])  ^  (b[9] & b[52])  ^  (b[18] & b[37])  ^  (b[44] & b[76])
          ^ b[5] ^ (b[8] & b[82])  ^  (b[34] & b[67] & b[73])  ^  (b[2] & b[28] & b[41] & b[65])
          ^ (b[13] & b[29] & b[50] & b[64] & b[75])  ^  (b[6] & b[14] & b[26] & b[32] & b[47] & b[61])
@@ -52,7 +52,7 @@ module gecko
   localparam RUN     = 4'b1000;
   reg [4:0] count;
 
-  // Cycle the key after KEY_LENGTH bytes
+  // Recycle the key after KEY_LENGTH bytes
   wire recycle = (count > (15 - KEY_LENGTH));
   wire [7:0] inkey = (recycle) ? key : b[(16 - KEY_LENGTH)*8 : (16 - KEY_LENGTH)*8 - 7];
 
@@ -74,7 +74,7 @@ module gecko
             state <= DIFFUSE;
           end
         end
-      DIFFUSE:                  // diffuse the key using 128 iterations
+      DIFFUSE:                  // diffuse the key using 32 iterations
         begin
           s <= {x ^ a, s[30:1]};
           b <= {y ^ a, b[89:1]};
