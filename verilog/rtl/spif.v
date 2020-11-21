@@ -205,10 +205,10 @@ module spif
   always @* begin                       // UART output mux
     if (ispActive)
       case (i_usel[2:0])                // ping response:
-      3'b000:  u_dout <= 8'hAA;         // 'tis a ping
-      3'b001:  u_dout <= sernum[7:0];
+      3'b000:  u_dout <= 8'hAA;         // format byte: AA = this one
+      3'b001:  u_dout <= sernum[23:16];
       3'b010:  u_dout <= sernum[15:8];
-      3'b011:  u_dout <= sernum[23:16];
+      3'b011:  u_dout <= sernum[7:0];
       3'b100:  u_dout <= PRODUCT_ID[15:8];
       3'b101:  u_dout <= PRODUCT_ID[7:0];
       3'b110:  u_dout <= BASEBLOCK[7:0];

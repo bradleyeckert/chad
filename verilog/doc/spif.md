@@ -200,22 +200,29 @@ since pages can be re-programmed in case of bad verification.
 
 ### Ping data
 
-A 'ping' command (0x42) sends 5 bytes out the UART:
-- BASEBLOCK, first 64KB sector of user flash
-- KEYID, identifies the boot code decryption key (0 = plaintext)
-- PRODUCT_ID0, product ID\[7:0]
-- PRODUCT_ID1, product ID\[15:8]
-- 0xAA, sanity check
-- RESERVED, ignore this and treat it as a spare slot for future use
+A 'ping' command (0x42) sends 7 bytes out the UART:
 
-The "Product ID" (or `pid`) is used to manage ISP.
+- BASEBLOCK, first 64KB sector of user flash
+- Product ID\[7:0]
+- Product ID\[15:8]
+- SerialNumber\[7:0];
+- SerialNumber\[15:8];
+- SerialNumber\[23:16];
+- 0xAA, indicates a valid ping format
+
+The SerialNumber is 0 if there is no serialization.
+If you make it (and the decryption key) programmable,
+it can be associated with the key through the use of a KDF so that the key
+can be deduced from the serial number.
+
+The "Product ID" (or `pid`) and BASEBLOCK are used to manage ISP.
 If you build products with `chad`, you can pick your own `pid` bytes.
 I charge you nothing, unlike rent-seeking bodies like USB-IF and IEEE.
 Yup, numbers as free as air.
-If you want to reserve your PRODUCT_ID1 to avoid collision with other adopters
+If you want to reserve your PRODUCT_ID to avoid collision with other adopters
 of `chad`, add it to this list and do a pull request:
 
-### Reserved PRODUCT_ID values
+### Reserved PRODUCT ID values
 
 - 0, Demonstration models for `chad`
 - 1 to 99, Reserved for Brad Eckert's commercial projects
