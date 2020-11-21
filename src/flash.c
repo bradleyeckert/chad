@@ -12,12 +12,17 @@ The interface to flash memory is through a SPI interface.
 Flash memory is a static array of bytes that C initializes to 0.
 Read and write invert the data so that blank means 0xFF.
 Chad can call LoadFlashMem to initialize it from a file.
+
+The flash memory may be relocated by non-zero BASEBLOCK so that the
+beginning of physical memory is reserved for a FPGA bitstream.
 */
 
 //#define VERBOSE
 
 static uint8_t mem[FlashMemorySize];
 static uint8_t boilerplate[16];
+
+#define BASEBLOCK boilerplate[4]		// 64K block of physical memory
 
 void FlashMemStore(uint32_t addr, uint8_t c) {
 	if (addr < FlashMemorySize)
@@ -43,6 +48,10 @@ static uint32_t crc32b(uint8_t* message, uint32_t length) {
 	return ~crc;
 }
 
+int FlashBaseBlock(void) {
+	return BASEBLOCK;
+}
+
 int LoadFlashMem(char* filename) {      // load binary image
 	memset(mem, 0, FlashMemorySize);    // erase flash
 	FILE* fp;
@@ -62,7 +71,9 @@ int LoadFlashMem(char* filename) {      // load binary image
 // Save binary image
 // A little extra is saved in case the last byte(s) are unintentional 0xFF
 // caused by the PRNG xoring.
+// the low byte of pid is the BASEBLOCK number, other bytes are product ID.
 int SaveFlashMem(char* filename, uint32_t pid) {
+	BASEBLOCK = (uint8_t)pid;
 	uint32_t i = FlashMemorySize;
 	while ((i) && (mem[--i] == 0)) {}   // trim
 	i += 0x140;  
@@ -188,8 +199,10 @@ int FlashMemSPI8(uint8_t cin) {
 		state = jid3;  break;
 	case jid3: cout = 0xFF & (FlashMemorySize >> 16);
 		state = wait_;  break;
-	case addr2: addr = cin << 16;  state = addr1;  break;
-	case addr1: addr += cin << 8;  state = addr0;  break;
+	case addr2: addr = (cin - BASEBLOCK) << 16;
+		state = addr1;  break;
+	case addr1: addr += cin << 8;
+		state = addr0;  break;
 	case addr0: addr += cin;
 #ifdef VERBOSE
 		printf("%02X[%06X] ", command, addr);

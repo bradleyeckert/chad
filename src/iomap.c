@@ -153,7 +153,7 @@ void FlashMemBoot(void) {
     FlashMemSPIformat(0);
     FlashMemSPIformat(2);
     FlashSPI(0x0B);
-    FlashSPI(0);                // 3-byte address
+    FlashSPI(FlashBaseBlock()); // 3-byte address
     FlashSPI(0);
     FlashSPI(0);
     FlashSPI(0);                // dummy byte

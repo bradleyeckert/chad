@@ -7,6 +7,7 @@
 int LoadFlashMem(char *filename);
 int SaveFlashMem(char* filename, uint32_t pid);
 int SaveFlashMemHex(char* filename, int baseblock);
+int FlashBaseBlock(void);
 
 // Write byte to flash directly, used to build boot list
 void FlashMemStore(uint32_t addr, uint8_t c);
