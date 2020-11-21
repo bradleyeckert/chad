@@ -8,7 +8,8 @@
 module mcu
 #(
   parameter WIDTH = 18,
-  parameter URATE = 32                  // 96 MHz / 32 = 3MBPS baud rate
+  parameter URATE = 32,                 // 96 MHz / 32 = 3MBPS baud rate
+  parameter KEY_LENGTH = 7
 )(
   input wire               clk,         // target frequency is 96 MHz
   input wire               rst_n,
@@ -23,7 +24,9 @@ module mcu
   output wire              txd
 );
 
-  // Processor interface (J1, chad, etc)
+  localparam PID = 0;                   // product ID
+
+// Processor interface (J1, chad, etc)
   wire                io_rd;            // I/O read strobe: get io_din    i
   wire                io_wr;            // I/O write strobe: register din i
   wire                mem_rd;           // Data memory read enable        i
@@ -36,14 +39,14 @@ module mcu
   wire [15:0]         insn;             // Code memory data               o
   wire                p_hold;           // Processor hold                 o
   wire                p_reset;          // Processor reset                o
-  // UART interface
+// UART interface
   wire                u_ready;          // Ready for next byte to send    i
   wire                u_wr;             // UART transmit strobe           o
   wire [7:0]          u_din;            // UART transmit data             o
   wire                u_full;           // UART has received a byte       i
   wire                u_rd;             // UART received strobe           o
   wire [7:0]          u_dout;           // UART received data             i
-  // Flash Memory interface
+// Flash Memory interface
   wire                f_ready;          // Ready for next byte to send    i
   wire                f_wr;             // Flash transmit strobe          o
   wire                f_who;            // Who is requesting the transfer?o
@@ -56,6 +59,13 @@ module mcu
   wire                irq;              // Interrupt request              i
   wire [3:0]          ivec;             // Interrupt vector for irq       i
   wire                iack;             // Interrupt acknowledge          o
+
+// Boot key
+// In an ASIC, you would provide these from a MTP or OTP ROM and associate
+// them with a KDF when programming.
+
+  wire [KEY_LENGTH*8-1:0] key = 1;      // demo key
+  wire [23:0]         sernum = 0;       // serial number or HW revision
 
 // chad processor
   chad #(WIDTH) CPU (
@@ -101,8 +111,8 @@ module mcu
   end
 
 // stream stub
-  wire [8:0] st_o;                      // stream output data
-  wire       st_stb;                    // stream strobe
+  wire [8:0] st_o;                      // stream output data           i
+  wire       st_stb;                    // stream strobe                i
   wire st_busy = 1'b0;
 
 // Wishbone master
@@ -119,8 +129,7 @@ module mcu
 
 // spif is the SPI flash controller for the chad processor
 // 4096 words of code, 2048 words of data (see config.h)
-//  spif #(12, WIDTH, 11, 0, 0, 0) bridge (
-  spif #(12, WIDTH, 11, 0, 1, 0, 9, 0, 1) bridge (
+  spif #(12, WIDTH, 11, 0, PID, 9, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
@@ -135,6 +144,8 @@ module mcu
     .insn     (insn     ),
     .p_hold   (p_hold   ),
     .p_reset  (p_reset  ),
+    .key      (key      ),
+    .sernum   (sernum   ),
     .u_ready  (u_ready  ),
     .u_wr     (u_wr     ),
     .u_dout   (u_dout   ),

@@ -8,12 +8,9 @@ module spif
   parameter WIDTH = 18,                 // word size of data memory
   parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
   parameter BASEBLOCK = 0,              // first 64KB sector of user flash
-  parameter PRODUCT_KEY = 0,            // 8-bit key ID for ISP
   parameter PRODUCT_ID = 1,             // 16-bit product ID for ISP
   parameter STWIDTH = 9,                // Width of outgoing stream data
-  parameter BKEY_HI = 0,                // flash cypher key, 0 means no cypher
-  parameter BKEY_LO = 0,                // the ISP host will need the same key
-  parameter KEY_LENGTH = 7
+  parameter KEY_LENGTH = 7              // Length of boot key
 )(
   input  wire              clk,
   input  wire              arstn,       // async reset (active low)
@@ -30,6 +27,9 @@ module spif
   output wire [15:0]       insn,        // Code memory data
   output wire              p_hold,      // Processor hold
   output reg               p_reset,     // Processor reset
+// Boot key
+  input wire [KEY_LENGTH*8-1:0] key,    // Boot code decrypt key, 0 if plaintext
+  input wire [23:0]        sernum,      // Serial number or boot key ID
 // UART interface
   input  wire              u_ready,     // Ready for next byte to send
   output reg               u_wr,        // UART transmit strobe
@@ -206,10 +206,12 @@ module spif
     if (ispActive)
       case (i_usel[2:0])                // ping response:
       3'b000:  u_dout <= 8'hAA;         // 'tis a ping
-      3'b001:  u_dout <= PRODUCT_ID[15:8];
-      3'b010:  u_dout <= PRODUCT_ID[7:0];
-      3'b011:  u_dout <= PRODUCT_KEY[7:0];
-      3'b100:  u_dout <= BASEBLOCK[7:0];
+      3'b001:  u_dout <= sernum[7:0];
+      3'b010:  u_dout <= sernum[15:8];
+      3'b011:  u_dout <= sernum[23:16];
+      3'b100:  u_dout <= PRODUCT_ID[15:8];
+      3'b101:  u_dout <= PRODUCT_ID[7:0];
+      3'b110:  u_dout <= BASEBLOCK[7:0];
       default: u_dout <= f_din;
       endcase
     else  u_dout <= outword[7:0];
@@ -250,21 +252,25 @@ module spif
 
   reg [KEY_LENGTH*8-1:0] widekey;       // 0 = no cypher
   reg [3:0] key_index;
+  reg key_init;                         // initialize key at POR
 
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
       key_index <= KEY_LENGTH - 1;
-      widekey <= {BKEY_HI[KEY_LENGTH*8-33:0], BKEY_LO[31:0]};
+      key_init <= 1'b1;
     end else begin
-      if (g_reset_n) begin
-        if (g_load)                     // shift in a key digit:
+      if (g_reset_n == 1'b0) begin
+        key_index <= KEY_LENGTH - 1;    // sync reset
+        if (key_init) begin
+          widekey <= key;
+          key_init <= 1'b0;
+        end
+      end else if (g_load)              // shift in a key digit:
           widekey <= {widekey[KEY_LENGTH*8 - (WIDTH+1) : 0], outword};
         else if (key_index) begin       // shift out a byte
           key_index <= key_index - 1'b1;
           widekey <= {8'b0, widekey[KEY_LENGTH*8 - 1 : 8]};
         end
-      end else
-        key_index <= KEY_LENGTH - 1;    // sync reset
     end
 
   wire g_ready;                         // g_dout is ready
@@ -323,7 +329,7 @@ module spif
       b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= 0;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 4'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
-      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd5;
+      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd7;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
@@ -374,7 +380,7 @@ module spif
                       p_reset <= ISPbyte[0];
                       if (ISPbyte[1]) begin
                         i_state <= ISP_PING;
-                        i_count <= 12'd3;
+                        i_count <= 12'd6;
                       end
                       if (ISPbyte[2])
                         b_state <= 3'b001; // reboot from flash
@@ -408,7 +414,7 @@ module spif
               ISP_DNLOAD:
                 if (b_txok) begin
                   u_wr <= 1'b1;         // flash --> UART
-          	  i_usel <= 3'd5;
+          	  i_usel <= 3'd7;
                   if (i_count) begin
                     i_count <= i_count - 12'd1;
                     f_wr <= 1'b1;
@@ -513,7 +519,7 @@ module spif
             case (mem_addr[3:0])
             4'h0: begin
                 u_wr <= 1'b1;           // UART output byte
-       	        i_usel <= 3'd5;
+       	        i_usel <= 3'd7;
                 outword <= din;
               end
             4'h3: b_state <= 3'd6;      // interpret flash byte stream
