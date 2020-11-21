@@ -1,6 +1,6 @@
 // Wrapper for the MCU                           10/18/2020 BNE
 
-// This runs on the Brevia 2 board. FPGA: LFXP2-5E-6TN144C
+// This runs on a MAX10. It uses clkgen.v PLL IP.
 
 // Without changing the MCU, the UART baud rate is 1MBPS since Fclk = 50 MHz.
 // This is supported by the FTDI chip, port B.
@@ -34,12 +34,15 @@ module mcu_top
   output wire         uart_tx
 );
 
-  wire clk;
+  wire clk, locked;
   reg arst_n = 1'b0;
   reg rst_n1 = 1'b0;
-  wire locked;
 
-  clkgen pll (.CLK(clk_in), .CLKOP(clk), .LOCK(locked));
+  clkgen clkgen_inst (
+	.inclk0 ( clk_in ),
+	.c0 ( clk ),
+	.locked ( locked )
+	);
 
   always @(posedge clk) begin
     arst_n <= rst_n1;

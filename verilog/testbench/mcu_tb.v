@@ -8,8 +8,8 @@
 
 module mcu_tb();
 
-  localparam CLKPERIOD = 104;   // 96 MHz
-  localparam UBAUD = 32;        // 3 MBPS
+  localparam CLKPERIOD = 100;   // 100 MHz
+  localparam UBAUD = 31;        // 3 MBPS, off by 1%
 
   reg	        clk = 1;
   reg	        rst_n = 0;
@@ -20,8 +20,8 @@ module mcu_tb();
   wire          cs_n;
   wire  [3:0]   qdi;
   wire  [3:0]   qdo;
-  wire  [3:0]   oe;               // output enable for qdo
-  wire  [3:0]   qd;               // quad data bus
+  wire  [3:0]   oe;             // output enable for qdo
+  wire  [3:0]   qd;             // quad data bus
 
   assign qdi = qd;
   assign qd[0] = (oe[0]) ? qdo[0] : 1'bZ;
@@ -48,7 +48,7 @@ module mcu_tb();
   pullup(qd[0]);
   pullup(cs_n);
 
-  mcu #(24) u1 (
+  mcu #(24, UBAUD) u1 (
     .clk      (clk     ),
     .rst_n    (rst_n   ),
     .rxd      (rxd     ),

@@ -154,7 +154,7 @@ ISP command bytes:
 
 - s = SPI cycle: write byte again, reading the result.
 - g = Load the cypher with the new key.
-- f = set flash bus rate from N.
+- f = set flash bus rate from N. 0 is fastest.
 - b = Reboot from flash.
 - p = Trigger a ping. It will send boilerplate out the UART.
 - r = Reset the processor.

@@ -66,15 +66,15 @@ module coproc
     y <= 1'b0;
   else if (go)
     case (sel[3:0])
-    4'h0:    y = mbusy | dbusy | sbusy;
-    4'h1:    y = {overflow, 8'h07};
-    4'h2:    y = product[2*WIDTH-1:WIDTH];
-    4'h3:    y = product[WIDTH-1:0];
-    4'h4:    y = quot;
-    4'h5:    y = rem;
-    4'h6:    y = shifter[2*WIDTH-1:WIDTH];
-    4'h7:    y = shifter[WIDTH-1:0];
-    default: y = 1'b0;
+    4'h0:    y <= mbusy | dbusy | sbusy;
+    4'h1:    y <= {overflow, 8'h07};
+    4'h2:    y <= product[2*WIDTH-1:WIDTH];
+    4'h3:    y <= product[WIDTH-1:0];
+    4'h4:    y <= quot;
+    4'h5:    y <= rem;
+    4'h6:    y <= shifter[2*WIDTH-1:WIDTH];
+    4'h7:    y <= shifter[WIDTH-1:0];
+    default: y <= 1'b0;
     endcase
 
 endmodule
