@@ -1,4 +1,4 @@
-// Serial Flash Controller for Chad                  		11/20/2020 BNE
+// Serial Flash Controller for Chad                  		11/22/2020 BNE
 // License: This code is a gift to the divine.
 
 `default_nettype none
@@ -12,54 +12,61 @@ module spif
   parameter STWIDTH = 9,                // Width of outgoing stream data
   parameter KEY_LENGTH = 7              // Length of boot key
 )(
-  input  wire              clk,
-  input  wire              arstn,       // async reset (active low)
+  input  wire                 clk,
+  input  wire                 arstn,    // async reset (active low)
 // Processor interface (J1, chad, etc)
-  input  wire              io_rd,       // I/O read strobe: get io_din
-  input  wire              io_wr,       // I/O write strobe: register din
-  input  wire              mem_rd,      // Data memory read enable
-  input  wire              mem_wr,      // Data memory write enable
-  input  wire [14:0]       mem_addr,    // Data memory address
-  input  wire [WIDTH-1:0]  din,         // Data memory & I/O in (from N)
-  output wire [WIDTH-1:0]  mem_dout,    // Data memory out
-  output wire [WIDTH-1:0]  io_dout,     // I/O data out
-  input  wire [14:0]       code_addr,   // Code memory address
-  output wire [15:0]       insn,        // Code memory data
-  output wire              p_hold,      // Processor hold
-  output reg               p_reset,     // Processor reset
+  input  wire                 io_rd,    // I/O read strobe: get io_din
+  input  wire                 io_wr,    // I/O write strobe: register din
+  input  wire                 mem_rd,   // Data memory read enable
+  input  wire                 mem_wr,   // Data memory write enable
+  input  wire [14:0]          mem_addr, // Data memory address
+  input  wire [WIDTH-1:0]     din,      // Data memory & I/O in (from N)
+  output wire [WIDTH-1:0]     io_dout,  // I/O data out
+  input  wire [14:0]          code_addr,// Code memory address
+  output wire                 p_hold,   // Processor hold
+  output reg                  p_reset,  // Processor reset
+// Memory write ports and read/write control
+  output wire [DATA_SIZE-1:0] data_a,   // Data RAM read/write address
+  output wire [WIDTH-1:0]     data_din, // Data RAM write data
+  output wire                 data_wr,  // Data RAM write enable
+  output wire                 data_rd,  // Data RAM read enable
+  output wire [CODE_SIZE-1:0] code_a,   // Code RAM read/write address
+  output wire [15:0]          code_din, // Code RAM write data
+  output wire                 code_wr,  // Code RAM write enable
+  output wire                 code_rd,  // Code RAM read enable
 // Boot key
   input wire [KEY_LENGTH*8-1:0] key,    // Boot code decrypt key, 0 if plaintext
-  input wire [23:0]        sernum,      // Serial number or boot key ID
+  input wire [23:0]           sernum,   // Serial number or boot key ID
 // UART interface
-  input  wire              u_ready,     // Ready for next byte to send
-  output reg               u_wr,        // UART transmit strobe
-  output reg  [7:0]        u_dout,      // UART transmit data
-  input  wire              u_full,      // UART has received a byte
-  output reg               u_rd,        // UART received strobe
-  input  wire [7:0]        u_din,       // UART received data
+  input  wire                 u_ready,  // Ready for next byte to send
+  output reg                  u_wr,     // UART transmit strobe
+  output reg  [7:0]           u_dout,   // UART transmit data
+  input  wire                 u_full,   // UART has received a byte
+  output reg                  u_rd,     // UART received strobe
+  input  wire [7:0]           u_din,    // UART received data
 // Flash Memory interface
-  input  wire              f_ready,     // Ready for next byte to send
-  output reg               f_wr,        // Flash transmit strobe
-  output reg               f_who,       // Who is requesting the transfer?
-  output reg  [7:0]        f_dout,      // Flash transmit data
-  output reg  [2:0]        f_format,    // Flash format
-  output reg  [3:0]        f_rate,      // Flash SCLK divisor
-  input  wire [7:0]        f_din,       // Flash received data
+  input  wire                 f_ready,  // Ready for next byte to send
+  output reg                  f_wr,     // Flash transmit strobe
+  output reg                  f_who,    // Who is requesting the transfer?
+  output reg  [7:0]           f_dout,   // Flash transmit data
+  output reg  [2:0]           f_format, // Flash format
+  output reg  [3:0]           f_rate,   // Flash SCLK divisor
+  input  wire [7:0]           f_din,    // Flash received data
 // Wishbone master
-  output wire [14:0]       adr_o,       // address
-  output wire [31:0]       dat_o,       // data out
-  input wire  [31:0]       dat_i,       // data in
-  output wire              we_o,        // 1 = write, 0 = read
-  output wire              stb_o,       // strobe
-  input wire               ack_i,       // acknowledge
+  output wire [14:0]          adr_o,    // address
+  output wire [31:0]          dat_o,    // data out
+  input wire  [31:0]          dat_i,    // data in
+  output wire                 we_o,     // 1 = write, 0 = read
+  output wire                 stb_o,    // strobe
+  input wire                  ack_i,    // acknowledge
 // User stream output (from flash or processor)
-  output reg [STWIDTH-1:0] st_o,        // stream output data
-  output wire              st_stb,      // stream strobe
-  input wire               st_busy,     // 1 = not ready for st_stb
+  output reg [STWIDTH-1:0]    st_o,     // stream output data
+  output wire                 st_stb,   // stream strobe
+  input wire                  st_busy,  // 1 = not ready for st_stb
 // Interrupt requests
-  output reg               cyclev,      // cycle count overflow strobe
-  output wire              urxirq,      // UART full strobe
-  output wire              utxirq       // UART ready strobe
+  output reg                  cyclev,   // cycle count overflow strobe
+  output wire                 urxirq,   // UART full strobe
+  output wire                 utxirq    // UART ready strobe
 );
 
 // Wishbone bus master
@@ -565,48 +572,13 @@ module spif
 // p_hold inhibits reads to keep the read streams in sync with their addresses.
 
   assign p_hold = codeWr | dataWr | iobusy | wbbusy;
-  wire code_rd = ~p_hold;
-  wire [CODE_SIZE-1:0] code_ia =
-       (codeWr) ? b_dest[CODE_SIZE-1:0] : code_addr[CODE_SIZE-1:0];
-
-  wire data_rd = mem_rd & ~p_hold;
-  wire data_wr = mem_wr | dataWr;
-  wire [DATA_SIZE-1:0] data_ia = (dataWr) ? b_dest[DATA_SIZE-1:0]
-                                          : mem_addr[DATA_SIZE-1:0];
-  wire [WIDTH-1:0]    data_din = (dataWr) ? b_data : din;
-
-//=======================================
-// Data RAM
-//=======================================
-spram
-#(
-  .ADDR_WIDTH (DATA_SIZE),
-  .DATA_WIDTH (WIDTH)
-) data_ram
-(
-  .clk  ( clk      ),
-  .addr ( data_ia  ),
-  .din  ( data_din ),
-  .dout ( mem_dout ),
-  .we   ( data_wr  ),
-  .re   ( data_rd  )
-);
-
-//=======================================
-// Code RAM
-//=======================================
-spram
-#(
-  .ADDR_WIDTH (CODE_SIZE),
-  .DATA_WIDTH (16)
-) code_ram
-(
-  .clk  ( clk      ),
-  .addr ( code_ia  ),
-  .din  ( b_data[15:0]),
-  .dout ( insn     ),
-  .we   ( codeWr   ),
-  .re   ( code_rd  )
-);
+  assign code_rd = ~p_hold;
+  assign code_wr = codeWr;
+  assign code_a = (codeWr) ? b_dest[CODE_SIZE-1:0] : code_addr[CODE_SIZE-1:0];
+  assign data_rd = mem_rd & ~p_hold;
+  assign data_wr = mem_wr | dataWr;
+  assign data_a = (dataWr) ? b_dest[DATA_SIZE-1:0] : mem_addr[DATA_SIZE-1:0];
+  assign data_din = (dataWr) ? b_data : din;
+  assign code_din = b_data[15:0];
 
 endmodule

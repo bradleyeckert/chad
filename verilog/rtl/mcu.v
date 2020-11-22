@@ -1,4 +1,4 @@
-// Minimal MCU based on J1-type CPU                             11/15/2020 BNE
+// Minimal MCU based on J1-type CPU                             11/22/2020 BNE
 // License: This code is a gift to the divine.
 
 // This is expected to be wrapped by an I/O ring that steers bidirectional
@@ -7,11 +7,12 @@
 `default_nettype none
 module mcu
 #(
-  parameter WIDTH = 18,
+  parameter WIDTH = 18,                 // data cell size in bits
   parameter URATE = 32,                 // 96 MHz / 32 = 3MBPS baud rate
-  parameter KEY_LENGTH = 7
+  parameter CODE_SIZE = 12,             // log2 of # of 16-bit instruction words
+  parameter DATA_SIZE = 11              // log2 of # of cells in data memory
 )(
-  input wire               clk,         // target frequency is 96 MHz
+  input wire               clk,
   input wire               rst_n,
 // 6-wire connection to SPI flash chip
   output wire              sclk,
@@ -25,47 +26,48 @@ module mcu
 );
 
   localparam PID = 0;                   // product ID
+  localparam KEY_LENGTH = 7;
 
 // Processor interface (J1, chad, etc)
-  wire                io_rd;            // I/O read strobe: get io_din    i
-  wire                io_wr;            // I/O write strobe: register din i
-  wire                mem_rd;           // Data memory read enable        i
-  wire                mem_wr;           // Data memory write enable       i
-  wire [14:0]         mem_addr;         // Data memory & I/O address      i
-  wire [WIDTH-1:0]    din;              // Data memory & I/O in (from N)  i
-  wire [WIDTH-1:0]    mem_dout;         // Data memory out                o
-  wire [WIDTH-1:0]    io_dout;          // I/O data out                   o
-  wire [14:0]         code_addr;        // Code memory address            i
-  wire [15:0]         insn;             // Code memory data               o
-  wire                p_hold;           // Processor hold                 o
-  wire                p_reset;          // Processor reset                o
+  wire                 io_rd;           // I/O read strobe: get io_din    i
+  wire                 io_wr;           // I/O write strobe: register din i
+  wire                 mem_rd;          // Data memory read enable        i
+  wire                 mem_wr;          // Data memory write enable       i
+  wire [14:0]          mem_addr;        // Data memory & I/O address      i
+  wire [WIDTH-1:0]     din;             // Data memory & I/O in (from N)  i
+  wire [WIDTH-1:0]     mem_dout;        // Data memory out                o
+  wire [WIDTH-1:0]     io_dout;         // I/O data out                   o
+  wire [14:0]          code_addr;       // Code memory address            i
+  wire [15:0]          insn;            // Code memory data               o
+  wire                 p_hold;          // Processor hold                 o
+  wire                 p_reset;         // Processor reset                o
 // UART interface
-  wire                u_ready;          // Ready for next byte to send    i
-  wire                u_wr;             // UART transmit strobe           o
-  wire [7:0]          u_din;            // UART transmit data             o
-  wire                u_full;           // UART has received a byte       i
-  wire                u_rd;             // UART received strobe           o
-  wire [7:0]          u_dout;           // UART received data             i
+  wire                 u_ready;         // Ready for next byte to send    i
+  wire                 u_wr;            // UART transmit strobe           o
+  wire [7:0]           u_din;           // UART transmit data             o
+  wire                 u_full;          // UART has received a byte       i
+  wire                 u_rd;            // UART received strobe           o
+  wire [7:0]           u_dout;          // UART received data             i
 // Flash Memory interface
-  wire                f_ready;          // Ready for next byte to send    i
-  wire                f_wr;             // Flash transmit strobe          o
-  wire                f_who;            // Who is requesting the transfer?o
-  wire [7:0]          f_dout;           // Flash transmit data            o
-  wire [2:0]          f_format;         // Flash format                   o
-  wire [3:0]          f_rate;           // Flash configuration setup      o
-  wire [7:0]          f_din;            // Flash received data            i
+  wire                 f_ready;         // Ready for next byte to send    i
+  wire                 f_wr;            // Flash transmit strobe          o
+  wire                 f_who;           // Who is requesting the transfer?o
+  wire [7:0]           f_dout;          // Flash transmit data            o
+  wire [2:0]           f_format;        // Flash format                   o
+  wire [3:0]           f_rate;          // Flash configuration setup      o
+  wire [7:0]           f_din;           // Flash received data            i
 
   wire p_reset_n = ~p_reset;
-  wire                irq;              // Interrupt request              i
-  wire [3:0]          ivec;             // Interrupt vector for irq       i
-  wire                iack;             // Interrupt acknowledge          o
+  wire                 irq;             // Interrupt request              i
+  wire [3:0]           ivec;            // Interrupt vector for irq       i
+  wire                 iack;            // Interrupt acknowledge          o
 
 // Boot key
 // In an ASIC, you would provide these from a MTP or OTP ROM and associate
 // them with a KDF when programming.
 
   wire [KEY_LENGTH*8-1:0] key = 1;      // demo key
-  wire [23:0]         sernum = 0;       // serial number or HW revision
+  wire [23:0]          sernum = 0;      // serial number or HW revision
 
 // chad processor
   chad #(WIDTH) CPU (
@@ -87,6 +89,42 @@ module mcu
     .iack     (iack     )
   );
 
+// Memory: In this case, a couple of single-port RAMs.
+
+  wire [DATA_SIZE-1:0] data_a;          // Data RAM read/write address
+  wire [WIDTH-1:0]     data_din;        // Data RAM write data
+  wire                 data_wr;         // Data RAM write enable
+  wire                 data_rd;         // Data RAM read enable
+
+spram #(
+  .ADDR_WIDTH (DATA_SIZE),
+  .DATA_WIDTH (WIDTH)
+) data_ram (
+  .clk  ( clk      ),
+  .addr ( data_a   ),
+  .din  ( data_din ),
+  .dout ( mem_dout ),
+  .we   ( data_wr  ),
+  .re   ( data_rd  )
+);
+
+  wire [CODE_SIZE-1:0] code_a;          // Code RAM read/write address
+  wire [15:0]          code_din;        // Code RAM write data
+  wire                 code_wr;         // Code RAM write enable
+  wire                 code_rd;         // Code RAM read enable
+
+spram #(
+  .ADDR_WIDTH (CODE_SIZE),
+  .DATA_WIDTH (16)
+) code_ram (
+  .clk  ( clk      ),
+  .addr ( code_a   ),
+  .din  ( code_din ),
+  .dout ( insn     ),
+  .we   ( code_wr  ),
+  .re   ( code_rd  )
+);
+
 // Interrupts
 
   wire cyclev;                          // raw cycle counter overflow
@@ -98,6 +136,7 @@ module mcu
   assign irq = (ivec != 0);
 
 // Handle interrupt request strobes, edges, etc.
+
   always @(negedge p_reset_n or posedge clk)
   begin
     if (!p_reset_n) begin
@@ -129,7 +168,7 @@ module mcu
 
 // spif is the SPI flash controller for the chad processor
 // 4096 words of code, 2048 words of data (see config.h)
-  spif #(12, WIDTH, 11, 0, PID, 9, KEY_LENGTH) bridge (
+  spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, 9, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
@@ -138,12 +177,18 @@ module mcu
     .mem_wr   (mem_wr   ),
     .mem_addr (mem_addr ),
     .din      (din      ),
-    .mem_dout (mem_dout ),
     .io_dout  (s_io_dout),
     .code_addr(code_addr),
-    .insn     (insn     ),
     .p_hold   (p_hold   ),
     .p_reset  (p_reset  ),
+    .data_a   (data_a   ),
+    .data_din (data_din ),
+    .data_wr  (data_wr  ),
+    .data_rd  (data_rd  ),
+    .code_a   (code_a   ),
+    .code_din (code_din ),
+    .code_wr  (code_wr  ),
+    .code_rd  (code_rd  ),
     .key      (key      ),
     .sernum   (sernum   ),
     .u_ready  (u_ready  ),
