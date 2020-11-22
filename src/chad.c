@@ -140,6 +140,7 @@ static uint16_t Code[CodeSize];         // code memory
 static uint8_t spMax, rpMax;            // stack depth tracking
 static uint64_t cycles = 0;             // cycle counter
 static uint32_t latency = 0;            // maximum cycles between return
+static uint32_t irq = 0;                // interrupt requests
 
 // The C host uses this (externally) to write to code and data spaces.
 // Addr is a cell address in each case.
@@ -157,6 +158,11 @@ void chadToData(uint32_t addr, uint32_t x) {
     }
     Data[addr & (DataSize-1)] = (cell)x;
 }
+
+// Time-critical code starts here. Code is manually included to keep it
+// all together for cache-friendliness (hopefully).
+
+#include "coproc.c"                     // include coprocessor code
 
 SV Dpush(cell v)                        // push to on the data stack
 {
@@ -179,6 +185,16 @@ SV Rpush(cell v)                        // push to the return stack
     Rstack[RP] = v;
 }
 
+// Interrupts are handled by modifying the return instruction 
+
+static uint8_t Iack(void) {             // priority encoder
+    uint8_t r = 0;
+    uint32_t x = irq;
+    while (x >>= 1) ++r;                // position of highest bit
+    irq &= ~(1 << r);                   // clear the request bit
+    return r;
+}
+
 #if (CELLBITS > 31)
 #define sum_t uint64_t
 #else
@@ -190,7 +206,7 @@ SV Rpush(cell v)                        // push to the return stack
 // single = -1: Run until error, returns error code.
 // single = 1: Execute one instruction (single step) from Code[PC].
 // single = 10000h + instruction: Execute instruction. Returns the instruction.
-// MoreInstrumentation slows down the code by 40%.
+// MoreInstrumentation (config.h) slows down the code by 40%.
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
 CELL copresult;
@@ -203,6 +219,7 @@ SI CPUsim(int single) {
     uint16_t retMark = (uint16_t)cycles;
 #endif
     uint8_t mark = RDEPTH;
+    uint8_t ivec = 0;
     if (single == -1) {                 // run until error
         single = 0;
         mark = 0xFF;
@@ -222,6 +239,7 @@ SI CPUsim(int single) {
         _pc = pc + 1;
         cell _lex = 0;
         cell s = Dstack[SP];
+        cell temp;
         if (insn & 0x8000) {
             int target = (lex << 13) | (insn & 0x1fff);
             switch (insn >> 13) { // 4 to 7
@@ -243,9 +261,15 @@ SI CPUsim(int single) {
                 if (insn & 0x1000) {                                /*    imm */
                     Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
                     if (insn & 0x100) {                             /*  r->pc */
-                        _pc = Rstack[RP] >> 1;
-                        if (RDEPTH == mark) single = 2;
-                        RP = RPMASK & (RP - 1);
+                        ivec = Iack();
+                        if (ivec) {
+                            _pc = ivec;
+                        }
+                        else {
+                            _pc = Rstack[RP] >> 1;
+                            if (RDEPTH == mark) single = 2;
+                            RP = RPMASK & (RP - 1);
+                        }
 #ifdef MoreInstrumentation
                         uint16_t time = (uint16_t)cycles - retMark;
                         retMark = (uint16_t)cycles;
@@ -255,16 +279,22 @@ SI CPUsim(int single) {
                     }
                 } else {
                     if (insn & 0x800)                               /* coproc */
-                        copresult = coproc_c(insn & 0x7FF, CELLBITS,
-                            cycles, t & CELLMASK, s & CELLMASK, w & CELLMASK);
+                        copresult = coproc_c(insn & 0x7FF, 
+                            t & CELLMASK, s & CELLMASK, w & CELLMASK);
                     else 
                         _lex = (lex << 11) | (insn & 0x7FF);        /*   litx */
                 }
             }
         } else { // ALU
             if (insn & 0x100) {                                     /*  r->pc */
-                _pc = Rstack[RP] >> 1;
-                if (RDEPTH == mark) single = 2;
+                ivec = Iack();
+                if (ivec) {
+                    _pc = ivec;
+                }
+                else {
+                    _pc = Rstack[RP] >> 1;
+                    if (RDEPTH == mark) single = 2;
+                }
 #ifdef MoreInstrumentation
                 uint16_t time = (uint16_t)cycles - retMark;
                 retMark = (uint16_t)cycles;
@@ -273,7 +303,6 @@ SI CPUsim(int single) {
 #endif
             }
             cell _c = t & 1;
-            cell temp;
             sum_t sum;
             switch ((insn >> 9) & 0x1F) {
             case 0x00: _t = t;                               break; /*      T */
@@ -313,7 +342,8 @@ SI CPUsim(int single) {
             default:   _t = t;  single = BAD_ALU_OP;
             }
             SP = SPMASK & (SP + sign2b[insn & 3]);                /* dstack+- */
-            RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);         /* rstack+- */
+            if (ivec == 0)
+                RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);     /* rstack+- */
             switch ((insn >> 4) & 7) {
             case  1: Dstack[SP] = t;                         break;   /* T->N */
             case  2: Rstack[RP] = t;                         break;   /* T->R */
@@ -334,6 +364,8 @@ SI CPUsim(int single) {
         }
         pc = _pc;  lex = _lex;
         cycles++;
+        if ((cycles & CELLMASK) == 0)   // raw counter overflow
+            irq |= (1 << 1);            // lowest priority interrupt
 #ifdef MoreInstrumentation
         if (sp > spMax) spMax = sp;
         if (rp > rpMax) rpMax = rp;
@@ -1153,7 +1185,7 @@ SV SaveFlash(void) {                    // chad format ( d_pid baseblock -- )
     int baseblock = Dpop();
     uint64_t d = (uint64_t)Dpop() << CELLBITS;   d += Dpop();
     d = (d << 8) + baseblock;           // lowest byte = BASEBLOCK
-    error = SaveFlashMem(tok, d);       // {BASEBLOCK, KeyID, PIDlo, PIDhi}
+    error = SaveFlashMem(tok, (uint32_t)d); // {BASEBLOCK, KeyID, PIDlo, PIDhi}
 }
 
 SV SaveFlashHex(void) {                 // format for SPI flash Verilog model
@@ -1350,6 +1382,7 @@ SV Resolves(void) {                     // ( xt <name> -- )
 SV SkipToPar(void) {
     parseword(')');  LogColor(COLOR_COM, 0, tok);  Log(")");
 }
+SV irqStore  (void) { irq = Dpop(); }
 SV Nothing   (void) { }
 SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
 SV EndCode   (void) { EndDefinition();  OrderPop();  Dpop();  sane();}
@@ -1747,6 +1780,7 @@ SV Boot(void) {
 static char* FnTargetName(void (*fn)()) { // target: ( w -- )
     if (fn == Def_Exec)  return "execute";
     if (fn == Def_Comp)  return "compile,";
+    if (fn == CompMacro) return "compile,"; // ignore macro
     if (fn == Equ_Exec)  return "noop";
     if (fn == Equ_Comp)  return "lit,";
     if (fn == Prim_Exec) return "InstExec";
@@ -1978,6 +2012,7 @@ SV LoadKeywords(void) {
     AddKeyword("no-tail-recursion", "1.1350 --",    NoTailRecursion, noCompile);
     AddKeyword("|bits|",      "1.1360 n --",       SetTableBitWidth, noCompile);
     AddKeyword("|",           "1.1370 x --",          TableEntry,    noCompile);
+    AddKeyword("irq!",        "1.1380 x --",          irqStore,      noCompile);
     AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
     // Primitives can compile and execute
     // They are basically 16-bit fixed codes

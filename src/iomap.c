@@ -163,6 +163,10 @@ void FlashMemBoot(void) {
 static uint64_t gkey = 0;
 static uint8_t xorkey;
 
+int IOspiResult(void) {
+    return SPIresult ^ xorkey;
+}
+
 // ISP interpreter. In a real system, the UART can control the ISP.
 // In a PC environment, stdin is not given this access.
 // But, the processor can jam ISP bytes into a simulated ISP interpreter.
@@ -234,17 +238,17 @@ static uint8_t nohostAPI;               // prohibit access to host API
 static uint32_t WishboneUpperRx;
 static uint32_t WishboneUpperTx;
 
-static int termKey(void);
-static int termQkey(void);
+static int IOtermKey(void);
+static int IOtermQkey(void);
 
 uint32_t readIOmap (uint32_t addr) {
     if ((addr & 0x8000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
-    case 0: return termKey();           // Get the next incoming stream char
-    case 1: return termQkey();
+    case 0: return IOtermKey();         // Get the next incoming stream char
+    case 1: return IOtermQkey();
     case 2: return 0;                   // UART tx is never busy
-    case 3: return SPIresult ^ xorkey;  // SPI result
+    case 3: return IOspiResult();       // SPI result
     case 4: return 0;                   // Jam status, not busy
     case 5: return 0;                   // DMA status, not busy
     case 6: return (uint32_t)chadCycles();
@@ -292,22 +296,20 @@ KEY uses cooked input for compatibility with terminals.
 If you use a terminal (like PuTTY) over a UART, it has to use cooked mode.
 It buffers a line locally, allowing you to edit it, before sending it.
 termKey will wait until a CR is received.
-In an embedded system, KEY should return -1 if there's no key.
-Code should invoke KEY in a loop to replace the functionality of ?KEY.
 */
 
 static uint8_t buf[LineBufferSize];
 static int toin = 0;
 static int len = 0;
 
-static int termQkey(void) {
+static int IOtermQkey(void) {
     if (toin < len) {
         return 1;                       // there are chars in the buffer
     }
     return KbHit();
 }
 
-static int termKey(void) {              // Get the next byte in the input stream
+static int IOtermKey(void) {              // Get the next byte in the input stream
     if (toin < len) {
         return buf[toin++];
     }

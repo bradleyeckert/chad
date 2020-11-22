@@ -1,65 +1,65 @@
-#include <stdlib.h>
-#include <stdint.h>
+/*
+This file is meant to be included in chad.c using #include so as to
+keep it physically near the simulator code to make it cache-friendly.
 
-#define OPTIONS 7
+Already-defined variables:
+cycles = 64-bit cycle count
+*/
+#ifndef coproc_c
+#define COP_OPTIONS 7
 
 // bit 0: hardware unsigned multiplier exists
 // bit 1: hardware unsigned divider exists
 // bit 2: hardware shifter exists
 
-static uint64_t mtime, dtime, stime, product, shifted;
-static uint32_t quot, rem, overflow;
-
-uint32_t coproc_c(
+static uint32_t coproc_c(
 	int sel,					// operation select
-	int bits,					// bits per cell
-	uint64_t cycles, 			// simulator cycle count
 	uint32_t tos, 				// top of stack register
 	uint32_t nos,				// next on stack register
 	uint32_t w) {				// w register
+
+	static uint64_t mtime, dtime, stime, product, shifted;
+	static uint32_t quot, rem, overflow;
 	uint64_t ud, temp;
-	uint32_t mask = -1;		    // "bits" 1s
-	if (bits < 32) 
-		mask = mask >> (32 - bits);
 	switch (sel & 0x0F) {
 	case 0:
 		return (cycles < mtime) | (cycles < dtime) | (cycles < stime);
 	case 1:
-		return overflow | OPTIONS;
+		return overflow | COP_OPTIONS;
 	case 2:
-		return mask & (product >> bits);
+		return CELLMASK & (product >> CELLBITS);
 	case 3:
-		return mask & product;
+		return CELLMASK & product;
 	case 4:
 		return quot;
 	case 5:
 		return rem;
 	case 6:
-		return mask & (shifted >> bits);
+		return CELLMASK & (shifted >> CELLBITS);
 	case 7:
-		return mask & shifted;
+		return CELLMASK & shifted;
 	case 8:
-		mtime = cycles + bits + 1;
+		mtime = cycles + CELLBITS + 1;
 		product = (uint64_t)tos * (uint64_t)nos;
 		return 0;
 	case 9: 
-		dtime = cycles + bits + 1;
-		ud = ((uint64_t)tos << bits) | nos;
+		dtime = cycles + CELLBITS + 1;
+		ud = ((uint64_t)tos << CELLBITS) | nos;
 		temp = ud / w;
-		if (temp >> bits) {		// quotient doesn't fit in cell
-			quot = mask;
-			rem = mask;
+		if (temp >> CELLBITS) {		// quotient doesn't fit in cell
+			quot = CELLMASK;
+			rem = CELLMASK;
 			overflow = 0x100;
 		}
 		else {
-			quot = temp & mask;
+			quot = temp & CELLMASK;
 			rem = ud % w;
 			overflow = 0;
 		}
 		return 0;
 	case 10:
-		dtime = cycles + bits + 1;
-		ud = ((uint64_t)tos << bits) | nos;
+		stime = cycles + CELLBITS + 1;
+		ud = ((uint64_t)tos << CELLBITS) | nos;
 		if (sel & 0x40)
 			shifted = ud << w;
 		else if (sel & 0x80)
@@ -69,3 +69,4 @@ uint32_t coproc_c(
 	default: return 0;
 	}
 }
+#endif

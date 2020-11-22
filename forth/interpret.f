@@ -262,6 +262,4 @@ variable dpl
 
 [then]
 
-
 there swap - . .( instructions used by interpret) cr
-

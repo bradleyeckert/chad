@@ -4,7 +4,7 @@ Welcome to deep embedded computing, where the best hardware is no hardware.
 Well, minimal hardware. How does a processor in 200 lines of Verilog sound?
 Pretty awful? Try pretty awesome.
 
-It's so simple your computer will simulate it at 150 to 200 MIPS.
+It's so simple your computer will simulate it at 100 to 150 MIPS.
 At that speed, it can host itself on your computer.
 No need to turn the Verilog into hardware, just run the processor model
 on your desktop or laptop.
@@ -56,17 +56,12 @@ Chad improves on the J1 to facilitate bigger apps.
 `chad` protects your software investment by targeting a very simple but
 very powerful (for its size) stack computer.
 Modern desktop computers are fast enough to simulate the CPU on the order of at-speed.
-Simulation speed on my desktop depends on the compiler:
-
-- 145 MIPS on Code::Blocks 17.12 (GCC).
-- 160 MIPS on Visual Studio 2019 Community Edition.
-
 It's like having a real CPU running in an FPGA, but without an FPGA.
 Forth should execute the code it compiles.
 Cross compiling, such as targeting ARM with code running on x86,
 adds a lot of complexity which is completely unnecessary with Chad.
 
-You can add custom functions easily. Just edit `chad.c` and `chaddefs.h`.
+You can add custom functions easily. Just edit `chad.c`, `coproc.c`, and `chaddefs.h`.
 Recompile and your simulated computer and its language have the new features.
 Chad comes as C source. Once you compile it, you have a Forth that can extend
 itself in such a way that the binaries can be output for inclusion in a SOC.
@@ -91,8 +86,9 @@ The main source files are:
 - `chad.c` Simulates the CPU and implements a text interpreter
 - `iomap.c` Simulates the I/O of the CPU
 
-To try it out, launch it with `chad include lib.fs`.
-At the `ok>` prompt, type `0 here dasm` to disassemble everything.
+To try it out, compile `chad` and put it in the `forth` folder.
+`cd` to the `myapp` directory and launch it with `../chad include myapp.fs`.
+At the `ok>` prompt, `0 here dasm` to disassemble everything.
 
 - `stats` lists the cycle count and maximum stack depths.
 - `words` lists words.
@@ -107,6 +103,11 @@ ok>25 fib .
 2792024 cycles, MaxSP=27, MaxRP=26, 155 MHz
 ok>
 ```
+
+The instruction rate is much less when doing I/O, so running an interpreter in
+the simulator (by loading myapp.f and entering "cold") shows the cycle counter
+incrementing at a much lower rate. When code is doing useful work, this isn't
+a problem. The thread stays in cache.
 
 ## It's also a documentation standard.
 
