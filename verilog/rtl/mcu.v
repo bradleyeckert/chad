@@ -96,34 +96,28 @@ module mcu
   wire                 data_wr;         // Data RAM write enable
   wire                 data_rd;         // Data RAM read enable
 
-spram #(
-  .ADDR_WIDTH (DATA_SIZE),
-  .DATA_WIDTH (WIDTH)
-) data_ram (
-  .clk  ( clk      ),
-  .addr ( data_a   ),
-  .din  ( data_din ),
-  .dout ( mem_dout ),
-  .we   ( data_wr  ),
-  .re   ( data_rd  )
-);
+  spram #(DATA_SIZE, WIDTH) data_ram (
+    .clk      (clk      ),
+    .addr     (data_a   ),
+    .din      (data_din ),
+    .dout     (mem_dout ),
+    .we       (data_wr  ),
+    .re       (data_rd  )
+  );
 
   wire [CODE_SIZE-1:0] code_a;          // Code RAM read/write address
   wire [15:0]          code_din;        // Code RAM write data
   wire                 code_wr;         // Code RAM write enable
   wire                 code_rd;         // Code RAM read enable
 
-spram #(
-  .ADDR_WIDTH (CODE_SIZE),
-  .DATA_WIDTH (16)
-) code_ram (
-  .clk  ( clk      ),
-  .addr ( code_a   ),
-  .din  ( code_din ),
-  .dout ( insn     ),
-  .we   ( code_wr  ),
-  .re   ( code_rd  )
-);
+  spram #(CODE_SIZE, 16) code_ram (
+    .clk      (clk      ),
+    .addr     (code_a   ),
+    .din      (code_din ),
+    .dout     (insn     ),
+    .we       (code_wr  ),
+    .re       (code_rd  )
+  );
 
 // Interrupts
 
@@ -166,8 +160,7 @@ spram #(
 
   assign io_dout = s_io_dout;           // spif is the only I/O device
 
-// spif is the SPI flash controller for the chad processor
-// 4096 words of code, 2048 words of data (see config.h)
+// spif is the SPI flash controller and ISP hub
   spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, 9, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
