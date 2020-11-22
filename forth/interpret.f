@@ -117,10 +117,6 @@ variable dpl
     then  (number)
 ;
 
-: num   /source (xnumber)
-   if d. else . then ." dpl=" dpl ?
-   postpone \ ;
-
 \ The search order is implemented as a stack that grows upward, with #order the
 \ offset into the orders array as well as the number of WIDs in the list.
 
@@ -149,22 +145,24 @@ variable dpl
 : get-current  current @ ;              \ 2.6210 -- wid
 : only         -1 set-order ;           \ 2.6220 --
 : also         get-order over swap 1+   \ 2.6230 --
-               set-order ;
+               set-order
+;
 : previous     get-order nip 1-         \ 2.6240 --
-               set-order ;
+               set-order
+;
 : definitions                           \ 2.6250 --
    get-order  over set-current  set-order
 ;
 : forth        get-order nip            \ 2.6260 --
-               forth-wordlist swap set-order ;
-
-:noname @+ .wid ;
+               forth-wordlist swap set-order
+;
 : order                                 \ 2.6270 --
-   ."  Context: "    orders  #order @  literal times  drop
+   ."  Context: " #order @ ?dup if
+      for r@ cells [ orders 1 cells - ] literal + @ .wid
+      next
+   else ." <empty> " then
    cr ."  Current: " current @ .wid  cr
 ;
-\ NOTE: the display order is opposite the ANS standard.
-\ The top of the search order is on the right, per stack display conventions.
 
 \ `words` overrides the host version, which is in `root` so you can still
 \ use it if you don't have `forth` (forth-wordlist) in the search order.

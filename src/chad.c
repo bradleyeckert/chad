@@ -1800,9 +1800,11 @@ SV MakeHeaders(void) {
     for (uint8_t i = wordlists; i > 0; i--) {
         char* wname = &wordlistname[i][0];
         size_t len = strlen(wname);
-        GeckoLoad(0);                   // wordlist name is not encrypted
-        for (size_t i = 0; i < len; i++) 
-            flashC8(*wname++);          // begin wordlist with its name
+        NewTextKey();
+        flashC8((uint8_t)len);          // begin wordlist with its name
+        for (size_t i = 0; i < len; i++)
+            flashC8(*wname++);
+        NewTextKey();
         flashC8((uint8_t)len);
         uint32_t link = 0;
         uint16_t p = wordlist[i];

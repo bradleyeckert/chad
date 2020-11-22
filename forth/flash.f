@@ -4,10 +4,6 @@
 \ Compiled strings (for `type` etc.) are assumed to have 0 for the upper cell
 \ of the address. Those strings must be below flash address 2^cellsize.
 
-\ Byte and cell reads from flash close the SPI flash after reading.
-\ There is no assumption of continuity: Font bitmaps may be read between bytes.
-\ So, c@f is slow. If you need speed, read flash in chunks.
-
 there hex
 
 : _isp  ( c -- )                \ write ISP byte to SPIF
@@ -59,10 +55,24 @@ there hex
 : fcount                        \ 2.4060 df-addr -- df-addr+1 c
    2dup 1 0 d+  2swap c@f
 ;
+
+\ `emit` may require reading font bitmaps from flash, so `f$type` reads the
+\ string into a RAM buffer because the bitmap read disrupts keystream sync.
+\ This is a good place for `pad`. Make it big enough for app usage.
+\
+\ `fbuf` moves a string from flash to RAM.
+\ The keystream is assumed to be in sync.
+
+:noname _c@f over c! 1+ ;      ( a -- a+1 )
+: fbuf                         \ 2.4060 df-addr c-addr u --
+   2swap @f(  literal times drop  )@f
+;
+
+256 equ |pad|
+|pad| buffer: pad
+
 : ftype                         \ 2.4070 df-addr u --
-   ?dup if
-      for  fcount emit  next
-   then  2drop
+   >r pad r@ fbuf  pad r> type
 ;
 : /text  ( f-addr -- df-addr )  \ synchronize keystream
    tkey 2dup or 0= if 2drop exit then
@@ -86,9 +96,9 @@ there hex
 \ The count is after the name instead of before it so it's stored as plaintext.
 
 : (.wid)  \ f-addr --                   \ f-addr points to the link that's 0
-   1-  dup 0 c@f  tuck - 0 rot          \ daddr-f len
-   dup 31 > if 2drop [char] ? emit exit then \ no name
-   ftype
+   1-  dup /text c@f  tuck -  swap      \ f-addr len
+   31 > if drop [char] ? emit exit then \ no name
+   1-  f$type
 ;
 : [wid]   ( wid -- addr )               \ wid is indexed from 1
    cells [ wids cell - ] literal +

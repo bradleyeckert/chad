@@ -50,6 +50,7 @@ there
 : 2swap  rot >r rot r> ;                \ 2.1190 abcd -- cdab
 : 2nip   >carry nip nip w ;
 : 2over  >r >r 2dup r> r> 2swap ;
+: 3drop  drop 2drop ;
 
 \ fixed left shifts
 
