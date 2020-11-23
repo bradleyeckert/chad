@@ -1,10 +1,6 @@
 # SPI flash interface
 
 The `spif` SPI flash controller loads code and data memory at boot time.
-The controller contains inferred single-port RAM for code and data spaces.
-Generics specify the sizes of memory.
-It also has an I/O space.
-These memory and I/O spaces connect to the ports of a J1 (etc.) CPU.
 
 The design intent here was:
 
@@ -15,30 +11,25 @@ The design intent here was:
 Making an ASIC is expensive in terms of time and cost.
 To de-risk, code memory should be RAM.
 Another reason for RAM-based code space is speed. ROM is slower.
-4K bytes of code RAM would be 0.2 mm2 in a 180nm process,
-or 0.8mm2 in a 350nm process. Either way the chip is probably pad-limited.
+SPI flash is a very attractive option. You get lots of storage at low cost.
+The flash chip can be put outside or inside your chip's package.
+Either way, it can be probed.
+So, we encrypt the flash contents and decrypt it on the fly. 
 
-ISP over USB is possible using a cheap ($0.30) USB UART chip, the CH330N.
-
-FPGAs that boot from SPI flash are usually programmed by using another 
-controller connected to the SPI flash.
-Lattice and Efinix use a FTDI chip on their evaluation boards to program
-the flash. A little extra logic (like a 74VHC4051AFT 2:1 mux) could switch
-the FT232H between the SPI flash and a 4-wire "FSI UART".
-This would supply a nice ISP/debug/streaming port at a cost of maybe $4 above
-the super cheap CH330N solution. That might justify using a more expensive
-flash-based FPGA such as an Intel MAX10 or a Gowin GW1N.
+ISP of SPI flash over USB is possible using a cheap ($0.30) USB UART chip,
+the CH330N, or any of a number of such parts.
 
 ## Parameters (aka generics)
 
 - CODE_SIZE, log2 of # of 16-bit instruction words in code RAM
-- DWIDTH, Word size of data memory
+- WIDTH, Word size of data memory
 - DATA_SIZE, log2 of # of cells in data RAM
 - BASEBLOCK: Which 64KB sector to start user flash at.
 Allows room for FPGA bitstream if used.
-- PRODUCT_ID0: First product ID byte, user defined.
-- PRODUCT_ID1: Second product ID byte, user defined.
-- KEY0, KEY1, KEY2, KEY3: SPI flash cypher key
+- PRODUCT_ID: Product ID for ISP, user defined.
+- STWIDTH: Width of outgoing stream data.
+- KEY_LENGTH: Length of boot key
+- RAM_INIT: Initialize RAM by default, set to 0 for faster verification
 
 ## Ports
 
@@ -53,10 +44,8 @@ To keep the J1 naming conventions, the ports on the processor side are:
 | mem_wr   | in  | 1    | Data memory write enable        |
 | mem_rd   | in  | 1    | Data memory read enable         |
 | din      | in  | N    | Data memory (and I/O) in        |
-| mem_dout | out | N    | Data memory out                 |
 | io_dout  | out | N    | I/O data out                    |
 | code_addr| in  | 16   | Code memory address             |
-| insn     | out | 16   | Code memory data                |
 | p_hold   | out | 1    | Processor hold                  |
 | p_reset  | out | 1    | Processor reset                 |
 
@@ -94,17 +83,10 @@ Flash ports are:
 |----------|:---:|-----:|---------------------------------|
 | f_ready  | in  | 1    | Ready for next byte to send     |
 | f_wr     | out | 1    | Flash transmit strobe           |
-| f_who    | out | 1    | Who's asking? 0=sys, 1=UART     |
 | f_dout   | out | 8    | Flash transmit data             |
 | f_format | out | 3    | Flash format                    |
 | f_rate   | out | 4    | SPI frequency divider           |
 | f_din    | in  | 8    | Flash received data             |
-
-When the `who` signal is `1`, the flash may opt to return blank data.
-This would prevent the reading of internal flash via UART ISP.
-Although it's not very useful with a board-mounted SPI flash,
-a flash subsystem on an ASIC could have lock bits added for security.
-A locked flash could return the "Write In Progress" status as data.
 
 f_format is the bus format of the SPI:
 
@@ -132,8 +114,8 @@ the `0x12` never shows up. The UART side is responsible for handling
 that case by buffering one byte and interpreting it accordingly.
 
 Of the 256 bytes in an 8-bit character, we avoid using XON and XOFF
-(0x11 and 0x13) to allow for soft flow control and 0x12 to avoid the
-special case.
+(0x11 and 0x13) to allow for soft flow control in the future and
+0x12 to avoid the special case.
 
 0x10 fills in the hole left in the character set so that all 256 codes can be
 received by `spif`. `0x10 n` is interpreted as:
@@ -142,6 +124,11 @@ received by `spif`. `0x10 n` is interpreted as:
 - 0x10 0x01 = 0x11 
 - 0x10 0x02 = 0x12 
 - 0x10 0x03 = 0x13
+
+Outgoing bytes use the same scheme. Although a UART can send all 256 codes,
+you might want to replace the UART with a SPI slave or a JTAG register.
+In that case, you'll need a `sync` character, which can be `12h` meaning
+no data. That would be implemented in the module that replaces the UART.
 
 ISP command bytes:
 

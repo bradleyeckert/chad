@@ -11,7 +11,6 @@ parameter FILENAME = "fdata.hex"
 // Flash Memory interface to spif
   output reg          ready,            // Ready for next byte to send
   input wire          wr,               // Flash transmit strobe
-  input wire          who,              // Who's asking
   input wire  [7:0]   din,              // Flash transmit data
   input wire  [2:0]   format,           // Flash format
   input wire  [3:0]   prescale,         // Flash configuration setup

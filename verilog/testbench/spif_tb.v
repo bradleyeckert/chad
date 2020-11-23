@@ -27,11 +27,10 @@ module spif_tb();
     wire		 u_full;	// UART has received a byte	  i
     wire		 u_rd;		// UART received strobe		  o
     wire [7:0]		 u_dout;	// UART received data		  i
-    wire [15:0]          u_rate;        // UART baud rate divisor         o
+    wire [15:0]          u_rate = 32;   // UART baud rate divisor         o
     //	Flash Memory interface
     wire		 f_ready;	// Ready for next byte to send	  i
     wire		 f_wr;		// Flash transmit strobe	  o
-    wire                 f_who;         // Who is requesting the transfer?o
     wire [7:0]		 f_dout;	// Flash transmit data		  o
     wire [2:0]		 f_format;	// Flash format			  o
     wire [3:0]		 f_rate;	// Flash configuration setup	  o
@@ -39,11 +38,70 @@ module spif_tb();
 
     reg uart_rst_n = 0;  // release UART reset later than global reset
 
+    wire [55:0]          key = 0;       // demo key
+    wire [23:0]          sernum = 18;   // serial number or HW revision
+
+    wire [9:0]           data_a;        // Data RAM read/write address
+    wire [17:0]          data_din;      // Data RAM write data
+    wire                 data_wr;       // Data RAM write enable
+    wire                 data_rd;       // Data RAM read enable
+
+    spram #(10, 18) data_ram (
+      .clk      (clk      ),
+      .addr     (data_a   ),
+      .din      (data_din ),
+      .dout     (mem_dout ),
+      .we       (data_wr  ),
+      .re       (data_rd  )
+    );
+
+    wire [9:0]           code_a;        // Code RAM read/write address
+    wire [15:0]          code_din;      // Code RAM write data
+    wire                 code_wr;       // Code RAM write enable
+    wire                 code_rd;       // Code RAM read enable
+
+    spram #(10, 16) code_ram (
+      .clk      (clk      ),
+      .addr     (code_a   ),
+      .din      (code_din ),
+      .dout     (insn     ),
+      .we       (code_wr  ),
+      .re       (code_rd  )
+    );
+
+// stream stub
+  wire [7:0] st_o;                      // stream output data           i
+  wire       st_stb;                    // stream strobe                i
+  reg        st_busy = 1'b0;
+
+// Wishbone master
+  wire [14:0] adr_o;
+  wire [31:0] dat_o, dat_i;
+  wire we_o, stb_o, ack_i;
+
+// For testing, we loop back stb_o to ack_i.
+
+  reg [31:0] wbreg;
+  reg stb_od;
+  always @(posedge clk or negedge rst_n) begin
+    if (!rst_n)
+      wbreg <= 'b0;
+    else begin
+      if ((stb_o) && (we_o))
+        wbreg <= dat_o;
+      stb_od <= stb_o; // delayed stb
+    end
+  end
+
+  assign dat_i = wbreg;
+  assign ack_i = stb_od;
+
+
     // 100 MHz clock
     always #5 clk = ~clk;
 
-    // spif is the SPI flash controller for the chad processor
-    spif #(11, 18, 10, 0, 3, 4, 868) u0 (
+    // spif is the SPI flash controller
+    spif #(10, 18, 10, 0, 16, 8, 7, 0) u0 (
 	.clk(clk),
 	.arstn(rst_n),
 	.io_rd	  (io_rd    ),
@@ -52,26 +110,44 @@ module spif_tb();
 	.mem_wr	  (mem_wr   ),
 	.mem_addr (mem_addr ),
 	.din	  (din	    ),
-	.mem_dout (mem_dout ),
 	.io_dout  (io_dout  ),
 	.code_addr(code_addr),
-	.insn	  (insn	    ),
 	.p_hold	  (p_hold   ),
 	.p_reset  (p_reset  ),
-	.u_ready  (u_ready  ),
-	.u_wr	  (u_wr	    ),
-	.u_dout	  (u_dout   ),
-	.u_full	  (u_full   ),
-	.u_rd	  (u_rd	    ),
-	.u_din	  (u_din    ),
-	.u_rate	  (u_rate   ),
-	.f_ready  (f_ready  ),
-	.f_wr	  (f_wr	    ),
-	.f_who	  (f_who    ),
-	.f_dout	  (f_dout   ),
-	.f_format (f_format ),
-	.f_rate   (f_rate   ),
-	.f_din	  (f_din    )
+        .data_a   (data_a   ),
+        .data_din (data_din ),
+        .data_wr  (data_wr  ),
+        .data_rd  (data_rd  ),
+        .code_a   (code_a   ),
+        .code_din (code_din ),
+        .code_wr  (code_wr  ),
+        .code_rd  (code_rd  ),
+        .key      (key      ),
+        .sernum   (sernum   ),
+        .u_ready  (u_ready  ),
+        .u_wr     (u_wr     ),
+        .u_dout   (u_dout   ),
+        .u_full   (u_full   ),
+        .u_rd     (u_rd     ),
+        .u_din    (u_din    ),
+        .f_ready  (f_ready  ),
+        .f_wr     (f_wr     ),
+        .f_dout   (f_dout   ),
+        .f_format (f_format ),
+        .f_rate   (f_rate   ),
+        .f_din    (f_din    ),
+        .adr_o    (adr_o    ),
+        .dat_o    (dat_o    ),
+        .dat_i    (dat_i    ),
+        .we_o     (we_o     ),
+        .stb_o    (stb_o    ),
+        .ack_i    (ack_i    ),
+        .st_o     (st_o     ),
+        .st_stb   (st_stb   ),
+        .st_busy  (st_busy  ),
+        .cyclev   (cyclev   ),
+        .urxirq   (urxirq   ),
+        .utxirq   (utxirq   )
     );
 
     // flash simulator reads bytes from a file
@@ -80,7 +156,6 @@ module spif_tb();
 	.arstn(rst_n),
 	.ready	  (f_ready  ),
 	.wr	  (f_wr	    ),
-	.who	  (f_who    ),
 	.din	  (f_dout   ),
 	.format	  (f_format ),
 	.prescale (f_rate   ),
@@ -126,23 +201,23 @@ module spif_tb();
 
     initial
     begin
-	$display("Bootup started %t", $time);
+	$display("Bootup started %0t", $time);
 	#7 rst_n = 1;
         @(negedge p_reset); // wait for boot to finish
-	$display("Bootup finished %t", $time);
+	$display("Bootup finished %0t", $time);
         mem_rd = 1;  @(posedge clk);
         mem_rd = 0;  @(posedge clk);
         IO_WRITE(42, 0);  // send a byte to the UART
 
-        IO_WRITE(4, 4);      WAIT(4);  // 5-byte sequence to flash
-        IO_WRITE(8'h81, 4);  WAIT(4);  // start SPI sequence, single rate
-        IO_WRITE(8'h0B, 4);  WAIT(4);
-        IO_WRITE(8'h00, 4);  WAIT(4);
-        IO_WRITE(8'h00, 4);  WAIT(4);
-        IO_WRITE(8'h80, 4);  WAIT(4);
-        IO_WRITE(8'h00, 4);  WAIT(4);
-        IO_WRITE(8'h11, 3);   // start the flash interpreter
-        WAIT(5);              // wait until interpreter is finished
+//        IO_WRITE(4, 4);      WAIT(4);  // 5-byte sequence to flash
+//        IO_WRITE(8'h81, 4);  WAIT(4);  // start SPI sequence, single rate
+//        IO_WRITE(8'h0B, 4);  WAIT(4);
+//        IO_WRITE(8'h00, 4);  WAIT(4);
+//        IO_WRITE(8'h00, 4);  WAIT(4);
+//        IO_WRITE(8'h80, 4);  WAIT(4);
+//        IO_WRITE(8'h00, 4);  WAIT(4);
+//        IO_WRITE(8'h11, 3);   // start the flash interpreter
+//        WAIT(5);              // wait until interpreter is finished
 
         uart_rst_n <= 1;
 //	$display("status: %t done reset", $time);
@@ -151,6 +226,17 @@ module spif_tb();
 //
 //	$display("\n\nstatus: %t Testbench done", $time);
 //	$finish;
+    end
+
+// Hold off the stream every other sample
+    reg holding = 1'b0;
+    always @(negedge st_stb) begin
+        if (holding) begin
+        #3 st_busy <= 1'b1;
+        repeat (20) @(posedge clk);
+        #3 st_busy <= 1'b0;
+        end else st_busy <= 1'b0;
+        holding <= ~holding;
     end
 
 endmodule

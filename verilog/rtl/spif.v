@@ -9,8 +9,9 @@ module spif
   parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
   parameter BASEBLOCK = 0,              // first 64KB sector of user flash
   parameter PRODUCT_ID = 1,             // 16-bit product ID for ISP
-  parameter STWIDTH = 9,                // Width of outgoing stream data
-  parameter KEY_LENGTH = 7              // Length of boot key
+  parameter STWIDTH = 8,                // Width of outgoing stream data
+  parameter KEY_LENGTH = 7,             // Length of boot key
+  parameter RAM_INIT = 1                // Initialize RAM by default
 )(
   input  wire                 clk,
   input  wire                 arstn,    // async reset (active low)
@@ -47,7 +48,6 @@ module spif
 // Flash Memory interface
   input  wire                 f_ready,  // Ready for next byte to send
   output reg                  f_wr,     // Flash transmit strobe
-  output reg                  f_who,    // Who is requesting the transfer?
   output reg  [7:0]           f_dout,   // Flash transmit data
   output reg  [2:0]           f_format, // Flash format
   output reg  [3:0]           f_rate,   // Flash SCLK divisor
@@ -61,7 +61,7 @@ module spif
   input wire                  ack_i,    // acknowledge
 // User stream output (from flash or processor)
   output reg [STWIDTH-1:0]    st_o,     // stream output data
-  output wire                 st_stb,   // stream strobe
+  output reg                  st_stb,   // stream strobe
   input wire                  st_busy,  // 1 = not ready for st_stb
 // Interrupt requests
   output reg                  cyclev,   // cycle count overflow strobe
@@ -90,17 +90,49 @@ module spif
           wbxi <= dat_i[31:WIDTH];
   end
 
-// Free-running cycles counter readable by the CPU. Rolls over at Fclk*2^-WIDTH
-// Hz: 100 MHz, 18-bit -> 1.5 kHz. ISR[1] services the overflow.
+// Free-running cycles counter readable by the CPU. Rolls over at Fclk*2^-WIDTH.
 
   reg [WIDTH-1:0] cycles;
-//  reg [7:0] cycles; // shorten counter to demonstrate interrupts faster
   always @(posedge clk or negedge arstn) begin
     if (!arstn)
       {cyclev, cycles} <= 0;
     else
       {cyclev, cycles} <= cycles + 1'b1;
   end
+
+//==============================================================================
+// UART output FSM
+// Output bytes get translated into escape sequences here
+//==============================================================================
+
+  reg           uo_escaped;             // Escape sequence in progress
+  reg  [1:0]    uo_lower;               // LSBs
+  reg           uo_wr;                  // UART transmit strobe
+  reg  [7:0]    uo_dout;                // UART transmit data
+  wire uo_ready = u_ready & ~uo_escaped & ~u_wr;
+
+  always @(posedge clk or negedge arstn)
+    if (!arstn) begin
+      uo_escaped <= 1'b0;
+      u_wr <= 1'b0;
+    end else begin
+      u_wr <= 1'b0;
+      if (uo_escaped) begin
+        if (u_ready & ~u_wr) begin
+          u_wr <= 1'b1;
+          u_dout <= {6'b000000, uo_lower};
+          uo_escaped <= 1'b0;
+        end
+      end if (uo_wr) begin
+        u_wr <= 1'b1;
+        if (uo_dout[7:2] == 6'b000100) begin
+          uo_lower <= uo_dout[1:0];     // 10h to 13h ==> 10h, 0 to 3
+          uo_escaped <= 1'b1;
+          u_dout <= 8'h10;
+        end else
+          u_dout <= uo_dout;
+      end
+    end
 
 //==============================================================================
 // UART input FSM
@@ -113,7 +145,7 @@ module spif
   reg ispActive;                        // Indicate that ISP mode is active
   reg ISPfull, ISPack;                  // Indicate ISP byte was received
   reg iobusy;
-  wire txbusy = ~u_ready | ispActive;   // tell CPU that TX is busy
+  wire txbusy = ~uo_ready | ispActive;  // tell CPU that TX is busy
 
   reg [3:0] r_state;                    // UART receive state
   localparam unlockbyte0  = 8'hA5;
@@ -129,82 +161,79 @@ module spif
   assign urxirq = uartRXfull & ~uartRXfull_d;
 
   always @(posedge clk or negedge arstn)
-    if (!arstn)
-      begin
-        uartRXfull <= 1'b0;     u_rd <= 1'b0;
-        ISPfull <= 1'b0;   ispActive <= 1'b0;
-        uartRXbyte <= 8'h00;   uartRXfull_d <= 1'b0;
-        ISPbyte <= 8'h00;    r_state <= UART_RX_IDLE;
-      end
-    else
-      begin
-        uartRXfull_d <= uartRXfull;
-        u_rd <= 1'b0;
-        if (u_rxok)
-          case (r_state)
-          UART_RX_IDLE:
-            if (u_din[7:2] == 6'b000100) begin
-              u_rd <= 1'b1;
-              case (u_din[1:0])
-              2'b00: r_state <= UART_RX_ESC;
-              2'b10: r_state <= UART_UNLOCK;
-              endcase
+    if (!arstn) begin
+      uartRXfull <= 1'b0;     u_rd <= 1'b0;
+      ISPfull <= 1'b0;   ispActive <= 1'b0;
+      uartRXbyte <= 8'h00;   uartRXfull_d <= 1'b0;
+      ISPbyte <= 8'h00;    r_state <= UART_RX_IDLE;
+    end else begin
+      uartRXfull_d <= uartRXfull;
+      u_rd <= 1'b0;
+      if (u_rxok)
+        case (r_state)
+        UART_RX_IDLE:
+          if (u_din[7:2] == 6'b000100) begin
+            u_rd <= 1'b1;
+            case (u_din[1:0])
+            2'b00: r_state <= UART_RX_ESC;
+            2'b10: r_state <= UART_UNLOCK;
+            endcase
+          end
+          else if (u_rxready) begin
+            u_rd <= 1'b1;
+            if (ispActive) begin
+              ISPbyte <= u_din;
+              ISPfull <= 1'b1;
+            end else begin
+              uartRXbyte <= u_din;
+              uartRXfull <= 1'b1;
             end
-            else if (u_rxready) begin
-              u_rd <= 1'b1;
-              if (ispActive) begin
-                ISPbyte <= u_din;
-                ISPfull <= 1'b1;
-              end else begin
-                uartRXbyte <= u_din;
-                uartRXfull <= 1'b1;
-              end
-            end
-          UART_RX_ESC:
-            if (u_rxready) begin        // 2-byte escape sequence: 10h, 0xh
-              u_rd <= 1'b1;
-              r_state <= UART_RX_IDLE;
-              if (ispActive) begin
-                ISPbyte <= {6'b000100, u_din[1:0]};
-                ISPfull <= 1'b1;
-              end else begin
-                uartRXbyte <= {6'b000100, u_din[1:0]};
-                uartRXfull <= 1'b1;
-              end
-            end
-          UART_UNLOCK:
-            begin
-              ispActive <= 1'b0;        // any bad unlock sequence clears this
-              u_rd <= 1'b1;
-              if (u_din == unlockbyte0)
-                r_state <= UART_UNLOCK1;
-              else
-                r_state <= UART_RX_IDLE;
-            end
-          UART_UNLOCK1:
-            begin
-              u_rd <= 1'b1;
-              if (u_din == unlockbyte1)
-                ispActive <= 1'b1;
-              r_state <= UART_RX_IDLE;
-            end
-          default:
+          end
+        UART_RX_ESC:
+          if (u_rxready) begin          // 2-byte escape sequence: 10h, 0xh
+            u_rd <= 1'b1;
             r_state <= UART_RX_IDLE;
+            if (ispActive) begin
+              ISPbyte <= {6'b000100, u_din[1:0]};
+              ISPfull <= 1'b1;
+            end else begin
+              uartRXbyte <= {6'b000100, u_din[1:0]};
+              uartRXfull <= 1'b1;
+            end
+          end
+        UART_UNLOCK:
+          begin
+            ispActive <= 1'b0;          // any bad unlock sequence clears this
+            u_rd <= 1'b1;
+            if (u_din == unlockbyte0)
+              r_state <= UART_UNLOCK1;
+            else
+              r_state <= UART_RX_IDLE;
+          end
+        UART_UNLOCK1:
+          begin
+            u_rd <= 1'b1;
+            if (u_din == unlockbyte1)
+              ispActive <= 1'b1;
+            r_state <= UART_RX_IDLE;
+          end
+        default:
+          r_state <= UART_RX_IDLE;
+        endcase
+      if (ISPack == 1'b1)
+        ISPfull <= 1'b0;
+      if (io_rd)
+        if (!p_hold)
+          case (mem_addr[3:0])          // io read clears UART receive flag
+          4'h0: uartRXfull <= 1'b0;
           endcase
-        if (ISPack == 1'b1)
-          ISPfull <= 1'b0;
-        if (io_rd)
-          if (!p_hold)
-            case (mem_addr[3:0])        // io read clears UART receive flag
-            4'h0: uartRXfull <= 1'b0;
-            endcase
-        if (io_wr)
-          if (!p_hold)
-            case (mem_addr[3:0])
-            4'h4:                       // jam an ISP byte
-              {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
-            endcase
-      end
+      if (io_wr)
+        if (!p_hold)
+          case (mem_addr[3:0])
+          4'h4:                         // jam an ISP byte
+            {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
+          endcase
+    end
 
   reg [2:0] b_state;                    // boot FSM state
   reg [2:0] i_usel;                     // UART output select for ISP
@@ -212,16 +241,16 @@ module spif
   always @* begin                       // UART output mux
     if (ispActive)
       case (i_usel[2:0])                // ping response:
-      3'b000:  u_dout <= 8'hAA;         // format byte: AA = this one
-      3'b001:  u_dout <= sernum[23:16];
-      3'b010:  u_dout <= sernum[15:8];
-      3'b011:  u_dout <= sernum[7:0];
-      3'b100:  u_dout <= PRODUCT_ID[15:8];
-      3'b101:  u_dout <= PRODUCT_ID[7:0];
-      3'b110:  u_dout <= BASEBLOCK[7:0];
-      default: u_dout <= f_din;
+      3'b000:  uo_dout <= 8'hAA;        // format byte: AA = this one
+      3'b001:  uo_dout <= sernum[23:16];
+      3'b010:  uo_dout <= sernum[15:8];
+      3'b011:  uo_dout <= sernum[7:0];
+      3'b100:  uo_dout <= PRODUCT_ID[15:8];
+      3'b101:  uo_dout <= PRODUCT_ID[7:0];
+      3'b110:  uo_dout <= BASEBLOCK[7:0];
+      default: uo_dout <= f_din;
       endcase
-    else  u_dout <= outword[7:0];
+    else  uo_dout <= outword[7:0];
   end
 
   always @* begin                       // insert i/o wait states
@@ -310,7 +339,10 @@ module spif
   reg bumpDest;                         // trigger address bump
   reg [3:0] b_mode;                     // boot interpreter mode
   reg [1:0] st_new;                     // stream triggers
-  assign st_stb = st_new[0];
+
+  always @(posedge clk or negedge arstn)
+  if (!arstn) st_stb <= 1'b0;
+  else        st_stb <= st_new[0];
 
   reg [3:0] i_state;
   localparam ISP_IDLE =   4'b0001;
@@ -319,7 +351,7 @@ module spif
   localparam ISP_PING =   4'b1000;
 
   wire b_rxok = ISPfull & ~ISPack;      // okay to process UART input
-  wire b_txok = u_ready & ~u_wr;        // okay to send to UART
+  wire b_txok = uo_ready & ~uo_wr;      // okay to send to UART
   wire st_ready = ~(st_busy & (bytecount == 0)); // blocked on last flash byte
   wire f_ok = f_ready & ~f_wr & g_ready & st_ready;
   reg init;                             // initialize memory at POR
@@ -332,16 +364,16 @@ module spif
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
-      f_dout <= 8'h00;    f_wr <= 1'b0;      f_who <= 1'b0;
+      f_dout <= 8'h00;    f_wr <= 1'b0;
       b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= 0;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 4'd0;     bumpDest <= 1'b0;  i_state <= ISP_PING;
       bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd7;
       bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 3'd1;    f_format <= 3'd0;  g_load <= 1'b0;
-      p_reset <= 1'b1;    u_wr <= 1'b0;      g_reset_n <= 1'b0;
+      p_reset <= 1'b1;    uo_wr <= 1'b0;     g_reset_n <= 1'b0;
       outword <= 91;  // power-up output character
-      init <= 1'b1;       i_count <= (1 << CODE_SIZE) - 1;
+      init <= RAM_INIT;   i_count <= (1 << CODE_SIZE) - 1;
       st_new <= 2'b00;
     end else begin
       codeWr <= 1'b0;                   // strobes
@@ -358,7 +390,7 @@ module spif
         if (i_count) i_count <= i_count - 12'd1;
         else init <= 1'b0;
       end else begin
-        u_wr <= 1'b0;
+        uo_wr <= 1'b0;
         case (b_state)
           3'b000 : f_dout <= ISPbyte;
           3'b001 : f_dout <= FAST_READ;
@@ -369,12 +401,10 @@ module spif
         f_wr <= 1'b0;
         if (f_ok) begin
           f_wr <= 1'b1;
-          f_who <= 1'b0;
           case (b_state)
           3'b000:
             begin
               f_wr <= 1'b0;             // ========== Interpret ISP bytes
-              f_who <= 1'b1;
               case (i_state)
               ISP_IDLE:
                 if (b_rxok) begin
@@ -415,12 +445,12 @@ module spif
                 if (b_rxok) begin
                   ISPack <= 1'b1;
                   f_wr <= 1'b1; 	// UART --> flash
-                  if (i_count) i_count <= i_count - 12'd1;
+                  if (i_count) i_count <= i_count - 1'b1;
                   else i_state <= ISP_IDLE;
                 end
               ISP_DNLOAD:
                 if (b_txok) begin
-                  u_wr <= 1'b1;         // flash --> UART
+                  uo_wr <= 1'b1;        // flash --> UART
           	  i_usel <= 3'd7;
                   if (i_count) begin
                     i_count <= i_count - 12'd1;
@@ -430,7 +460,7 @@ module spif
                 end
               ISP_PING:
                 if (b_txok) begin
-                  u_wr <= 1'b1;
+                  uo_wr <= 1'b1;
           	  i_usel <= i_count[2:0];
                   if (i_count) i_count <= i_count - 12'd1;
                   else i_state <= ISP_IDLE;
@@ -525,7 +555,7 @@ module spif
           if (internal)                 // write to register:
             case (mem_addr[3:0])
             4'h0: begin
-                u_wr <= 1'b1;           // UART output byte
+                uo_wr <= 1'b1;          // UART output byte
        	        i_usel <= 3'd7;
                 outword <= din;
               end

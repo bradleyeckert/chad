@@ -9,7 +9,6 @@ module sflash
 // Flash Memory interface to spif
   output reg          ready,            // Ready for next byte to send
   input wire          wr,               // Flash transmit strobe
-  input wire          who,              // Who's asking?
   input wire  [7:0]   din,              // Flash transmit data
   input wire  [2:0]   format,           // Flash format
   input wire  [3:0]   prescale,         // Flash configuration setup
@@ -24,10 +23,6 @@ module sflash
 
 // The 4-bit prescale value allows for a divisor of 2 to 32 on SCLK.
 // for a 50 MHz SPI clock, the maximum module clock is 1.6 GHz.
-
-// `who` is not used because you can't hide SPI bus data anyway.
-// One could encrypt and decrypt data in this module, but this not done to keep
-// it small and simple.
 
 // format is the bus format of the SPI:
 // 00x = inactive (CS# = '1')

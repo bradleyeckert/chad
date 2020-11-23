@@ -51,7 +51,6 @@ module mcu
 // Flash Memory interface
   wire                 f_ready;         // Ready for next byte to send    i
   wire                 f_wr;            // Flash transmit strobe          o
-  wire                 f_who;           // Who is requesting the transfer?o
   wire [7:0]           f_dout;          // Flash transmit data            o
   wire [2:0]           f_format;        // Flash format                   o
   wire [3:0]           f_rate;          // Flash configuration setup      o
@@ -192,7 +191,6 @@ module mcu
     .u_din    (u_din    ),
     .f_ready  (f_ready  ),
     .f_wr     (f_wr     ),
-    .f_who    (f_who    ),
     .f_dout   (f_dout   ),
     .f_format (f_format ),
     .f_rate   (f_rate   ),
@@ -217,7 +215,6 @@ module mcu
     .arstn    (rst_n    ),
     .ready    (f_ready  ),
     .wr       (f_wr     ),
-    .who      (f_who    ),
     .din      (f_dout   ),
     .format   (f_format ),
     .prescale (f_rate   ),
