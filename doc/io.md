@@ -10,4 +10,6 @@ Output devices sit on (`mem_addr`,`dout`).
 See the `iomap.c` file for implementation details.
 
 A Wishbone bus is implemented by `spif.v` to connect to user peripherals.
+
+See the `spif` documentation for register details.
  

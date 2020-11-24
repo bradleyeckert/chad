@@ -31,7 +31,7 @@ memory decryption, in-system-programming, and boot-from-flash. Chad is:
 The sample MCU uses an external SPI flash and external USB UART.
 Green data is plaintext, red data is encrypted.
 
-![MCU Image](verilog/doc/mcu.png)
+![MCU Image](doc/mcu.png)
 
 ## A self-hosting Forth for J1-style CPUs
 

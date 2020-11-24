@@ -163,7 +163,7 @@ void FlashMemBoot(void) {
 static uint64_t gkey = 0;
 static uint8_t xorkey;
 
-int IOspiResult(void) {
+static int IOspiResult(void) {
     return SPIresult ^ xorkey;
 }
 
@@ -178,8 +178,8 @@ int IOspiResult(void) {
 // `11xxxxff` Read N+1 bytes from flash using format f
 
 static void JamISP(uint8_t c) {
-    static state = 0;
-    static n = 0;
+    static int state = 0;
+    static int n = 0;
     int sel = c >> 6;
 #ifdef VERBOSE
     printf("j[%d,%02X] ", state, c);
@@ -194,16 +194,16 @@ static void JamISP(uint8_t c) {
             // (c & 1) ignore reset
             if (c & 2) { printf("ISP: no ping\n"); }
             if (c & 4) { FlashMemBoot(); }
-            if (c & 8) { 
+            if (c & 8) {
 #ifdef VERBOSE
                 printf("Loading Key %X%08X\n", (uint32_t)(gkey >> 32), (uint32_t)gkey);
 #endif
                 GeckoLoad(gkey);
-                gkey = 0; 
+                gkey = 0;
                 xorkey = GeckoByte();
             }
             if (c & 32) {
-                FlashSPI(0); 
+                FlashSPI(0);
                 xorkey = GeckoByte();
 #ifdef VERBOSE
                 printf("SPI xfer, keystream=%02Xh, raw=%02X\n", xorkey, SPIresult);
@@ -214,9 +214,9 @@ static void JamISP(uint8_t c) {
             FlashMemSPIformat(c & 7);
             if (c & 7) state = sel;
             break;
-        case 3: 
+        case 3:
             FlashMemSPIformat(c & 7);
-            state = sel;  
+            state = sel;
             break;
         } break;
     case 2: // write makes sense
@@ -228,6 +228,40 @@ static void JamISP(uint8_t c) {
     }
 }
 
+/*
+There are two ways to input from a keyboard: Cooked and Raw. Each has trade-offs.
+KEY uses cooked input for compatibility with terminals.
+If you use a terminal (like PuTTY) over a UART, it has to use cooked mode.
+It buffers a line locally, allowing you to edit it, before sending it.
+termKey will wait until a CR is received.
+*/
+
+static uint8_t buf[LineBufferSize];
+static int toin = 0;
+static int len = 0;
+
+static int IOtermQkey(void) {
+    if (toin < len) {
+        return 1;                       // there are chars in the buffer
+    }
+    return KbHit();
+}
+
+static int IOtermKey(void) {              // Get the next byte in the input stream
+    if (toin < len) {
+        return buf[toin++];
+    }
+    toin = 0;
+    len = 0;
+    if (fgets((char*)buf, LineBufferSize, stdin) != NULL) {
+        len = strlen((char*)buf);
+    }
+    if (len) {                          // the string ends in newline
+        return buf[toin++];
+    }
+    return -1;                          // so this shouldn't happen ever
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Host words start at I/O address 8000h.
 
@@ -237,9 +271,6 @@ static void JamISP(uint8_t c) {
 static uint8_t nohostAPI;               // prohibit access to host API
 static uint32_t WishboneUpperRx;
 static uint32_t WishboneUpperTx;
-
-static int IOtermKey(void);
-static int IOtermQkey(void);
 
 uint32_t readIOmap (uint32_t addr) {
     if ((addr & 0x8000) && (nohostAPI))
@@ -288,40 +319,6 @@ int writeIOmap (uint32_t addr, uint32_t x) {
     default: return BAD_IOADDR;
     }
     return 0;
-}
-
-/*
-There are two ways to input from a keyboard: Cooked and Raw. Each has trade-offs.
-KEY uses cooked input for compatibility with terminals.
-If you use a terminal (like PuTTY) over a UART, it has to use cooked mode.
-It buffers a line locally, allowing you to edit it, before sending it.
-termKey will wait until a CR is received.
-*/
-
-static uint8_t buf[LineBufferSize];
-static int toin = 0;
-static int len = 0;
-
-static int IOtermQkey(void) {
-    if (toin < len) {
-        return 1;                       // there are chars in the buffer
-    }
-    return KbHit();
-}
-
-static int IOtermKey(void) {              // Get the next byte in the input stream
-    if (toin < len) {
-        return buf[toin++];
-    }
-    toin = 0;
-    len = 0;
-    if (fgets((char*)buf, LineBufferSize, stdin) != NULL) {
-        len = strlen((char*)buf);
-    }
-    if (len) {                          // the string ends in newline
-        return buf[toin++];
-    }
-    return -1;                          // so this shouldn't happen ever
 }
 
 void killHostIO(void) {

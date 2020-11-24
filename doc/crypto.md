@@ -20,6 +20,9 @@ It takes 48 clock cycles to initialize and then provides a new pseudorandom
 byte every 8 clocks.
 So, with a 200 MHz clock, an on-chip (or QSPI) flash would be read at 25 MBPS.
 
+The encryption hardware is limited to SPI flash decryption. It's not set up to
+encrypt messages, so it's not hardened for that use case.
+
 The multi-cell keys are `bkey` for the boot record and `tkey` for text in flash.
 If non-zero, `bkey` encrypts the boot record when it gets written to flash memory.
 Hardware that instantiates `spif.v` must use the same key in its parameters.

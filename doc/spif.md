@@ -239,7 +239,7 @@ Memory type `2` is for a user output stream.
 The SCLK frequency starts out at sysclk / 16 to be conservative.
 At some point early on, you should include a command byte to raise the
 frequency to more closely match the capability of the flash chip.
-For example, `A0` sets the maximum SCLK.
+For example, `80` sets the maximum SCLK.
 
 ## User output stream
 
@@ -267,7 +267,6 @@ Read:
 - 5: Boot transfer status: 1 = loading memory from flash
 - 6: Raw clock cycle count
 - 7: Upper bits of a 32-bit Wishbone Bus read if cells are less than 32-bit 
-- 8: Read exception parameter
 
 Write:
 
@@ -279,7 +278,6 @@ Write:
 - 5: Write key: key = key<<cellbits + n
 - 6: Write raw data to user output stream
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
-- 8: Save exception parameter
 
 ### Jamming ISP bytes
 
@@ -300,13 +298,6 @@ registers handle the extra bits.
 There are no byte lanes in the bus, so `sel_o` is assumed high. 
 Since `cyc_o` is always the same as `stb_o`, it is not duplicated.
 
-### Exception parameter
-
-An exception occurs when there is an error.
-Exceptions are handled by issuing a hard reset to the CPU and rebooting.
-After cold boot, the exception register can be read to determine the reset source.
-0 means POR.
-
 ## Sample MCU
 
 The MCU in the `verilog` folder connects to SPI flash and a USB UART such as CH330N.
@@ -319,7 +310,7 @@ warn you about possible simulation mismatch. Such problems occur if you try to
 read back a word that was written to the same address in the previous cycle.
 That won't happen in this architecture, the way `chad` is set up.
 
-![MCU Image](mcu.png)
+![MCU Image](doc/mcu.png)
 
 ## Why spif?
 
