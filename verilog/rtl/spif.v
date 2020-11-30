@@ -60,7 +60,7 @@ module spif
   output wire                 stb_o,    // strobe
   input wire                  ack_i,    // acknowledge
 // User stream output (from flash or processor)
-  output reg [STWIDTH-1:0]    st_o,     // stream output data
+  output reg [STWIDTH+1:0]    st_o,     // stream output data
   output reg                  st_stb,   // stream strobe
   input wire                  st_busy,  // 1 = not ready for st_stb
 // Interrupt requests
@@ -565,7 +565,7 @@ module spif
                 outword <= din;
               end
             4'h6: begin
-                st_o <= din[STWIDTH-1:0];
+                st_o <= din[STWIDTH+1:0];
                 st_new <= 2'b01;
               end
             4'h7:                       // upper bits of outgoing Wishbone
@@ -574,7 +574,7 @@ module spif
             4'h8: outword <= din;
             endcase
       if (st_new == 2'b11)
-        st_o <= b_data[STWIDTH-1:0];
+        st_o <= {2'b00, b_data[STWIDTH-1:0]};
     end
 
   wire booting = (b_state) ? 1'b1 : 1'b0;

@@ -70,7 +70,7 @@ module spif_tb();
     );
 
 // stream stub
-  wire [7:0] st_o;                      // stream output data           i
+  wire [9:0] st_o;                      // stream output data           i
   wire       st_stb;                    // stream strobe                i
   reg        st_busy = 1'b0;
 

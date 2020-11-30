@@ -8,6 +8,9 @@
 // This is not a problem: loading a 0 key just makes decryption not work.
 // Matching "key.c" uses the same algorithm in C.
 
+// It takes 8 cycles to get the next byte unless the key is 0, in which `dout`
+// stays stuck at 0 and `ready` is always set. With a 0 key, plaintext can stream faster.
+
 `default_nettype none
 
 module gecko
@@ -55,10 +58,11 @@ module gecko
   // Recycle the key after KEY_LENGTH bytes
   wire recycle = (count > (15 - KEY_LENGTH));
   wire [7:0] inkey = (recycle) ? key : b[(16 - KEY_LENGTH)*8 : (16 - KEY_LENGTH)*8 - 7];
+  reg keyed;                    // key detected
 
   always @(posedge clk or negedge rst_n)
     if (!rst_n) begin
-      state <= LOAD;
+      state <= LOAD;  keyed <= 1'b0;
       ready <= 1'b0;  dout <= 8'd0;
       count <= 5'd15;
     end else if (clken) begin
@@ -71,8 +75,17 @@ module gecko
             count <= count - 1'b1; // to fill out the internal state
           else begin
             count <= 5'd31;
-            state <= DIFFUSE;
+            if (keyed)
+              state <= DIFFUSE;
+            else if (inkey)
+              state <= DIFFUSE;
+            else begin          // zero key detected, nothing to do
+              state <= WAIT;
+              ready <= 1'b1;
+            end
           end
+          if (inkey)            // detect non-zero key
+            keyed <= 1'b1;
         end
       DIFFUSE:                  // diffuse the key using 32 iterations
         begin
@@ -98,7 +111,7 @@ module gecko
           end
         end
       WAIT:                     // wait for the next byte trigger
-        if (next) begin
+        if (next & keyed) begin
           count <= 5'd7;
           ready <= 1'b0;
           state <= RUN;

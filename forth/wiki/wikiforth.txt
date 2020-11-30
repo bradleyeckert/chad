@@ -439,7 +439,7 @@ H</ul>
  `addr` is the address of the selected string within the input buffer and `len` is
  its length in bytes. If the parse area is empty or contains only white space,
  the resulting string has length zero.
-=2.6070: parse-word ( delimiter -- addr len )
+=2.6070: parse ( delimiter -- addr len )
  If `delimiter` is a blank, skip leading spaces.
  Parse name delimited by `delimiter`.
  If `delimiter` is non-blank, advance `>in` one position so it's just past the delimiter.

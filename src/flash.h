@@ -4,7 +4,7 @@
 #ifndef __FLASH_H__
 #define __FLASH_H__
 
-int LoadFlashMem(char *filename);
+int LoadFlashMem(char *filename, uint32_t origin);
 int SaveFlashMem(char* filename, uint32_t pid);
 int SaveFlashMemHex(char* filename, int baseblock);
 int FlashBaseBlock(void);

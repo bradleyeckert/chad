@@ -1175,9 +1175,9 @@ SV Include(void) {                      // Nest into a source file
     error = OpenNewFile(tok);
 }
 
-SV LoadFlash(void) {
+SV LoadFlash(void) {                    // ( dest -- )
     ParseFilename();
-    error = LoadFlashMem(tok);
+    error = LoadFlashMem(tok, Dpop());
 }
 
 SV SaveFlash(void) {                    // chad format ( d_pid baseblock -- )
@@ -1765,12 +1765,14 @@ SV MakeBootList(void) {
 }
 
 SV BootNrun(void) {
+    Dpush(0);
     LoadFlash();                        // file --> "SPI flash"
     FlashMemBoot();                     // boot from flash
     Cold();                             // run CPU
 }
 
 SV Boot(void) {
+    Dpush(0);
     LoadFlash();                        // file --> "SPI flash"
     FlashMemBoot();                     // boot from flash
     SkipToEOL();
@@ -1930,7 +1932,7 @@ SV LoadKeywords(void) {
     AddKeyword("+bkey",       "1.0093 u --",          AddBootKey,    noCompile);
     AddKeyword("+tkey",       "1.0094 u --",          AddTextKey,    noCompile);
     AddKeyword("tkey",        "1.0095 -- ud",         ExecTextKey, CompTextKey);
-    AddKeyword("load-flash",  "1.0134 <filename> --", LoadFlash,     noCompile);
+    AddKeyword("load-flash",  "1.0134 <filename> a --", LoadFlash,   noCompile);
     AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
     AddKeyword("save-flash", "1.0136 pid bit <filename> --", SaveFlash, noCompile);
     AddKeyword("boot",        "1.0138 <filename> --", BootNrun,      noCompile);

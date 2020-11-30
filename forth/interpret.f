@@ -42,7 +42,7 @@ there
    repeat nip                           \ end of input
 ;
 : parse-name  bl [ ;                    \ 2.6060 <name> -- addr len
-: parse-word  _parse over - ;           \ 2.6070 delimiter -- addr len
+: parse       _parse over - ;           \ 2.6070 delimiter -- addr len
 
 \ Text input uses shared data so >in can be manipulated here.
 

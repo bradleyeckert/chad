@@ -52,8 +52,13 @@ int FlashBaseBlock(void) {
 	return BASEBLOCK;
 }
 
-int LoadFlashMem(char* filename) {      // load binary image
-	memset(mem, 0, FlashMemorySize);    // erase flash
+// load binary image
+// origin=0 is a special case: initialize flash and skip the boilerplate.
+// otherwise, you can load raw data at an offset without clearing memory.
+
+int LoadFlashMem(char* filename, uint32_t origin) { 
+	if (origin == 0)
+		memset(mem, 0, FlashMemorySize); // erase entire flash
 	FILE* fp;
 #ifdef MORESAFE
 	errno_t err = fopen_s(&fp, filename, "rb");
@@ -61,9 +66,10 @@ int LoadFlashMem(char* filename) {      // load binary image
 	fp = fopen(filename, "rb");
 #endif
 	if (fp == NULL) return BAD_OPENFILE;
-	fread(boilerplate, 1, 16, fp);		// get boilerplate
-	uint32_t length = fread(mem, 1, FlashMemorySize, fp);
-	invertMem(mem, length);
+	if (origin == 0)
+		fread(boilerplate, 1, 16, fp);	// get boilerplate
+	uint32_t length = fread(&mem[origin], 1, FlashMemorySize - origin, fp);
+	invertMem(&mem[origin], length);
 	fclose(fp);
 	return 0;
 }

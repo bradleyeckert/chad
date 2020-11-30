@@ -10,6 +10,7 @@
 \ boot code and headers. Should be a multiple of 4096.
 
 $4000 forg                              \ strings in flash start here
+$6000 equ fontDB                        \ font database location
 
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
@@ -68,6 +69,7 @@ variable hicycles
 \ Save to a flash memory image
 $2000 forg  make-heads                  \ build headers in flash
 $0000 forg  make-boot                   \ create a boot record in flash
+fontDB load-flash ../myfont.bin         \ add the fonts in raw binary
 0. BASEBLOCK save-flash myapp.bin       \ save to a 'chad' file you can boot
 BASEBLOCK save-flash-h myapp.txt        \ save in hex for flash memory model
 

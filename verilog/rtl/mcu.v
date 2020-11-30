@@ -143,7 +143,7 @@ module mcu
   end
 
 // stream stub
-  wire [8:0] st_o;                      // stream output data           i
+  wire [9:0] st_o;                      // stream output data           i
   wire       st_stb;                    // stream strobe                i
   wire st_busy = 1'b0;
 
@@ -160,7 +160,7 @@ module mcu
   assign io_dout = s_io_dout;           // spif is the only I/O device
 
 // spif is the SPI flash controller and ISP hub
-  spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, 9, KEY_LENGTH) bridge (
+  spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, 8, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
