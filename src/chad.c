@@ -209,7 +209,6 @@ static uint8_t Iack(void) {             // priority encoder
 // MoreInstrumentation (config.h) slows down the code by 40%.
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
-CELL copresult;
 
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
@@ -279,7 +278,7 @@ SI CPUsim(int single) {
                     }
                 } else {
                     if (insn & 0x800)                               /* coproc */
-                        copresult = coproc_c(insn & 0x7FF, 
+                        coprocGo(insn & 0x7FF,
                             t & CELLMASK, s & CELLMASK, w & CELLMASK);
                     else 
                         _lex = (lex << 11) | (insn & 0x7FF);        /*   litx */
@@ -304,9 +303,10 @@ SI CPUsim(int single) {
             }
             cell _c = t & 1;
             sum_t sum;
+            cell _w = (insn & 0x800) ? t : w;
             switch ((insn >> 9) & 0x1F) {
             case 0x00: _t = t;                               break; /*      T */
-            case 0x10: _t = copresult;                       break; /*    COP */
+            case 0x10: _t = coprocRead();                    break; /*    COP */
             case 0x01: _t = (t & MSB) ? -1 : 0;              break; /*    T<0 */
             case 0x11: _t = cy;                              break; /*      C */
             case 0x02: temp = (t & MSB);
@@ -357,7 +357,7 @@ SI CPUsim(int single) {
             case  5: temp = writeIOmap(CELL_ADDR(t), s);          /* N->io[T] */
                 if (temp) { single = temp; }   break;
                // 6 = IORD strobe
-            case  7: cy = _c;  w = t;                        break;   /*   co */
+            case  7: cy = _c;  w = _w;                       break;   /*   co */
             default: break;
             }
             t = _t & CELLMASK;
@@ -557,6 +557,12 @@ SV doNext(void) {
     toCode(alu | RM1toT | TtoN | sup);  /* (R-1)@ */
     toCode(alu | zeq | TtoR);  ResolveRev(zjump);
     toCode(alu | rdn);  latest = CP;    /* rdrop */
+}
+
+SV CoprocInst(void) {
+    int sel = Dpop();
+    if (sel > 0x3FF) error = BAD_COPROCESSOR;
+    toCode(copop | sel);
 }
 
 // HTML output is a kind of log file of token handling. It's a browsable
@@ -2018,6 +2024,7 @@ SV LoadKeywords(void) {
     AddKeyword("|",           "1.1370 x --",          TableEntry,    noCompile);
     AddKeyword("irq!",        "1.1380 x --",          irqStore,      noCompile);
     AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
+    AddKeyword("cotrig",      "1.1400 sel --",        CoprocInst,    noCompile);
     // Primitives can compile and execute
     // They are basically 16-bit fixed codes
     AddALUinst("nop",     "1.2000 --",   0);
@@ -2069,6 +2076,7 @@ SV LoadKeywords(void) {
     AddALUinst("spstat",  "1.2740 -- rp<<8|sp",       who   | TtoN | sup);
     AddALUinst("(R-1)@",  "1.2750 -- x-1 | x -- x",  RM1toT | TtoN | sup);
     AddALUinst("_next_",  "1.2760 n -- flag | x -- n", zeq  | TtoR);
+    AddALUinst("costat",  "1.2770 -- n",              cop   | TtoN | sup);
     // compile-only control words, can't be postponed
     AddKeyword("begin",   "1.2900 --",  noExecute, doBegin);
     AddKeyword("again",   "1.2910 --",  noExecute, doAgain);

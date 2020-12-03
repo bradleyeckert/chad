@@ -245,19 +245,4 @@ variable dpl
    again
 ;
 
-\ iomap.c sends errors to the Chad interpreter
-\ A QUIT loop running on the CPU would do something different.
-
-1 [if] \ quit is the interpreter
-
-:noname  ( error -- )  ?dup if  quit  then
-; resolves throw
-
-[else] \ host is the interpreter
-
-:noname  ( error -- )  ?dup if  [ $4000 cells ] literal io!  then
-; resolves throw
-
-[then]
-
 there swap - . .( instructions used by interpret) cr

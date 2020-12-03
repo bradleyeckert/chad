@@ -21,8 +21,8 @@ include ../coreext.f
 include ../redirect.f
 include ../frame.f
 include ../numout.f
-include ../flash.f
 include ../compile.f
+include ../flash.f
 include ../interpret.f
 \ include ../ctea.f
 \ include ../bignum.f
@@ -42,8 +42,20 @@ variable hicycles
    hicycles @
 ;
 
+\ Error handling
+
+[defined] quit [if]
+  :noname  ( error -- )  ?dup if  quit  then
+  ; resolves throw        \ quit handles the errors
+[else]
+  :noname  ( error -- )  ?dup if  [ $4000 cells ] literal io!  then
+  ; resolves throw        \ iomap.c sends errors to the Chad interpreter
+[then]
+
 \ Hardware loads code and data RAMs from flash. Upon coming out of reset,
 \ both are initialized. The PC can launch from 0 (cold).
+
+[defined] quit [if]
 
 : myapp  ( -- )
     ." May the Forth be with you."
@@ -55,6 +67,8 @@ variable hicycles
 \ You can now run the app with "cold"
 
 : hi ." 多么美丽的世界 " ;
+
+[then]
 
 \ Examples
 

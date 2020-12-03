@@ -55,7 +55,7 @@ there
 \ fixed left shifts
 
 : 16*   2* 2* 2* 2* ;
-: 256*  16* 16* ;
+: 256*  16* 16* ; \ faster than setting up the hardware shifter
 
 there swap - . .( instructions used by core ext) cr
 

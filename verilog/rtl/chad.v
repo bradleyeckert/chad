@@ -21,7 +21,12 @@ module chad
   input  wire [15:0] insn,              // Code memory data
   input  wire irq,                      // Interrupt request
   input  wire [3:0] ivec,               // Interrupt vector that goes with irq
-  output wire iack                      // Interrupt acknowledge
+  output wire iack,                     // Interrupt acknowledge
+  output wire copgo,                    // Coprocessor trigger, select = insn[10:0]
+  input  wire [WIDTH-1:0] cop,          // Coprocessor output
+  output wire [WIDTH-1:0] copa,         // Coprocessor A input
+  output wire [WIDTH-1:0] copb,         // Coprocessor B input
+  output wire [WIDTH-1:0] copc          // Coprocessor C input
 );
 
   reg  [4:0] dsp, rsp;                  // Stack depth tracking
@@ -49,10 +54,10 @@ module chad
     .rd(rst0), .we(rstkW), .wd(rstkD), .delta(rspI));
 
   // Coprocessor
-  wire [WIDTH-1:0] cop;
-  wire copgo = (insn[15:11] == 5'b11101);
-  coproc #(WIDTH) coprocessor (.clk(clk), .arstn(resetq), .sel(insn[10:0]),
-    .go(copgo), .y(cop), .a(st0), .b(st1), .c(wreg));
+  assign copgo = (insn[15:11] == 5'b11101);
+  assign copa = st0;
+  assign copb = st1;
+  assign copc = wreg;
 
   reg [WIDTH-12:0] lex;
   wire [WIDTH-1:0] longlex = {lex, insn[10:0]};
@@ -173,8 +178,10 @@ module chad
         { pc, st0 } <= { pcN, st0N };
         dsp <= dsp + {dspI[1], dspI[1], dspI[1], dspI};
         rsp <= rsp + {rspI[1], rspI[1], rspI[1], rspI};
-        if (func_co)
-          { carry, wreg } <= { co, st0 };
+        if (func_co) begin
+          carry <= co;
+          if (insn[11]) wreg <= st0;
+        end
         if (islex) lex <= longlex[WIDTH-12:0];
         else lex <= 0;
       end

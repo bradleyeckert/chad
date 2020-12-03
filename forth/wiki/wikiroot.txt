@@ -455,7 +455,9 @@ H</ul>
 =1.1390: gendoc ( -- )
  HTML documentation generator that compiles a master file
  for the application.
-
+=1.1400: coproc ( sel -- )
+ Compile a coprocessor instruction with 11-bit `sel` field.
+ Example: `... [ 5 coproc ] ...`.
 
 =1.2000: nop ( -- )
  Do nothing.
@@ -573,6 +575,9 @@ _
 =1.2760: _next_ ( n -- flag|x -- n )
  Write the counter back to the return stack and check its sign.
  See `next`.
+=1.2770: costat ( -- n )
+ Read the coprocessor output. If you are reading the `busy` status, use a
+ `[ 0 cotrig ]` to select the `busy` register for polling.
 =1.2900: begin ( -- )
  Compilation: ( C: -- dest )
  Put the next location for a transfer of control, dest, onto the control

@@ -230,10 +230,17 @@ is busy. Once finished, you can read the result from `COP`.
 - 0xE805 = Read division remainder
 - 0xE808 = Trigger unsigned multiplication of T and N
 - 0xE809 = Trigger division of T:N by W
+- 0xE80A = Trigger shift of T:N by W
 
 On a MAX10, a 24-bit processor needed about 300 LEs to add iterative hardware
 multiply and divide. Since the FPGA's hard multipliers are not used,
 the coprocessor won't slow down the processor if it's in an ASIC.
+
+Fractional multiplication is great way of scaling.
+A fractional multiply step is faster than a full iterative multiplication when
+full precision isn't required. 
+A `+*` instruction can't be added directly to the ISA without slowing it down.
+Instead, coprocessor logic does the fractional multiply.
 
 ### SDRAM (TBD)
 

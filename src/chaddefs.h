@@ -208,6 +208,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_INCLUDING   -78 // Nesting overflow during include
 #define BAD_NOCOMPILE   -79 // Compiling an execute-only word
 #define BAD_FSOVERFLOW  -82 // Flash string overflow
+#define BAD_COPROCESSOR -84 // Invalid coprocessor field
 #define BAD_CREATEFILE -198
 #define BAD_OPENFILE   -199 // Can't open file
 #define BYE            -299

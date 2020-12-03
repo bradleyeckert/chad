@@ -129,15 +129,17 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 
 \ This really comes in handy, although there is a small (9T) time penalty.
 : times                                 \ 2.0405 n xt --
-    swap dup 1- 0< if  2drop exit  then \ do 0 times
-    for  dup>r execute r>  next         \ do 1 or more times
-    drop
+   swap dup 1- 0< if  2drop exit  then  \ do 0 times
+   for  dup>r execute r>  next          \ do 1 or more times
+   drop
 ;
 
-CODE cop_options                        \ 2.0760 -- n
-    drop 1 cop                          \ get hardware option bits
-    COP T->N d+1  RET alu
-;CODE
+: cop_options  ( -- n )                 \ 2.0760 -- n
+   [ 1 cotrig ]  costat                 \ read coprocessor options register
+;
+: cowait  ( -- )                        \ wait until coprocessor finishes
+   [ 0 cotrig ] begin costat while noop repeat
+;
 
 \ Math iterations are subroutines to minimize the latency of lazy interrupts.
 \ These interrupts modify the RET operation to service ISRs.
@@ -145,109 +147,75 @@ CODE cop_options                        \ 2.0760 -- n
 \ Latency is the maximum time between returns.
 
 cop_options 1 and [if]                  \ hardware multiply?
-CODE um*                                \ 2.0410 u1 u2 -- ud
-    drop 8 cop                          \ trigger multiply
-    N d-1 alu   N d-1 alu               \ 2drop
-    begin
-        cop  COP T->N d+1 alu           \ get busy flag
-    while
-        drop ' noop scall               \ spin while it's busy
-    repeat
-    drop 3 cop
-    COP T->N d+1 alu
-    drop 2 cop
-    COP T->N d+1 RET alu
-;CODE
+: um*                                   \ 2.0410 u1 u2 -- ud
+   [ cellbits 1-  2* 2* 2* 2* 2*  $12 +  cotrig ]
+   2drop  cowait                        \ um* is a special case of fractional *
+   [ 3 cotrig ]  costat
+   [ 2 cotrig ]  costat
+;
 [else]
 
 \ Multiplication using shift-and-add, 160 to 256 cycles at 16-bit.
 \ Latency = 17
 : (um*)
-    2* >r 2*c carry
-    if  over r> +c >r carry +
-    then  r>
+   2* >r 2*c carry
+   if  over r> +c >r carry +
+   then  r>
 ;
 : um*                                   \ 2.0410 u1 u2 -- ud
-    0 [ cellbits 2/ ] literal           \ cell is an even number of bits
-    for (um*) (um*) next
-    >r nip r> swap
+   0 [ cellbits 2/ ] literal            \ cell is an even number of bits
+   for (um*) (um*) next
+   >r nip r> swap
 ;
 [then]
 
 cop_options 2 and [if]                  \ hardware divide?
-CODE um/mod                             \ 2.0420 ud u -- ur uq
-    N CO d-1 alu                        \ divisor to W
-    drop 9 cop                          \ trigger divide
-    N d-1 alu   N d-1 alu               \ 2drop
-    begin
-        cop  COP T->N d+1 alu           \ get busy flag
-    while
-        drop ' noop scall               \ spin while it's busy
-    repeat
-    drop 5 cop
-    COP T->N d+1 alu
-    drop 4 cop
-    COP T->N d+1 RET alu
-;CODE
+: um/mod                                \ 2.0420 ud u -- ur uq
+   >carry [ $14 cotrig ]  2drop cowait
+   [ 5 cotrig ]  costat
+   [ 4 cotrig ]  costat
+;
 [else]
-
 \ Long division takes about 340 cycles at 16-bit.
 \ Latency = 25
 : (um/mod)
-    >r  swap 2*c swap 2*c               \ 2dividend | divisor
-    carry if
-        r@ -   0 >carry
-    else
-        dup r@  -c drop                 \ test subtraction
-        carry 0= if  r@ -c  then        \ keep it
-    then
-    r>  carry                           \ carry is safe on the stack
+   >r  swap 2*c swap 2*c               \ 2dividend | divisor
+   carry if
+      r@ -   0 >carry
+   else
+      dup r@  -c drop                   \ test subtraction
+      carry 0= if  r@ -c  then          \ keep it
+   then
+   r> carry                             \ carry is safe on the stack
 ;
 : um/mod                                \ 2.0420 ud u -- ur uq
-    over over- drop carry
-    if  drop drop dup xor
-        dup invert  exit                \ overflow = 0 -1
-    then
-    [ cellbits 2/ ] literal
-    for (um/mod) >carry
-        (um/mod) >carry
-    next
-    drop swap 2*c invert                \ finish quotient
+   over over- drop carry
+   if  drop drop dup xor
+       dup invert  exit                 \ overflow = 0 -1
+   then
+   [ cellbits 2/ ] literal
+   for (um/mod) >carry
+       (um/mod) >carry
+   next
+   drop swap 2*c invert                 \ finish quotient
 ;
 [then]
 
 cop_options 4 and [if]                  \ hardware shifter?
-CODE )dshift                            \ d1 -- d2
-    N d-1 alu   N d-1 alu               \ 2drop
-    begin
-        cop  COP T->N d+1 alu           \ get busy flag
-    while
-        drop ' noop scall               \ spin while it's busy
-    repeat
-    drop 7 cop
-    COP T->N d+1 alu                    \ get result
-    drop 6 cop
-    COP T->N d+1 RET alu
-;CODE
-
-CODE drshift                            \ d1 u -- d2
-    N CO d-1 alu                        \ count to W
-    drop 10 cop                         \ trigger right shift
-    drop ' )dshift branch               \ finish up
-;CODE
-
-CODE darshift                           \ d1 u -- d2
-    N CO d-1 alu                        \ count to W
-    drop 10 128 + cop                   \ trigger arithmetic right shift
-    drop ' )dshift branch               \ finish up
-;CODE
-
-CODE dlshift                            \ d1 u -- d2
-    N CO d-1 alu                        \ count to W
-    drop 10 64 + cop                    \ trigger left shift
-    drop ' )dshift branch               \ finish up
-;CODE
-
+: )dshift                               \ d1 -- d2
+   2drop  cowait                        \ SL1_011x
+   [ 7 cotrig ]  costat
+   [ 6 cotrig ]  costat
+;
+: drshift                               \ ud1 u -- ud2
+   >carry  [ $16 cotrig ]  )dshift
+;
+: darshift                              \ d1 u -- d2
+   >carry  [ $56 cotrig ]  )dshift
+;
+: dlshift                               \ d1 u -- d2
+   >carry  [ $36 cotrig ]  )dshift
+;
 : lshift  over swap dlshift drop ;	\ 2.1110 x1 u -- x2
 : rshift  0 swap drshift drop ;		\ 2.1120 x1 u -- x2
 
@@ -283,13 +251,13 @@ CODE dlshift                            \ d1 u -- d2
 : /mod   over 0< swap m/mod ;           \ 2.0470 n1 n2 -- rem quot
 : mod    /mod drop ;                    \ 2.0480 n1 n2 -- rem
 : /      /mod nip ;                     \ 2.0490 n1 n2 -- quot
-: m*                                    \ 2.0500 n1 n2 -- d
-    2dup xor 0< >r
-    abs swap abs um*
-    r> if dnegate then
-;
-: */mod  >r m* r> m/mod ;               \ 2.0510 n1 n2 n3 -- rem quot
-: */     */mod swap drop ;              \ 2.0520 n1 n2 n3 -- n4
+\ : m*                                    \ 2.0500 n1 n2 -- d
+\     2dup xor 0< >r
+\     abs swap abs um*
+\     r> if dnegate then
+\ ;
+\ : */mod  >r m* r> m/mod ;               \ 2.0510 n1 n2 n3 -- rem quot
+\ : */     */mod swap drop ;              \ 2.0520 n1 n2 n3 -- n4
 
 \ In order to use CREATE DOES>, we need ',' defined here.
 

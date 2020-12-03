@@ -61,6 +61,17 @@ module mcu
   wire [3:0]           ivec;            // Interrupt vector for irq       i
   wire                 iack;            // Interrupt acknowledge          o
 
+  wire                 copgo;           // Coprocessor trigger            i
+  wire [WIDTH-1:0]     cop;             // Coprocessor output             o
+  wire [WIDTH-1:0]     copa;            // Coprocessor A input            i
+  wire [WIDTH-1:0]     copb;            // Coprocessor B input            i
+  wire [WIDTH-1:0]     copc;            // Coprocessor C input            i
+
+// Coprocessor is instantiated outside of the processor
+
+  coproc #(WIDTH) coprocessor (.clk(clk), .arstn(rst_n), .sel(insn[10:0]),
+    .go(copgo), .y(cop), .a(copa), .b(copb), .c(copc));
+
 // Boot key
 // In an ASIC, you would provide these from a MTP or OTP ROM and associate
 // them with a KDF when programming.
@@ -85,7 +96,12 @@ module mcu
     .insn     (insn     ),
     .irq      (irq      ),
     .ivec     (ivec     ),
-    .iack     (iack     )
+    .iack     (iack     ),
+    .copgo    (copgo    ),
+    .cop      (cop      ),
+    .copa     (copa     ),
+    .copb     (copb     ),
+    .copc     (copc     )
   );
 
 // Memory: In this case, a couple of single-port RAMs.
