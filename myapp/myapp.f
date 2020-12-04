@@ -1,10 +1,10 @@
 ﻿\ Application example
 
 \ To load: With your working directory here, type:
-\ ..\chad include myapp.f  (in Windows), or
-\ ../chad include myapp.f  (in Linux)
+\ ..\bin\chad include myapp.f  (in Windows), or
+\ ../bin/chad include myapp.f  (in Linux)
 \ If SPI flash is encrypted, for example, with `1 +bkey`, launch with:
-\ ..\chad 1 +bkey boot myapp.bin
+\ ..\bin\chad 1 +bkey boot myapp.bin
 
 \ Put text high enough in flash memory that it won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
@@ -16,17 +16,17 @@ $6000 equ fontDB                        \ font database location
 2 +tkey                                 \ encrypt text if not zero
 0 equ BASEBLOCK                         \ space reserved for FPGA bitstream
 
-include ../core.f
-include ../coreext.f
-include ../redirect.f
-include ../frame.f
-include ../numout.f
-include ../compile.f
-include ../flash.f
-include ../interpret.f
-include ../tftlcd.f
-\ include ../ctea.f
-\ include ../bignum.f
+include ../forth/core.f
+include ../forth/coreext.f
+include ../forth/redirect.f
+include ../forth/frame.f
+include ../forth/numout.f
+include ../forth/compile.f
+include ../forth/flash.f
+include ../forth/interpret.f
+include ../forth/tftlcd.f
+\ include ../forth/ctea.f
+\ include ../forth/bignum.f
 
 variable hicycles
 
@@ -84,7 +84,7 @@ variable hicycles
 \ Save to a flash memory image
 $2000 forg  make-heads                  \ build headers in flash
 $0000 forg  make-boot                   \ create a boot record in flash
-fontDB load-flash ../myfont.bin         \ add the fonts in raw binary
+fontDB load-flash ../forth/myfont.bin   \ add the fonts in raw binary
 0. BASEBLOCK save-flash myapp.bin       \ save to a 'chad' file you can boot
 BASEBLOCK save-flash-h myapp.txt        \ save in hex for flash memory model
 
@@ -92,11 +92,11 @@ BASEBLOCK save-flash-h myapp.txt        \ save in hex for flash memory model
 
 \ Now let's generate a language standard
 only forth
-gendoc ../wiki/wikiforth.txt html/forth.html
+gendoc ../forth/wiki/wikiforth.txt html/forth.html
 previous
-gendoc ../wiki/wikiroot.txt html/root.html
+gendoc ../forth/wiki/wikiroot.txt html/root.html
 asm +order
-gendoc ../wiki/wikiasm.txt html/asm.html
+gendoc ../forth/wiki/wikiasm.txt html/asm.html
 only forth
 
 \ 0 there dasm \ dumps all code

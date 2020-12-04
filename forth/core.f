@@ -251,13 +251,13 @@ cop_options 4 and [if]                  \ hardware shifter?
 : /mod   over 0< swap m/mod ;           \ 2.0470 n1 n2 -- rem quot
 : mod    /mod drop ;                    \ 2.0480 n1 n2 -- rem
 : /      /mod nip ;                     \ 2.0490 n1 n2 -- quot
-\ : m*                                    \ 2.0500 n1 n2 -- d
-\     2dup xor 0< >r
-\     abs swap abs um*
-\     r> if dnegate then
-\ ;
-\ : */mod  >r m* r> m/mod ;               \ 2.0510 n1 n2 n3 -- rem quot
-\ : */     */mod swap drop ;              \ 2.0520 n1 n2 n3 -- n4
+: m*                                    \ 2.0500 n1 n2 -- d
+    2dup xor 0< >r
+    abs swap abs um*
+    r> if dnegate then
+;
+: */mod  >r m* r> m/mod ;               \ 2.0510 n1 n2 n3 -- rem quot
+: */     */mod swap drop ;              \ 2.0520 n1 n2 n3 -- n4
 
 \ In order to use CREATE DOES>, we need ',' defined here.
 

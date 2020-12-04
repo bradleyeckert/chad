@@ -65,6 +65,7 @@ module ishift_tb();
       TEST(    -1000000, 3, 0);               // LSR
       TEST(       -1000, 4, 3);               // ASL
       TEST(32'h80000405, 4, 4);               // ROR
+      TEST(32'h50000678, 8, 4);               // ROR
       repeat (20000) @(posedge clk);
       $stop();
     end
