@@ -35,8 +35,7 @@ module imultf_tb();
 
   always #5 clk <= !clk;
 
-  // Trigger a shift using (data, count, format)
-  // format: 0 to 3 = >>1, <<1, /2, *2
+  // Trigger a multiply
   reg  signed [7:0] ns;
   wire signed [15:0] ps = p;
   reg [8:0] denominator;

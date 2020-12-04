@@ -221,26 +221,27 @@ There are many ways to implement a multiplier: iterative, pipelined, or full.
 The software doesn't care. It just needs to test for completion.
 Once an operation is triggered, reading `COP` gives a 0 when the coprocessor
 is busy. Once finished, you can read the result from `COP`.
+The lower 11 bits control reading and triggering:
 
-- 0xE800 = Read status: 1 = busy, 0 = ready
-- 0xE801 = Read coprocessor boilerplate, 3 = have multiply and divide
-- 0xE802 = Read upper multiplication product
-- 0xE803 = Read lower multiplication product
-- 0xE804 = Read division quotient
-- 0xE805 = Read division remainder
-- 0xE808 = Trigger unsigned multiplication of T and N
-- 0xE809 = Trigger division of T:N by W
-- 0xE80A = Trigger shift of T:N by W
+- xxxxxxx0000 = Read status: 1 = busy, 0 = ready
+- xxxxxxx0001 = Read options, bits\[2:0] = {shift, divide, multiply}
+- xxxxxxx0010 = Read upper multiplication product
+- xxxxxxx0011 = Read lower multiplication product
+- xxxxxxx0100 = Read division quotient
+- xxxxxxx0101 = Read division remainder
+- xxxxxxx0110 = Read upper shift result
+- xxxxxxx0111 = Read lower shift result
+- SBBBBB1001x = Trigger multiplication of T and N; S=signed, B=bits-1
+- xxxxxx1010x = Trigger division of T:N by W
+- xxxxSL1011x = Trigger shift of T:N by W; S=signed, L=left
 
 On a MAX10, a 24-bit processor needed about 300 LEs to add iterative hardware
 multiply and divide. Since the FPGA's hard multipliers are not used,
 the coprocessor won't slow down the processor if it's in an ASIC.
 
-Fractional multiplication is great way of scaling.
-A fractional multiply step is faster than a full iterative multiplication when
+Fractional multiplication is great way to multiply small numbers or scale.
+A fractional multiply is faster than a full iterative multiplication when
 full precision isn't required. 
-A `+*` instruction can't be added directly to the ISA without slowing it down.
-Instead, coprocessor logic does the fractional multiply.
 
 ### SDRAM (TBD)
 
@@ -248,8 +249,7 @@ Coprocessor instructions could be used to page data between SDRAM and
 data RAM. It seems you get a choice between high pin count and high cost
 when choosing a SDRAM. 
 For example, the Infineon/Cypress HyperRam has a reduced
-pin count (5x5 BGA with 1mm ball pitch) but cost $3 to $4 for 64Mb.
-64Mb is 8M bytes.
+pin count (5x5 BGA with 1mm ball pitch) but cost $3 to $4 for 64Mb (8MB).
 
 SDRAMs usually need an occasional `refresh` instruction, which could be
 supplied by a periodic ISR. 

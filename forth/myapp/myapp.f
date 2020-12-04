@@ -24,6 +24,7 @@ include ../numout.f
 include ../compile.f
 include ../flash.f
 include ../interpret.f
+include ../tftlcd.f
 \ include ../ctea.f
 \ include ../bignum.f
 
