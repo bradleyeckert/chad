@@ -714,7 +714,7 @@ SV printWID(int wid) {
 
 SV Order(void) {
     printf(" Context : ");
-    for (uint8_t i = 0; i < ORDERS; i++)  printWID(ORDER(i));
+    for (int i = ORDERS; i > 0; i--)  printWID(ORDER(i-1));
     printf("\n Current : ");  printWID(CURRENT);
 }
 
