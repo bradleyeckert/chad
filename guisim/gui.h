@@ -6,7 +6,7 @@
 static void GUIbuttonHandler(char c);
 
 // LED status input is by calling a function:
-void GUIsetStatusLEDs(uint16_t sr);
+void LEDstripWrite(uint16_t sr);
 
 // Launch and run the gui window, user closes it.
 void GUIrun(void);

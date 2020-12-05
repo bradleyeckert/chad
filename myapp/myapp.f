@@ -6,6 +6,10 @@
 \ If SPI flash is encrypted, for example, with `1 +bkey`, launch with:
 \ ..\bin\chad 1 +bkey boot myapp.bin
 
+\ To include the GUI stuff,
+\ ..\bin\gui include myapp.f
+
+
 \ Put text high enough in flash memory that it won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
 

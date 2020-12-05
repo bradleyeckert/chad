@@ -16,4 +16,14 @@ void FlashMemBoot(void);
 
 extern uint64_t ChadBootKey;
 
+// Function prototypes for specialzed peripherals
+
+#ifdef HAS_LCDMODULE
+void TFTLCDwrite(uint32_t n);
+#endif
+
+#ifdef HAS_LEDSTRIP
+void LEDstripWrite(uint16_t sr);
+#endif
+
 #endif // __IOMAP_H__

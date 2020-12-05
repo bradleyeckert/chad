@@ -6,7 +6,6 @@
 #include "iomap.h"
 #include "chad.h"
 #include "flash.h"
-#include "TFTsim.h"
 #include "gecko.h"
 #ifdef __linux__
 #include <unistd.h>
@@ -119,9 +118,7 @@ static void FlashInterpret(void) {      // see spif.v, line 288
 #endif
                     chadToData(b_dest++, boot_data);
                     break;
-                case 4:
-                    TFTLCDwrite(boot_data);
-                    break;
+                // room for 14 more memories or output streams here
                 }
                 boot_data = 0;
                 if (b_count)  b_count--;
@@ -293,27 +290,36 @@ uint32_t readIOmap (uint32_t addr) {
 // In the J1, output devices sit on (mem_addr,dout)
 // Result is error code
 
+// 0 to 15 are reserved for SPIF registers, all else is Wishbone bus.
+// See spif.v for mapping and Wishbone implementation.
+
 int writeIOmap (uint32_t addr, uint32_t x) {
     static uint32_t codeAddr = 0;
     if ((addr & 0xFFFFC000) && (nohostAPI))
         chadError(BAD_HOSTAPI);
     switch (addr) {
-    case 0:                             // emit
+    case 0x00:                          // emit
         putchar(x);
 #ifdef __linux__
     fflush(stdout);
     usleep(1000);
 #endif
         break;
-    case 1: codeAddr = x;  break;
-    case 2: chadToCode(codeAddr++, x);  break;
-    case 3: FlashInterpret();  break;
-    case 4: JamISP(x);  break;          // Jam ISP byte
-    case 5: gkey = (gkey << CELLBITS) + x;
-    case 6: TFTLCDwrite(x);  break;
-    case 7: WishboneUpperTx = x;  break;
-    case 8: break; // reserved
-    case 15: nohostAPI = x;  break;
+    case 0x01: codeAddr = x;  break;
+    case 0x02: chadToCode(codeAddr++, x);  break;
+    case 0x03: FlashInterpret();  break;
+    case 0x04: JamISP(x);  break;       // Jam ISP byte
+    case 0x05: gkey = (gkey << CELLBITS) + x;
+    case 0x06: break; // reserved (was stream output)
+    case 0x07: WishboneUpperTx = x;  break;
+    case 0x08: break; // reserved
+#ifdef HAS_LCDMODULE
+    case 0x10: TFTLCDwrite(x);  break;
+#endif
+#ifdef HAS_LEDSTRIP
+    case 0x14: LEDstripWrite(x);  break;
+#endif
+    case 0x100: nohostAPI = x;  break;
     case 0x4000:                        // trigger an error
         chadError(x);  break;
     default: return BAD_IOADDR;

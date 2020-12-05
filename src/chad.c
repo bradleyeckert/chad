@@ -1903,6 +1903,17 @@ SV Twovariable(void) { Variable();  allot(CELLS); }
 SV Char       (void) { parseword(' ');  Dpush(getUTF8()); }
 SV BrackChar  (void) { parseword(' ');  Literal(getUTF8()); }
 
+SV HWoptions(void) { 
+    int n = COP_OPTIONS;
+#ifdef HAS_LCDMODULE
+    n |= 0x100;
+#endif
+#ifdef HAS_LEDSTRIP
+    n |= 0x200;
+#endif
+    Dpush(n);
+}
+
 // Initialize the dictionary at startup
 
 SV LoadKeywords(void) {
@@ -1947,6 +1958,7 @@ SV LoadKeywords(void) {
     AddKeyword("make-boot",   "1.0145 --",            MakeBootList,  noCompile);    
     AddKeyword("equ",         "1.0150 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0160 n1 n2 --",      Assert,        noCompile);
+    AddKeyword("hwoptions",   "1.0170 -- n",          HWoptions,     noCompile);
     AddKeyword(".s",          "1.0200 ? -- ?",        dotESS,        noCompile);
     AddKeyword("see",         "1.0210 <name> --",     See,           noCompile);
     AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          noCompile);

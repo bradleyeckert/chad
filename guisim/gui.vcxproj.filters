@@ -39,7 +39,7 @@
     <ClCompile Include="..\src\main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\TFTsim.c">
+    <ClCompile Include="TFTsim.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,7 +65,7 @@
     <ClInclude Include="..\src\iomap.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\TFTsim.h">
+    <ClInclude Include="TFTsim.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

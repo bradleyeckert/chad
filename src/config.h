@@ -41,4 +41,10 @@
 #error StackSize must be an exact power of 2
 #endif
 
+#define COP_OPTIONS 15	/* Coprocessor options */
+
+//Set these up in the project's build configuration
+//#define HAS_LCDMODULE			/* Include LCD module in I/O map			*/
+//#define HAS_LEDSTRIP			/* Include LED strip in I/O map				*/
+
 #endif

@@ -5,7 +5,6 @@ and to take advantage of predefined constants.
 */
 
 #ifndef coprocGo
-#define COP_OPTIONS 15
 
 // bit 0: hardware multiplier exists, trig = SBBBBB1001x, read = xxxxxx0001x
 // bit 1: hardware divider exists,	  trig = xxxxxx1010x, read = xxxxxx0010x
@@ -81,6 +80,7 @@ static void coprocGo(
 	uint32_t us;
 
 	switch ((sel >> 1) & 0x0F) {		// start a new operation
+#if (COP_OPTIONS & 1)
 	case 9:
 		p = (uint64_t)tos;
 		for (int i = 0; i < mulcount; i++) {
@@ -103,7 +103,9 @@ static void coprocGo(
 		}
 		cop_prod = p;
 		break;
-	case 10: 
+#endif
+#if (COP_OPTIONS & 2)
+	case 10:
 		ud = ((uint64_t)tos << CELLBITS) | nos;
 		temp = ud / w;
 		if (temp >> CELLBITS) {			// quotient doesn't fit in cell
@@ -117,6 +119,8 @@ static void coprocGo(
 			cop_over = 0;
 		}
 		break;
+#endif
+#if (COP_OPTIONS & 4)
 	case 11:
 		ud = ((uint64_t)tos << CELLBITS) | nos;
 		if (sel & 0x80) {	// 32-bit rotate right
@@ -131,6 +135,8 @@ static void coprocGo(
 		else
 			cop_shift = ud >> w;
 		break;
+#endif
+#if (COP_OPTIONS & 8)
 	case 12: // actions: cload, mload, gray, mono
 		switch ((sel >> 5) & 3) {
 		case 0: // cload
@@ -138,7 +144,7 @@ static void coprocGo(
 			cop_bgcolor = nos;
 			break;
 		case 1: // mload
-			cop_monobits = w;
+			cop_monobits = tos;
 			break;
 		case 2: // mono
 			cop_color = (cop_monobits & 1) ? cop_fgcolor : cop_bgcolor;
@@ -149,6 +155,8 @@ static void coprocGo(
 			break;
 		}
 		break;
+#endif
+	default: break;
 	}
 }
 #endif

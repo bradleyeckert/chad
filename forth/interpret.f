@@ -14,7 +14,7 @@ there
    dup 9 > 7 and -
    dup r> u<
 ;
-: >number                        \ 2.6020 ud1 c-addr1 u1 –– ud2 c-addr2 u2
+: >number                        \ 2.6020 ud1 c-addr1 u1 -- ud2 c-addr2 u2
    begin  dup   while
       over c@  base @ tuck digit? if    \ ud a u base n
          >r >r 2swap r@ um* rot r> um* d+
@@ -43,10 +43,6 @@ there
 ;
 : parse-name  bl [ ;                    \ 2.6060 <name> -- addr len
 : parse       _parse over - ;           \ 2.6070 delimiter -- addr len
-
-\ Text input uses shared data so >in can be manipulated here.
-
-: \   #tib @ >in ! ; immediate          \ 2.6080 ccc<EOL> --
 
 \ Cooked terminal input doesn't need echoing. It lets you edit the line before
 \ sending it, at which point it sends the string all at once with an ending LF.
@@ -244,5 +240,14 @@ variable dpl
       prompt  refill drop  interpret
    again
 ;
+
+0 [if]
+\ Text input uses shared data (chad.c and the Forth) so >in can be manipulated
+\ here. However, `\` is defined here the host version will stop compiling
+\ HTML code after \. So, don't define it until you need it.
+
+: \   #tib @ >in ! ; immediate          \ 2.6080 ccc<EOL> --
+
+[then]
 
 there swap - . .( instructions used by interpret) cr

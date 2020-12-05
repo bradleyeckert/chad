@@ -135,6 +135,20 @@ H</ul>
  for its definition. It creates a word that pushes x onto the stack.
 =1.0160: assert ( n1 n2 -- )
  Displays an error message if n1 <> n2. n1 is actual, n2 is expected.
+=1.0170: hwoptions ( -- n )
+ Returns the hardware options installed.
+ Bits 7:0 are reserved for the coprocessor.
+#
+H<ul>
+-`0` Iterative multipler with programmable iteration count.
+-`1` Iterative divider for `um/mod`.
+-`2` Shifter for double shifts and 32-bit ROR.
+-`3` Accelerator for LCD bitmaps.
+-`4` to `7` reserved.
+-`8` TFT LCD port (basic parallel output with timer).
+-`9` LED string: 3-wire SPI clocks 74HCT595s that drive LEDs at 5V (etc.)
+H</ul>
+
 =1.0200: .s ( ? -- ? )
  Copy and display the values currently on the data stack.
  The interpreter does this for you if the stack is not empty:

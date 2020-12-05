@@ -55,7 +55,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HAS_LCDMODULE;HAS_LEDSTRIP;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>include_glut;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -94,7 +94,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HAS_LCDMODULE;HAS_LEDSTRIP;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>include_glut;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ObjectFileName>$(IntDir)</ObjectFileName>
@@ -138,9 +138,9 @@
     <ClCompile Include="..\src\gecko.c" />
     <ClCompile Include="..\src\iomap.c" />
     <ClCompile Include="..\src\main.c" />
-    <ClCompile Include="..\src\TFTsim.c" />
     <ClCompile Include="gui.c" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="TFTsim.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\chad.h" />
@@ -149,8 +149,8 @@
     <ClInclude Include="..\src\flash.h" />
     <ClInclude Include="..\src\gecko.h" />
     <ClInclude Include="..\src\iomap.h" />
-    <ClInclude Include="..\src\TFTsim.h" />
     <ClInclude Include="gui.h" />
+    <ClInclude Include="TFTsim.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

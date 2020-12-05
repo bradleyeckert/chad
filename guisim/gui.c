@@ -1,9 +1,9 @@
-// GLUT-based GUI 
+// GLUT-based GUI
 
 #include "glut.h"
 #include <stdio.h>
 #include <stdint.h>
-#include "../src/TFTsim.h"
+#include "TFTsim.h"
 #include <windows.h>
 #define MORESAFE
 
@@ -34,11 +34,10 @@ static void GUIbuttonHandler(char c) {
 }
 #endif
 
-
 static uint16_t LEDstatus = 2;
 
 // LED status input is by calling a function:
-void GUIsetStatusLEDs(uint16_t sr) {
+void LEDstripWrite(uint16_t sr) {
     LEDstatus = sr;
 }
 
@@ -51,7 +50,7 @@ void GUIsetStatusLEDs(uint16_t sr) {
 // 11 D6    G1 5
 // 10 D7    R2 6
 //  9 D8    Y2 7
-//  8 D11   Y3 10 
+//  8 D11   Y3 10
 // 7:5 ---     255
 //  4 D4    R1 3
 //  3 D3    G0 2
@@ -64,7 +63,7 @@ float LEDoffset[3] = { -LEDPITCH , 0.0f, LEDPITCH };
 
 static void DisplayLEDs(uint16_t sr) {
     for (uint8_t i = 0; i < 16; i++) {
-        uint8_t p = LEDpos[i]; 
+        uint8_t p = LEDpos[i];
         if (p < 16) {
             int button = 3 - 2 * (p / 3); // 0..3 = 3, 1, -1, -3
             GLfloat x = 0.85f;
@@ -154,7 +153,7 @@ static void MyMouseFunc(int button, int state, int ix, int iy) {
 // LCD display simulator
 // For 240 x 320 graphic LCD module ILI9341 controller with IM=0000.
 // The raw data is held in Windows 24-bit BMP format with reversed red/blue.
-// glDrawPixels does not support GL_BGR (native BMP) format. 
+// glDrawPixels does not support GL_BGR (native BMP) format.
 
 #define LCDimageSize (3 * 320 * 256 + 56)
 static uint8_t LCDimage[LCDimageSize];
@@ -235,7 +234,7 @@ void GUIrun(void)
     glutIdleFunc(displayMe);
     glutMouseFunc(MyMouseFunc);
     glutReshapeFunc(MyReshape);
-    GUILCDload("splash.bmp");    
+    GUILCDload("splash.bmp");
     TFTLCDsetup(&LCDimage[54], 0, 3, 240, 320);
     glutMainLoop();
 }

@@ -134,9 +134,6 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
    drop
 ;
 
-: cop_options  ( -- n )                 \ 2.0760 -- n
-   [ 1 cotrig ]  costat                 \ read coprocessor options register
-;
 : cowait  ( -- )                        \ wait until coprocessor finishes
    [ 0 cotrig ] begin costat while noop repeat
 ;
@@ -146,7 +143,7 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 \ RET ends the scope of carry and W so that ISRs may trash them.
 \ Latency is the maximum time between returns.
 
-cop_options 1 and [if]                  \ hardware multiply?
+hwoptions 1 and [if]                    \ hardware multiply?
 : um*                                   \ 2.0410 u1 u2 -- ud
    [ cellbits 1-  2* 2* 2* 2* 2*  $12 +  cotrig ]
    2drop  cowait                        \ um* is a special case of fractional *
@@ -169,7 +166,7 @@ cop_options 1 and [if]                  \ hardware multiply?
 ;
 [then]
 
-cop_options 2 and [if]                  \ hardware divide?
+hwoptions 2 and [if]                    \ hardware divide?
 : um/mod                                \ 2.0420 ud u -- ur uq
    >carry [ $14 cotrig ]  2drop cowait
    [ 5 cotrig ]  costat
@@ -179,7 +176,7 @@ cop_options 2 and [if]                  \ hardware divide?
 \ Long division takes about 340 cycles at 16-bit.
 \ Latency = 25
 : (um/mod)
-   >r  swap 2*c swap 2*c               \ 2dividend | divisor
+   >r  swap 2*c swap 2*c                \ 2dividend | divisor
    carry if
       r@ -   0 >carry
    else
@@ -201,7 +198,7 @@ cop_options 2 and [if]                  \ hardware divide?
 ;
 [then]
 
-cop_options 4 and [if]                  \ hardware shifter?
+hwoptions 4 and [if]                    \ hardware shifter?
 : )dshift                               \ d1 -- d2
    2drop  cowait                        \ SL1_011x
    [ 7 cotrig ]  costat
