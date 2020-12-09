@@ -1,17 +1,12 @@
-\ TFT LCD drawing                               11/29/20 BNE
+\ TFT LCD drawing                               12/9/20 BNE
 
 \ Font data is stored in SPI flash in compressed format. It uses 16-bit tokens
 \ for various encoding types to handle glyph bitmaps that are mostly black and
 \ white but with 4-bit grayscale at the edges.
 
-\ tokens are encoded for decoding with 16-way jump.
-\ 000xxxxx_xxxxxxxx  Reserved
-\ 001nnnnx_xxxxxxxx  Output 0 to 9 monochrome pixels, LSB first.
-\ 0100aaaa_aabbbbbb  Output a BG pixels followed by b FG pixels.
-\ 0110gggg_cccccccc  Output 4-bit g pixel followed by up to 127 BG pixels
-\ 0111gggg_cccccccc  Output 4-bit g pixel followed by up to 127 FG pixels
-\ 1xxxxxxx_xxxxxxxx  Output 15 monochrome pixels, LSB first.
 there
+
+: LCDdimensions  ( -- x y )  320 480 ;  \ physical dimensions, datasheet view
 
 : LCDcommand [ $10 cells ] literal io! ; \ c -- \ write command byte
 : LCDdata    [ $11 cells ] literal io! ; \ c -- \ write data byte
@@ -47,6 +42,13 @@ hwoptions 8 and [if]                    \ TFT support?
 [then]
 
 \ Pixel interpreter
+\ tokens are encoded for decoding with 16-way jump.
+\ 000xxxxx_xxxxxxxx  Reserved
+\ 001nnnnx_xxxxxxxx  Output 0 to 9 monochrome pixels, LSB first.
+\ 0100aaaa_aabbbbbb  Output a BG pixels followed by b FG pixels.
+\ 0110gggg_cccccccc  Output 4-bit g pixel followed by up to 127 BG pixels
+\ 0111gggg_cccccccc  Output 4-bit g pixel followed by up to 127 FG pixels
+\ 1xxxxxxx_xxxxxxxx  Output 15 monochrome pixels, LSB first.
 
 : pixrun  ( color length -- )           \ output a run of pixels
    dup if
@@ -87,13 +89,6 @@ hwoptions 8 and [if]                    \ TFT support?
    dup  swapb 2/ 2/ $3C and bitcmd_table execute
 ;
 
-
-
-
-
-
-
-
 : LCDrowcol  ( z0 z1 cmd -- )            \ set row or column entry limits
    LCDcommand  >r
    dup swapb LCDdata  LCDdata  r>
@@ -106,15 +101,24 @@ variable g_Y                            \ current field Y position
 variable g_X                            \ current field X position
 variable g_H                            \ current field height
 variable g_W                            \ current field width
-variable g_rotation                     \ graphic rotation angle in 90deg steps
+variable g_MADCTL                       \ state of Memory Access Control bits
 variable g_cdims                        \ packed char field width:height
 variable g_corner                       \ packed char field x:y corner
 variable kerning                        \ amount of horizontal kerning (signed)
 variable linepitch                      \ amount of vertical spacing for CR
 
-: LCDdimensions  ( -- x y )  240 320 ;  \ physical dimensions, datasheet view
+: g_setmac  ( c -- )
+   dup g_MADCTL !
+   $36 LCDcommand  LCDdata              \ Set bits MY, MX, MV, ...
+;
 
-: _g_wh  ( -- x y )  LCDdimensions  g_rotation @ 1 and if swap then ;
+\ Bits 7:5 of the LCD controller's MADCTL (36h) register determines the image
+\ orientation. Real hardware would flip the display immediately after the bits
+\ are changed. In simulation, changes don't show until the screen is redrawn.
+
+\ MV=1 mode does not work in C simulation.
+
+: _g_wh  ( -- x y )  LCDdimensions  g_MADCTL @ $20 and if swap then ;
 : g_width  ( -- x )  _g_wh  drop ;
 : g_height  ( -- y ) _g_wh  nip ;
 
@@ -132,12 +136,19 @@ variable linepitch                      \ amount of vertical spacing for CR
    dup r> + $2A LCDrowcol
    dup r> + $2B LCDrowcol
 ;
+
 : g_fill  ( color -- )                  \ put color in the g_box
    g_H 2@ * ?dup if
       $2C LCDcommand
       for  dup LCDgram  next
       LCDend
    then  drop
+;
+
+: g_page  ( -- )                        \ fill with background color
+   0 0 g_at  g_width g_height g_box
+   get-colors drop g_fill
+   0 0 at                               \ home the cursor
 ;
 
 \ After a xchar has been drawn, its width is known. Calculate the amount to
@@ -166,8 +177,8 @@ variable FontID                         \ 0 = main font
    >r  )gkey
    [ fontDB 4 + ] literal               \ skip the font revision number
    FontID @ 3* + 0 d@f  fontDB 0 d+     \ 'tables for this FontID
-   2dup  r@ 6 rshift 2* 0 d+  w@f  dup if ( 'fine offset )
-      0 d+  fcount  r> $3F and            ( 'glyphs max index )
+   2dup  r@ 6 rshift 2* 0 d+  w@f  dup if   ( 'fine offset )
+      0 d+  fcount  r> $3F and              ( 'glyphs max index )
       tuck > 0= if  2drop 0 dup exit  then  \ beyond the end
       3* 0 d+ d@f  exit
    then  rdrop dup                      \ fine table does not exist
@@ -195,6 +206,11 @@ variable FontID                         \ 0 = main font
    g_Xpitch cursorX +!                  \ bump cursor
 ;
 
+: qq  \ test dump 10 digits 9 to 0
+   g_page
+   10 for r@ 47 + g_emit next
+;
+
 \ define some colors
 
 8 base !
@@ -209,3 +225,8 @@ decimal
 black white set-colors \ for testing
 
 there swap - . .( instructions used by LCD) cr
+
+\ To do:
+\ Add some compact fixed fonts for programming stuff.
+\ For example: 5x7 chars on a 6 pixel pitch would fit 53 chars in 320 pels or
+\ 80 chars in 480 pels. Enough for a terminal.

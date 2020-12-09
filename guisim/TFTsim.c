@@ -45,6 +45,7 @@ static void resetLCD(void) {
 }
 
 static uint8_t* boilerptr;				// 54-byte boilerplate followed by BMP data
+static uint16_t BMPH, BMPW;				// BMP dimensions
 
 static void BoilerWr(uint32_t x) {
 	for (int i = 0; i < 4; i++) {
@@ -69,12 +70,12 @@ int TFTLCDsetup(uint8_t* BMP, int type, int width, int height) {
 	*boilerptr++ = 'M';
 	BoilerWr(pixels * 3);  BoilerWr(0);  BoilerWr(54);  BoilerWr(40);
 	if (rotation & 1) {
-		BoilerWr(height);
-		BoilerWr(width);
+		BoilerWr(height);  BMPW = height;
+		BoilerWr(width);   BMPH = width;
 	}
 	else {
-		BoilerWr(width);
-		BoilerWr(height);
+		BoilerWr(width);   BMPW = width;
+		BoilerWr(height);  BMPH = height;
 	}
 	BoilerWr(0x180001);  BoilerWr(0);  BoilerWr(pixels);
 	BoilerWr(0);  BoilerWr(0);  BoilerWr(0);  BoilerWr(0);
@@ -111,18 +112,22 @@ static void plotColor(void) {
 	int y = rowPtr;
 	int w = LCDwidth;
 	int h = LCDheight;
-	if (MX)
-		x = w - x;
-	if (MY)
-		y = h - y;
 	int t;
-	switch (rotation) {
+	if (MX)
+		x = w - x - 1;
+	if (MY)
+		y = h - y - 1;
+	if (MV) {
+		t = x;  x = y;  y = t;
+	}
+	switch (rotation) {					// rotate image
 	case 1:
 		t = w;  w = h;  h = t;			// swap w and h
 		t = x;  x = y;  y = (h - t - 1);// rotate (x,y) left 90 degrees
 		break;
 	case 2:
 		x = w - x - 1;  y = h - y - 1;	// rotate 180 degrees
+		break;
 	case 3:
 		t = w;  w = h;  h = t;			// swap w and h
 		t = x;  x = (w - y - 1);  y = t;// rotate (x,y) right 90 degrees
@@ -131,20 +136,15 @@ static void plotColor(void) {
 #endif
 	}
 	if (bmp != NULL) {					// ignore if not initialized
+		x %= BMPW;  y %= BMPH;			// limit to screen region
 		uint8_t* p = &bmp[54 + 3 * (w * (h - y - 1) + x)];
 #ifdef reverseRGB
 		* p++ = red;  *p++ = green;  *p++ = blue;
 #else
 		* p++ = blue;  *p++ = green;  *p++ = red;
 #endif
-		if (MV) {
-			int bump = bumpRow();
-			if (bump) bumpCol();
-		}
-		else {
-			int bump = bumpCol();
-			if (bump) bumpRow();
-		}
+		int bump = bumpCol();
+		if (bump) bumpRow();
 	}
 	cfgstate = 9;
 }

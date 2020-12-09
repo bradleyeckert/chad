@@ -592,10 +592,10 @@ module spif
           if (WIDTH != 32)
             wbxo <= din[31-WIDTH:0];
         4'hA: begin
-            b_state <= 4'dE;            // read next from flash to b_data
+            b_state <= 4'hE;            // read next from flash to b_data
           end
         4'hB: begin
-            b_state <= 4'd9;            // read a word from flash to b_data
+            b_state <= 4'h9;            // read a word from flash to b_data
             read_addr <= din;
           end
         endcase

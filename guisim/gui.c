@@ -14,7 +14,7 @@
 #define LANEPITCH 0.24f
 #define AACENTER -0.32f             /* center of LCD AA in X                 */
 #define AAWIDTH  0.55f
-#define AAHEIGHT (AAWIDTH * 0.75f)
+#define AAHEIGHT (AAWIDTH * 1.33f)
 #define WSIZE    (int)(0.5f + 320.0 / AAWIDTH) // for 1:1 display of LCD
 
 #define LEDCOLOR0 0.5f, 0.5f, 0.5f   /* LED color when off                   */
@@ -23,6 +23,9 @@
 #define LEDCOLORY 1.0f, 1.0f, 0.0f   /* LED color when yellow                */
 #define LEDSIZE  0.03f
 #define LEDPITCH 0.1f
+
+#define TFTX 320
+#define TFTY 480
 
 // The GL frame is centered at (0,0) and spans {-1,1} in both X and Y.
 
@@ -151,23 +154,14 @@ static void MyMouseFunc(int button, int state, int ix, int iy) {
 
 //##############################################################################
 // LCD display simulator
-// For 240 x 320 graphic LCD module ILI9341 controller with IM=0000.
+// For TFTX x TFTY graphic LCD module ILI9341 controller with IM=0000.
 // The raw data is held in Windows 24-bit BMP format with reversed red/blue.
 // glDrawPixels does not support GL_BGR (native BMP) format.
 
-#define LCDimageSize (3 * 320 * 256 + 56)
+#define LCDimageSize (3 * TFTX * TFTY + 56)
 static uint8_t LCDimage[LCDimageSize];
 
-// Raw LCD write:
-// Bit n[9] = RS pin: When RS = ’1’, data is selected. When RS = ’0’, command.
-// The preferred data format is 2 bytes per pixel: DBI[2:0] bits of 3Ah register
-// are set to "101". Big-endian pixel is R5:G6:B5. DBI[2:0]="110" is one color
-// per byte in RGB sequence.
-void GUILCDwrite(uint16_t n) {
-
-}
-
-// Load a bitmap from a file. Must be 24-bit, 320 x 240.
+// Load a bitmap from a file. Must be 24-bit, TFTX x TFTY.
 void GUILCDload(char * s) {
     FILE* fp;
 #ifdef MORESAFE
@@ -182,7 +176,7 @@ void GUILCDload(char * s) {
         fread(LCDimage, LCDimageSize, 1, fp);
         // Swap the R and B bytes assuming no padding (width is multiple of 4)
         uint8_t* p = &LCDimage[54];     // skip the header
-        for (int i = 0; i < (3 * 320 * 240); i += 3) {
+        for (int i = 0; i < (3 * TFTX * TFTY); i += 3) {
             uint8_t temp = p[2];
             p[2] = p[0];
             p[0] = temp;
@@ -203,7 +197,7 @@ static void displayMe(void)
     glColor3f(0.0f, 0.0f, 0.0f);        // dark LCD
     DisplayLEDs(LEDstatus);
     glRasterPos2f(AACENTER - AAWIDTH, -AAHEIGHT); // lower left corner of LCD
-    glDrawPixels(320, 240, GL_RGB, GL_UNSIGNED_BYTE, &LCDimage[54]);
+    glDrawPixels(TFTX, TFTY, GL_RGB, GL_UNSIGNED_BYTE, &LCDimage[54]);
     glFlush();    glFlush();
     Sleep(10); // <-- windows.h dependency
 }
@@ -235,6 +229,6 @@ void GUIrun(void)
     glutMouseFunc(MyMouseFunc);
     glutReshapeFunc(MyReshape);
     GUILCDload("splash.bmp");
-    TFTLCDsetup(LCDimage, 3, 240, 320);
+    TFTLCDsetup(LCDimage, 0, TFTX, TFTY);
     glutMainLoop();
 }
