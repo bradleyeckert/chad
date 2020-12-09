@@ -80,7 +80,7 @@ static void FlashInterpret(void) {      // see spif.v, line 288
         case 0:                         // command mode
             switch (plain & 0xC0) {
             case 0xC0:
-                if (plain & 0x20) { // 111xxxxx
+                if (plain & 0x20) {     // 111xxxxx
                     FlashMemSPIformat(0);
                     return;
                 }
@@ -268,6 +268,7 @@ static int IOtermKey(void) {              // Get the next byte in the input stre
 static uint8_t nohostAPI;               // prohibit access to host API
 static uint32_t WishboneUpperRx;
 static uint32_t WishboneUpperTx;
+static uint32_t FlashReadResult;
 
 uint32_t readIOmap (uint32_t addr) {
     if ((addr & 0x8000) && (nohostAPI))
@@ -281,6 +282,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 5: return 0;                   // DMA status, not busy
     case 6: return (uint32_t)chadCycles();
     case 7: return WishboneUpperRx;
+    case 11: return FlashReadResult;
     default: chadError(BAD_IOADDR);
     }
     return 0;
@@ -292,6 +294,10 @@ uint32_t readIOmap (uint32_t addr) {
 
 // 0 to 15 are reserved for SPIF registers, all else is Wishbone bus.
 // See spif.v for mapping and Wishbone implementation.
+
+int read_bytes;     // Set up flash read parameters
+int read_addr;      // address to use in the 4K sector
+int boot_format;    // format to use for SPI bus
 
 int writeIOmap (uint32_t addr, uint32_t x) {
     static uint32_t codeAddr = 0;
@@ -310,11 +316,31 @@ int writeIOmap (uint32_t addr, uint32_t x) {
     case 0x03: FlashInterpret();  break;
     case 0x04: JamISP(x);  break;       // Jam ISP byte
     case 0x05: gkey = (gkey << CELLBITS) + x;
-    case 0x06: break; // reserved (was stream output)
+    case 0x06: 
+        read_bytes = (x & 3) + 1;
+        boot_format = (x >> 2) & 7;
+        break;
     case 0x07: WishboneUpperTx = x;  break;
-    case 0x08: break; // reserved
+    case 0x0B: 
+        FlashMemSPIformat(boot_format);
+        FlashSPI(0x0B);
+        FlashSPI(FlashBaseBlock() + (x >> 16)); // 3-byte address
+        FlashSPI(x >> 8);
+        FlashSPI(x);
+        FlashSPI(0);
+    case 0x0A:
+        FlashReadResult = 0;
+        for (int i = 0; i < read_bytes; i++) {
+            FlashSPI(0);
+            xorkey = GeckoByte();
+            FlashReadResult = (FlashReadResult << 8) + IOspiResult();;
+         } // note: flash is left open
+        break;
 #ifdef HAS_LCDMODULE
-    case 0x10: TFTLCDwrite(x);  break;
+    case 0x10: TFTLCDcommand(x);  break;
+    case 0x11: TFTLCDdata(SERIAL8, x);  break;
+    case 0x12: TFTLCDend();  break;
+    case 0x13: TFTLCDdata(WHOLE18, x);  break;
 #endif
 #ifdef HAS_LEDSTRIP
     case 0x14: LEDstripWrite(x);  break;

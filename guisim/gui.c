@@ -235,6 +235,6 @@ void GUIrun(void)
     glutMouseFunc(MyMouseFunc);
     glutReshapeFunc(MyReshape);
     GUILCDload("splash.bmp");
-    TFTLCDsetup(&LCDimage[54], 0, 3, 240, 320);
+    TFTLCDsetup(LCDimage, 3, 240, 320);
     glutMainLoop();
 }

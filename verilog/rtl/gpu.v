@@ -16,27 +16,16 @@ module gpu
 (
   input wire  clk,
   input wire  rst_n,
-  input wire  [2:0] sel,
+  input wire  [1:0] sel,
   input wire  go,                       // trigger CLOAD, MLOAD, MONO, GRAY
   output reg  busy,
-  output reg  [WIDTH-1:0] y,
+  output wire [WIDTH-1:0] y,
   input wire  [WIDTH-1:0] a,            // tos
   input wire  [WIDTH-1:0] b             // nos
 );
 
   reg [17:0] pixel, fgcolor, bgcolor;
-
-  always @*
-  case (sel) // Verilog zero-extends
-  3'b000: y <= {pixel[17:12], 2'b00};       // RRRRRR00
-  3'b001: y <= {pixel[11:6],  2'b00};       // GGGGGG00
-  3'b010: y <= {pixel[5:0],   2'b00};       // BBBBBB00
-  3'b011: y <= pixel;                       // RRRRRRGGGGGGBBBBBB
-  3'b100: y <= {pixel[17:13], pixel[11:9]}; // RRRRRGGG
-  3'b101: y <= {pixel[8:6], pixel[5:1]};    // GGGBBBBB
-  3'b110: y <= {pixel[17:9]};               // RRRRRGGGG
-  3'b111: y <= {pixel[8:0]};                // GGGBBBBBB
-  endcase
+  assign y = pixel;
 
 // Two multipliers are used in the interpolation
 
@@ -101,7 +90,7 @@ module gpu
         end
       end else begin
         busy <= go;
-        if (go) case (sel[1:0])
+        if (go) case (sel)
         2'd0:
           begin
             fgcolor <= a[17:0];

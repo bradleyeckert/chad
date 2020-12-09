@@ -283,5 +283,6 @@ CODE depth                              \ 2.0730 -- +n
 
 : exec2: 2* [ ;             \ 2.0740 n -- \ for list of 2-inst literals
 : exec1: 2* r> + >r ;       \ 2.0750 n -- \ for list of 1-inst literals
+: exec0: r> + >r ;          \ 2.0760 n -- \ for list with raw index
 
 there . .( instructions used by core) cr

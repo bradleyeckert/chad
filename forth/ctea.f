@@ -42,4 +42,13 @@ $179B9 equ CTdelta
    next
 ;
 
+\ For SHA-256, there is support in the coprocessor for rotate right.
+
+hwoptions 4 and [if]                    \ hardware shifter?
+: ror32                                 \ d1 u -- d2
+   >carry  [ $96 cotrig ]  )dshift      \ 32-bit rotate right, zero-extended
+;
+[then]
+
+
 there swap - . .( instructions used by ctea) cr

@@ -69,11 +69,6 @@ module spif_tb();
       .re       (code_rd  )
     );
 
-// stream stub
-  wire [9:0] st_o;                      // stream output data           i
-  wire       st_stb;                    // stream strobe                i
-  reg        st_busy = 1'b0;
-
 // Wishbone master
   wire [14:0] adr_o;
   wire [31:0] dat_o, dat_i;
@@ -101,7 +96,7 @@ module spif_tb();
     always #5 clk = ~clk;
 
     // spif is the SPI flash controller
-    spif #(10, 18, 10, 0, 16, 8, 7, 0) u0 (
+    spif #(10, 18, 10, 0, 16, 7, 0) u0 (
 	.clk(clk),
 	.arstn(rst_n),
 	.io_rd	  (io_rd    ),
@@ -142,9 +137,6 @@ module spif_tb();
         .we_o     (we_o     ),
         .stb_o    (stb_o    ),
         .ack_i    (ack_i    ),
-        .st_o     (st_o     ),
-        .st_stb   (st_stb   ),
-        .st_busy  (st_busy  ),
         .cyclev   (cyclev   ),
         .urxirq   (urxirq   ),
         .utxirq   (utxirq   )
@@ -178,7 +170,7 @@ module spif_tb();
     // Write to i/o space
     task IO_WRITE;
       input [17:0] data;
-      input  [2:0] addr;
+      input  [3:0] addr;
       begin
         @(posedge clk);  io_wr <= 1'b1;  din <= data;  mem_addr <= addr;
         @(posedge clk);  io_wr <= 1'b0;
@@ -203,11 +195,13 @@ module spif_tb();
     begin
 	$display("Bootup started %0t", $time);
 	#7 rst_n = 1;
-        @(negedge p_reset); // wait for boot to finish
+        @(negedge p_reset);     // wait for boot to finish
 	$display("Bootup finished %0t", $time);
-        mem_rd = 1;  @(posedge clk);
-        mem_rd = 0;  @(posedge clk);
-        IO_WRITE(42, 0);  // send a byte to the UART
+        repeat(10) @(posedge clk);
+        IO_WRITE(65, 0);        // send a byte to the UART
+        IO_WRITE(18'h2084, 6);  // 3-byte read setup
+        IO_WRITE(18'h2000, 11); // flash read
+        WAIT(5);
 
 //        IO_WRITE(4, 4);      WAIT(4);  // 5-byte sequence to flash
 //        IO_WRITE(8'h81, 4);  WAIT(4);  // start SPI sequence, single rate
@@ -219,24 +213,15 @@ module spif_tb();
 //        IO_WRITE(8'h11, 3);   // start the flash interpreter
 //        WAIT(5);              // wait until interpreter is finished
 
+        repeat (1000) @(posedge clk);
         uart_rst_n <= 1;
+
 //	$display("status: %t done reset", $time);
 //
 //	@(posedge clk);
 //
 //	$display("\n\nstatus: %t Testbench done", $time);
 //	$finish;
-    end
-
-// Hold off the stream every other sample
-    reg holding = 1'b0;
-    always @(negedge st_stb) begin
-        if (holding) begin
-        #3 st_busy <= 1'b1;
-        repeat (20) @(posedge clk);
-        #3 st_busy <= 1'b0;
-        end else st_busy <= 1'b0;
-        holding <= ~holding;
     end
 
 endmodule

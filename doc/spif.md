@@ -267,17 +267,19 @@ Read:
 - 5: Boot transfer status: 1 = loading memory from flash
 - 6: Raw clock cycle count
 - 7: Upper bits of a 32-bit Wishbone Bus read if cells are less than 32-bit 
+- B: Get flash read-word result
 
 Write:
 
 - 0: UART transmit
 - 1: Set the address for code write
 - 2: Write 16-bit instruction to code RAM and bump the address
-- 3: Trigger the flash boot interpreter
+- 3: Trigger the flash boot interpreter starting at address (n<<12) using format n\[14:12]
 - 4: Jam an ISP byte (see UART ISP protocol)
 - 5: Write key: key = key<<cellbits + n
-- 6: Write raw data to user output stream
+- 6: Set the lower address to n\[11:0] and data size for flash read to n\[13:12]+1 bytes
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
+- B: Trigger flash read starting at address (n<<12) using format n\[14:12]
 
 ### Jamming ISP bytes
 
@@ -292,8 +294,8 @@ Make sure to poll io\[4] to wait until the jammed command has been processed.
 
 The I/O space starting at address 16 (byte address 32 or 64) is mapped to a
 Wishbone Bus Master.
-To handle 32-bit data when the processor cell size is less than that, a couple of
-registers handle the extra bits.
+To handle 32-bit data when the processor cell size is less than that,
+a couple of registers handle the extra bits.
 
 There are no byte lanes in the bus, so `sel_o` is assumed high. 
 Since `cyc_o` is always the same as `stb_o`, it is not duplicated.

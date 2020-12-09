@@ -4,7 +4,8 @@
 \ Compiled strings (for `type` etc.) are assumed to have 0 for the upper cell
 \ of the address. Those strings must be below flash address 2^cellsize.
 
-there hex
+there
+hex
 
 : _isp  ( c -- )                \ write ISP byte to SPIF
    [ 4 cells ] literal io!
@@ -33,6 +34,7 @@ there hex
 ;
 
 \ Read from SPI flash
+\ Primitives for string reading using double address
 
 : @f(                           \ 2.4000 df-addr --
    0B  4 fcmd24  0 ispcmd       \ start 0B read command
@@ -49,12 +51,50 @@ there hex
 : )@f  ( -- )                   \ 2.4030 --
    80 _isp                      \ end read (raise CS#)
 ;
-: c@f    @f( _c@f )@f ;         \ 2.4040 df-addr -- c
-: @f     @f( _@f  )@f ;         \ 2.4050 df-addr -- n
+
+decimal
+
+\ Flash reads using hardware instead of discrete SPI transfers.
+\ Double cell addresses are used but not implemented. If they are needed,
+\ you can add code to handle the upper half of the address.
+
+: fwait  ( -- )                 \ wait for flash read to finish
+   begin  [ 5 cells ] literal io@  while  noop  repeat
+;
+: _x@f  ( df-addr cfg -- x )    \ hardware flash read
+   nip
+   [ 6 cells ] literal io!      \ flash read setup
+   [ 11 cells ] literal io!     \ trigger a read
+   fwait
+   [ 11 cells ] literal io@     \ get result
+;
+: @f>  ( -- x )
+   [ 10 cells ] literal dup io! \ trigger a read-next
+   fwait
+   [ 11 cells ] literal io@     \ get result
+;
+: @f  ( df-addr -- x )          \ 3-byte big-endian read
+   [ 2 2* 2*  2 + ] literal     \ format=2, size=2
+   _x@f  )@f                    \ raise CS afterwards
+;
+: w@f(  ( df-addr -- x )        \ first 2-byte big-endian read
+   [ 2 2* 2*  1 + ] literal
+   _x@f
+;
+: w@f  ( df-addr -- x )         \ 2-byte big-endian read
+   w@f(  )@f
+;
+: c@f  ( df-addr -- x )         \ 1-byte read
+   [ 2 2* 2* ] literal
+   _x@f  )@f
+;
+
+: d@f    @f 0 ;                 \ 2.4055 df-addr -- d
 
 : fcount                        \ 2.4060 df-addr -- df-addr+1 c
    2dup 1 0 d+  2swap c@f
 ;
+: 3*   ( n -- 3n ) dup 2* + ;   \ multiply by 3, goes with f@
 
 \ `emit` may require reading font bitmaps from flash, so `f$type` reads the
 \ string into a RAM buffer because the bitmap read disrupts keystream sync.
@@ -85,7 +125,7 @@ there hex
 : fdump  ( f-addr len -- )      \ only useful if tkey is 0
    over 5 h.x  0 swap
    for
-      over 0F and 0= if cr over 5 h.x then
+      over 15 and 0= if cr over 5 h.x then
       fcount h.2
    next 2drop
 ;
@@ -264,4 +304,4 @@ fhere equ errorMsgs \ starting at -2 and going negative
    ( -82 ) ," Flash string space overflow"
    ," " \ empty string = end of list
 
-decimal there swap - . .( instructions used by flash) cr
+there swap - . .( instructions used by flash) cr

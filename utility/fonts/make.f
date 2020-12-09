@@ -7,7 +7,9 @@ include fontcmp.f
 \ H3: 48-pel text field, 30-pel letters
 \ H2: 64-pel text field, 40-pel letters
 
-2 /FONTS
+0 constant revision
+
+revision 2 /FONTS
 
 cr .( ASCII in H4 size )
 /msg HasASCII
@@ -20,7 +22,7 @@ H2 MakeFont
 1 maketable
 
 cr fhere . .( bytes of data total)
-save myfont.bin
+save ../../forth/myfont.bin
 
 cr .( Finished generating the fonts)
 

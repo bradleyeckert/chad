@@ -85,7 +85,7 @@ module coproc
     gpu #(WIDTH) u3 (                   // small TFT helper
       .clk      (clk),
       .rst_n    (arstn),
-      .sel      (sel[7:5]),
+      .sel      (sel[6:5]),
       .go       (gtrig),
       .busy     (gbusy),
       .y        (color),

@@ -27,6 +27,7 @@ static uint32_t colorPlane(uint8_t gray6, uint8_t shift, uint32_t fg, uint32_t b
 }
 
 static uint32_t colorInterpolate(int gray4, uint32_t fg, uint32_t bg) {
+	gray4 &= 15; // limit to 4-bit
 	int gray6 = (gray4 << 2) | (gray4 >> 2);
 	uint32_t r;
 	r  = colorPlane(gray6,  0, fg, bg);
@@ -50,19 +51,7 @@ static uint32_t coprocRead(void) {
 	case 5:	r = cop_rem;							  break; // 10
 	case 6:	r = CELLMASK & (cop_shift >> CELLBITS);   break; // 11
 	case 7:	r = CELLMASK & cop_shift;				  break; // 11
-	case 8:
-		switch ((coprocSticky >> 5) & 7) {
-		case 0: r = (cop_color >> 10) & 0xFC;         break; // RRRRRR00
-		case 1: r = (cop_color >> 4) & 0xFC;          break; // GGGGGG00
-		case 2: r = (cop_color << 2) & 0xFC;          break; // BBBBBB00
-		case 3: r = cop_color;                        break; // RRRRRRGGGGGGBBBBBB
-		case 4: r = ((cop_color >> 10) & 0xF8)               // RRRRRGGG
-			      | ((cop_color >> 9) & 7);  		  break;
-		case 5: r = (cop_color >> 1) & 0xFF;          break; // GGGBBBBB
-		case 6: r = (cop_color >> 9) & 0x1FF;         break; // RRRRRGGGG
-		case 7: r = cop_color & 0x1FF;                break; // GGGBBBBBB
-		}
-		break;
+	case 8: r = cop_color;				              break; // 12
 	}
 	return r;
 }

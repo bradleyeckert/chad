@@ -58,7 +58,7 @@ module mcu
 
   wire p_reset_n = ~p_reset;
   wire                 irq;             // Interrupt request              i
-  wire [3:0]           ivec;            // Interrupt vector for irq       i
+  reg  [3:0]           ivec;            // Interrupt vector for irq       i
   wire                 iack;            // Interrupt acknowledge          o
 
   wire                 copgo;           // Coprocessor trigger            i
@@ -140,8 +140,9 @@ module mcu
   wire urxirq;                          // UART full strobe
   wire utxirq;                          // UART ready strobe
   reg [15:0] ipending;                  // up to 15 interrupts available
+  wire [3:0]  prioritie;
 
-  prio_enc #(4) pe (.a(ipending), .y(ivec));
+  prio_enc #(4) pe (.a(ipending), .y(prioritie));
   assign irq = (ivec != 0);
 
 // Handle interrupt request strobes, edges, etc.
@@ -150,18 +151,15 @@ module mcu
   begin
     if (!p_reset_n) begin
       ipending <= 0;
+      ivec <= 0;
     end else begin
+      ivec <= prioritie;
       ipending[1] <= ipending[1] | cyclev;
       ipending[2] <= ipending[2] | utxirq;
       ipending[3] <= ipending[3] | urxirq;
       if (iack)   ipending[ivec] <= 1'b0;
     end
   end
-
-// stream stub
-  wire [9:0] st_o;                      // stream output data           i
-  wire       st_stb;                    // stream strobe                i
-  wire st_busy = 1'b0;
 
 // Wishbone master
   wire [14:0] adr_o;
@@ -176,7 +174,7 @@ module mcu
   assign io_dout = s_io_dout;           // spif is the only I/O device
 
 // spif is the SPI flash controller and ISP hub
-  spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, 8, KEY_LENGTH) bridge (
+  spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (s_iord   ),
@@ -217,9 +215,6 @@ module mcu
     .we_o     (we_o     ),
     .stb_o    (stb_o    ),
     .ack_i    (ack_i    ),
-    .st_o     (st_o     ),
-    .st_stb   (st_stb   ),
-    .st_busy  (st_busy  ),
     .cyclev   (cyclev   ),
     .urxirq   (urxirq   ),
     .utxirq   (utxirq   )

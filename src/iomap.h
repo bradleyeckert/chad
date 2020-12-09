@@ -19,7 +19,7 @@ extern uint64_t ChadBootKey;
 // Function prototypes for specialzed peripherals
 
 #ifdef HAS_LCDMODULE
-void TFTLCDwrite(uint32_t n);
+#include "../guisim/TFTsim.h"
 #endif
 
 #ifdef HAS_LEDSTRIP

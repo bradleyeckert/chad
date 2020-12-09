@@ -243,7 +243,7 @@ variable dpl
 
 0 [if]
 \ Text input uses shared data (chad.c and the Forth) so >in can be manipulated
-\ here. However, `\` is defined here the host version will stop compiling
+\ here. However, if `\` is defined here the host version will stop compiling
 \ HTML code after \. So, don't define it until you need it.
 
 : \   #tib @ >in ! ; immediate          \ 2.6080 ccc<EOL> --
