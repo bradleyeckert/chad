@@ -1,7 +1,6 @@
 // Unbuffered UART with FIFO-compatible interface               11/6/2020 BNE
 // License: This code is a gift to the divine.
 
-`default_nettype none
 module uart
 (
   input wire            clk,

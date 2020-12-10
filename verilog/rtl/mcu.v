@@ -7,7 +7,7 @@
 `default_nettype none
 module mcu
 #(
-  parameter WIDTH = 18,                 // data cell size in bits
+  parameter WIDTH = 20,                 // data cell size in bits
   parameter URATE = 32,                 // 96 MHz / 32 = 3MBPS baud rate
   parameter CODE_SIZE = 12,             // log2 of # of 16-bit instruction words
   parameter DATA_SIZE = 11              // log2 of # of cells in data memory
@@ -58,7 +58,7 @@ module mcu
 
   wire p_reset_n = ~p_reset;
   wire                 irq;             // Interrupt request              i
-  reg  [3:0]           ivec;            // Interrupt vector for irq       i
+  wire [3:0]           ivec;            // Interrupt vector for irq       i
   wire                 iack;            // Interrupt acknowledge          o
 
   wire                 copgo;           // Coprocessor trigger            i
@@ -140,9 +140,8 @@ module mcu
   wire urxirq;                          // UART full strobe
   wire utxirq;                          // UART ready strobe
   reg [15:0] ipending;                  // up to 15 interrupts available
-  wire [3:0]  prioritie;
 
-  prio_enc #(4) pe (.a(ipending), .y(prioritie));
+  prio_enc #(4) pe (.a(ipending), .y(ivec));
   assign irq = (ivec != 0);
 
 // Handle interrupt request strobes, edges, etc.
@@ -151,9 +150,7 @@ module mcu
   begin
     if (!p_reset_n) begin
       ipending <= 0;
-      ivec <= 0;
     end else begin
-      ivec <= prioritie;
       ipending[1] <= ipending[1] | cyclev;
       ipending[2] <= ipending[2] | utxirq;
       ipending[3] <= ipending[3] | urxirq;
@@ -166,24 +163,17 @@ module mcu
   wire [31:0] dat_o, dat_i;
   wire we_o, stb_o, ack_i;
 
-  wire io_spif = (mem_addr[6:3] == 0);
-  wire s_iord = io_spif & io_rd;
-  wire s_iowr = io_spif & io_wr;
-  wire [WIDTH-1:0] s_io_dout;
-
-  assign io_dout = s_io_dout;           // spif is the only I/O device
-
 // spif is the SPI flash controller and ISP hub
   spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
-    .io_rd    (s_iord   ),
-    .io_wr    (s_iowr   ),
+    .io_rd    (io_rd    ),
+    .io_wr    (io_wr    ),
     .mem_rd   (mem_rd   ),
     .mem_wr   (mem_wr   ),
     .mem_addr (mem_addr ),
     .din      (din      ),
-    .io_dout  (s_io_dout),
+    .io_dout  (io_dout),
     .code_addr(code_addr),
     .p_hold   (p_hold   ),
     .p_reset  (p_reset  ),
@@ -276,3 +266,4 @@ module mcu
   assign ack_i = stb_od;
 
 endmodule
+`default_nettype wire

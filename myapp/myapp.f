@@ -28,7 +28,7 @@ include ../forth/numout.f
 include ../forth/compile.f
 include ../forth/flash.f
 include ../forth/interpret.f
-include ../forth/tftlcd.f
+\ include ../forth/tftlcd.f
 \ include ../forth/ctea.f
 \ include ../forth/bignum.f
 
@@ -63,6 +63,8 @@ variable hicycles
 [defined] quit [if]
 
 : myapp  ( -- )
+    1000 [ 100 cells ] literal io!      \ test wishbone write
+    [ 100 cells ] literal io@ drop      \ test wishbone read
     ." May the Forth be with you."
     0 quit
 ;

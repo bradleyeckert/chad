@@ -1,7 +1,5 @@
 // Generic synchronous read/write single-port RAM               10/26/2020 BNE
 
-`default_nettype none
-
 module spram
 #(parameter ADDR_WIDTH = 10,
   parameter DATA_WIDTH = 16

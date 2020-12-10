@@ -1,5 +1,12 @@
-// Serial Flash Controller for Chad                  		12/08/2020 BNE
-// License: This code is a gift to the divine.
+// Serial Flash Controller for Chad                  		12/10/2020 BNE
+// This code is a gift to the divine.
+
+// SPIF is an I/O processor that loads memories from SPI flash at boot time,
+// decrypts flash data on the fly, provides a Wishbone Bus for peripherals,
+// processes a UART stream, and provides ISP-over-UART functionality.
+
+// The processor interface is for J1-type CPUs. Study that if you need to port
+// SPIF to something less sexy like a RISC V.
 
 `default_nettype none
 module spif
@@ -52,11 +59,11 @@ module spif
   output reg  [3:0]           f_rate,   // Flash SCLK divisor
   input  wire [7:0]           f_din,    // Flash received data
 // Wishbone master
-  output wire [14:0]          adr_o,    // address
-  output wire [31:0]          dat_o,    // data out
+  output reg  [14:0]          adr_o,    // address
+  output reg  [31:0]          dat_o,    // data out
   input wire  [31:0]          dat_i,    // data in
-  output wire                 we_o,     // 1 = write, 0 = read
-  output wire                 stb_o,    // strobe
+  output reg                  we_o,     // 1 = write, 0 = read
+  output reg                  stb_o,    // strobe
   input wire                  ack_i,    // acknowledge
 // Interrupt requests
   output reg                  cyclev,   // cycle count overflow strobe
@@ -67,22 +74,29 @@ module spif
 // Wishbone bus master
 
   wire internal = (mem_addr[14:4] == 0);// anything above 0x000F is Wishbone
-  assign adr_o = mem_addr;
-  assign stb_o = (io_wr | io_rd) & ~internal ;
-  assign we_o = io_wr;
-  wire wbbusy = stb_o & ~ack_i;         // waiting for wishbone bus
-  reg [31:0] wbxo;
-
-  assign dat_o = (WIDTH == 32) ? din : {wbxo, din}; // let it truncate
-
+  wire wbbusy = stb_o;                  // waiting for wishbone bus
+  wire wbreq = (~internal) & (io_wr | io_rd);
+`ifndef IS32BIT
+  reg [31-WIDTH:0] wbxo;
+`endif
   reg [31:0] wbxi;
   always @(posedge clk or negedge arstn) begin
-    if (!arstn)
-      wbxi <= 'b0;
-    else
-      if ((!internal) && (io_rd) && (stb_o) && (ack_i))
-        if (WIDTH != 32)
-          wbxi <= dat_i[31:WIDTH];
+    if (!arstn) begin
+      wbxi <= 0;
+      {stb_o, we_o} <= 2'b0;
+    end else begin
+      if (stb_o) begin                  // waiting for ack_i
+        if (ack_i) begin
+          stb_o <= 1'b0;
+          if (!we_o)                    // capture read data
+            wbxi <= dat_i;
+        end
+      end else if (wbreq) begin
+        {stb_o, we_o} <= {1'b1, io_wr};
+        dat_o <= (WIDTH == 32) ? din : {wbxo, din};
+        adr_o <= mem_addr;
+      end
+    end
   end
 
 // Free-running cycles counter readable by the CPU. Rolls over at Fclk*2^-WIDTH.
@@ -217,17 +231,15 @@ module spif
         endcase
       if (ISPack == 1'b1)
         ISPfull <= 1'b0;
-      if (io_rd)
-        if (!p_hold)
-          case (mem_addr[3:0])          // io read clears UART receive flag
-          4'h0: uartRXfull <= 1'b0;
-          endcase
-      if (io_wr)
-        if (!p_hold)
-          case (mem_addr[3:0])
-          4'h4:                         // jam an ISP byte
-            {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
-          endcase
+      if (io_rd & internal & ~p_hold)
+        case (mem_addr[3:0])            // io read clears UART receive flag
+        4'h0: uartRXfull <= 1'b0;
+        endcase
+      if (io_wr & internal & ~p_hold)
+        case (mem_addr[3:0])
+        4'h4:                           // jam an ISP byte
+          {ISPbyte, ISPfull} <= {din[7:0], 1'b1};
+        endcase
     end
 
   reg [2:0] i_usel;                     // UART output select for ISP
@@ -248,7 +260,7 @@ module spif
   end
 
   always @* begin                       // insert i/o wait states
-    if (io_wr) begin
+    if (io_wr & internal) begin
       case (mem_addr[3:0])
       4'h0:  iobusy = txbusy;           // UART output
       4'h4:  iobusy = ISPfull;          // SPI flash byte-banging
@@ -282,7 +294,6 @@ module spif
 
 // To do:
 // When loading a key, don't block the start of a read sequence
-// Change the key loading method to use less MCU code
 
   reg [KEY_LENGTH*8-1:0] widekey;       // 0 = no cypher
   reg [3:0] key_index;
@@ -336,7 +347,8 @@ module spif
   reg [23:0] read_addr;                 // flash read address
   reg [1:0]  read_bytes;                // byte count for multibyte read
 
-  reg [WIDTH-1:0] b_data;
+  reg [WIDTH-1:0] b_data;               // plaintext boot data
+  reg [31:0] fr_data;                   // flash read data word
   reg codeWr, dataWr;
   reg [1:0] bytes, bytecount;           // bytes per b_data word
   reg bumpDest;                         // trigger address bump
@@ -547,14 +559,19 @@ module spif
                 end
               endcase
             end
-          4'b1110:                      // clear b_data before shifting in bytes
-            b_data <= 0;
+          4'b1110:                      // clear fr_data before shifting in bytes
+            begin
+              fr_data <= 0;
+              b_state <= b_state + 1'b1;
+              g_next <= 1'b1;           // get keystream before the read
+            end
           4'b1111:                      // ========== Read a word
             begin
-              b_data <= {b_data[WIDTH-9:0], plain};
+              fr_data <= {fr_data[WIDTH-9:0], plain};
               if (read_bytes) begin
                 read_bytes <= read_bytes - 2'd1;
-                g_next <= 1'b1;
+                if (read_bytes > 1)
+                  g_next <= 1'b1;
               end else begin
                 b_state <= b_state + 1'b1;
                 f_wr <= 1'b0;
@@ -614,13 +631,16 @@ module spif
     4'h4:    spif_dout = jammin;        // jammed byte is still pending
     4'h5:    spif_dout = booting;       // still reading flash?
     4'h6:    spif_dout = cycles;        // free-running counter
-    4'h7:    spif_dout = wbxi;          // Wishbone bus extra input bits
-    4'hB:    spif_dout = b_data;        // flash read word
+`ifndef IS32BIT
+    4'h7:    spif_dout = wbxi[31:WIDTH];// Wishbone bus extra input bits
+    4'hA:    spif_dout = fr_data[31:WIDTH]; // flash read word
+`endif
+    4'hB:    spif_dout = fr_data[WIDTH-1:0];
     default: spif_dout = outword;
     endcase
   end
 
-  assign io_dout = (internal) ? spif_dout : dat_i[WIDTH-1:0];
+  assign io_dout = (internal) ? spif_dout : wbxi[WIDTH-1:0];
 
 // The Data and Code RAMs are accessed via DMA by the boot process.
 // The bootloader writes to either code or data RAM.
@@ -637,3 +657,4 @@ module spif
   assign code_din = b_data[15:0];
 
 endmodule
+`default_nettype wire

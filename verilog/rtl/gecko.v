@@ -11,8 +11,6 @@
 // It takes 8 cycles to get the next byte unless the key is 0, in which `dout`
 // stays stuck at 0 and `ready` is always set. With a 0 key, plaintext can stream faster.
 
-`default_nettype none
-
 module gecko
 #(
   parameter KEY_LENGTH = 7      // in bytes

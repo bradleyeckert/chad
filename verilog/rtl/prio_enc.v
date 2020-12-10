@@ -3,8 +3,6 @@
 
 // `y` = bit number of the highest `a` bit, 0 if none.
 
-`default_nettype none
-
 module prio_enc #(
   parameter WIDTH = 4
 )(

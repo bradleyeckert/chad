@@ -1,7 +1,6 @@
 // SPI flash interface                                          10/2/2020 BNE
 // License: This code is a gift to the divine.
 
-`default_nettype none
 module sflash
 (
   input wire          clk,

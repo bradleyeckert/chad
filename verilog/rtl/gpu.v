@@ -116,3 +116,4 @@ module gpu
     end
 
 endmodule
+`default_nettype wire

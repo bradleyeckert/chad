@@ -1,7 +1,6 @@
 // Stack definition from J1 family
 // Made from shift registers
 
-`default_nettype none
 module stack
 #(
   parameter WIDTH = 18,

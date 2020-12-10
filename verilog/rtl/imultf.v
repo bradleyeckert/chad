@@ -15,7 +15,6 @@
 
 // a is signed or unsigned, b is unsigned with (bits-1) bits of precision.
 
-`default_nettype none
 module imultf
 #(parameter WIDTH = 24
 )(

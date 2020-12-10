@@ -5,7 +5,6 @@
 // The idea is to balance execution time with mux usage to use fewer
 // FPGA resources yet have a reasonable execution time.
 
-`default_nettype none
 module ishift
 #(parameter WIDTH = 32                  // should be 32 to 64
 )(

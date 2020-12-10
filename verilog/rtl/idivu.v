@@ -1,7 +1,6 @@
 // Iterative unsigned divider                     11/5/2020 BNE
 // License: This code is a gift to the divine.
 
-`default_nettype none
 module idivu
 #(parameter WIDTH = 8
 )(
