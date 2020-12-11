@@ -1,4 +1,4 @@
-// Serial Flash Controller for Chad                  		12/10/2020 BNE
+// Serial Flash Controller for Chad                  		12/11/2020 BNE
 // This code is a gift to the divine.
 
 // SPIF is an I/O processor that loads memories from SPI flash at boot time,
@@ -340,19 +340,19 @@ module spif
 //==============================================================================
 
   localparam FAST_READ = 8'h0B;
-  reg [3:0] b_state;                    // boot FSM state
+  reg [3:0]  b_state;                   // boot FSM state
   reg [15:0] b_count;                   // length of byte run
   reg [15:0] b_dest;                    // address register for boot load destination
-  reg [2:0]  boot_format;               // boot load SPI mode
-  reg [23:0] read_addr;                 // flash read address
-  reg [1:0]  read_bytes;                // byte count for multibyte read
+  reg [2:0]  rd_format;               // boot load SPI mode
+  reg [23:0] rd_addr;                   // flash read address
+  reg [1:0]  rd_bytes, rd_bcnt;         // byte count for multibyte read
 
   reg [WIDTH-1:0] b_data;               // plaintext boot data
   reg [31:0] fr_data;                   // flash read data word
   reg codeWr, dataWr;
-  reg [1:0] bytes, bytecount;           // bytes per b_data word
+  reg [1:0]  b_bytes, b_bcnt;           // bytes per b_data word
   reg bumpDest;                         // trigger address bump
-  reg [3:0] b_mode;                     // boot interpreter mode
+  reg [3:0]  b_mode;                    // boot interpreter mode
 
   reg [3:0] i_state;
   localparam ISP_IDLE =   4'b0001;
@@ -377,14 +377,14 @@ module spif
       b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= 0;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
       b_mode <= 4'd0;     bumpDest <= 1'b0;
-      bytes  <= 2'd0;     dataWr <= 1'b0;    i_usel <= 3'd7;
-      bytecount <= 2'd0;  codeWr <= 1'b0;    g_next <= 1'b0;
+      b_bytes  <= 2'd0;   dataWr <= 1'b0;    i_usel <= 3'd7;
+      b_bcnt <= 2'd0;     codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 4'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    uo_wr <= 1'b0;     g_reset_n <= 1'b0;
-      boot_format <= 3'b010;    // default is single-rate SPI
-      read_addr <= 0;
-      i_state <= ISP_PING;      // spit out a char on POR
-      outword <= 91;            // power-up output character
+      rd_format <= 3'b010;              // default is single-rate SPI
+      rd_addr <= 0;
+      i_state <= ISP_PING;              // spit out a char on POR
+      outword <= 91;                    // power-up output character
       init <= RAM_INIT;
       if (RAM_INIT)
         i_count <= (1 << CODE_SIZE) - 1;
@@ -408,9 +408,9 @@ module spif
         case (b_state[2:0])
           3'b000:  f_dout <= ISPbyte;
           3'b001:  f_dout <= FAST_READ;
-          3'b010:  f_dout <= read_addr[23:16] + BASEBLOCK[7:0];
-          3'b011:  f_dout <= read_addr[15:8];
-          3'b100:  f_dout <= read_addr[7:0];
+          3'b010:  f_dout <= rd_addr[23:16] + BASEBLOCK[7:0];
+          3'b011:  f_dout <= rd_addr[15:8];
+          3'b100:  f_dout <= rd_addr[7:0];
           default: f_dout <= 8'h00;
         endcase
         ISPack <= 1'b0;
@@ -437,8 +437,8 @@ module spif
                       end
                       if (ISPbyte[2]) begin
                         b_state <= 4'b0001; // reboot from flash
-                        read_addr <= 0;
-                        boot_format <= 3'b010;
+                        rd_addr <= 0;
+                        rd_format <= 3'b010;
                       end
                       g_reset_n <= ~ISPbyte[3];
                       if (ISPbyte[4])   // change flash bus rate
@@ -497,7 +497,7 @@ module spif
             end
           4'b0001, 4'b1001:             // begin fast read
             begin
-              f_format <= boot_format;
+              f_format <= rd_format;
               b_state <= b_state + 1'b1;
             end
           4'b0111:                      // ========== Interpret flash bytes
@@ -524,8 +524,8 @@ module spif
                 default:             	// data mode
                   begin
                     b_mode <= {1'b1, plain[4:2]};
-                    bytes <= plain[1:0];
-                    bytecount <= plain[1:0];
+                    b_bytes <= plain[1:0];
+                    b_bcnt <= plain[1:0];
                   end
                 endcase
               3'b010:                   // 010x = set destination address
@@ -543,11 +543,11 @@ module spif
               default:                  // 1mmx = write to memory
                 begin
                   b_data <= {b_data[WIDTH-9:0], plain};
-                  if (bytecount)
-                    bytecount <= bytecount - 2'd1;
+                  if (b_bcnt)
+                    b_bcnt <= b_bcnt - 2'd1;
                   else
                     begin               // write to 1 of 8 sinks
-                      bytecount <= bytes;
+                      b_bcnt <= b_bytes;
                       case (b_mode[2:0])
                       3'd0: codeWr <= 1'b1;
                       3'd1: dataWr <= 1'b1;
@@ -564,14 +564,14 @@ module spif
               fr_data <= 0;
               b_state <= b_state + 1'b1;
               g_next <= 1'b1;           // get keystream before the read
+              rd_bcnt <= rd_bytes;
             end
           4'b1111:                      // ========== Read a word
             begin
               fr_data <= {fr_data[WIDTH-9:0], plain};
-              if (read_bytes) begin
-                read_bytes <= read_bytes - 2'd1;
-                if (read_bytes > 1)
-                  g_next <= 1'b1;
+              if (rd_bcnt) begin
+                rd_bcnt <= rd_bcnt - 2'd1;
+                g_next <= 1'b1;
               end else begin
                 b_state <= b_state + 1'b1;
                 f_wr <= 1'b0;
@@ -595,15 +595,15 @@ module spif
           end
         4'h3: begin
             b_state <= 4'd1;            // interpret flash byte stream
-            read_addr <= din;
+            rd_addr <= din;
           end
         4'h5: begin
             g_load <= 1'b1;             // load key
             outword <= din;
           end
         4'h6: begin
-            boot_format <= din[4:2];
-            read_bytes <= din[1:0];     // Set up flash read parameters
+            rd_format <= din[4:2];
+            rd_bytes <= din[1:0];       // Set up flash read parameters
           end
         4'h7:                           // upper bits of outgoing Wishbone
           if (WIDTH != 32)
@@ -613,7 +613,7 @@ module spif
           end
         4'hB: begin
             b_state <= 4'h9;            // read a word from flash to b_data
-            read_addr <= din;
+            rd_addr <= din;
           end
         endcase
     end
@@ -636,6 +636,8 @@ module spif
     4'hA:    spif_dout = fr_data[31:WIDTH]; // flash read word
 `endif
     4'hB:    spif_dout = fr_data[WIDTH-1:0];
+    4'hE:    spif_dout = PRODUCT_ID;    // basic versioning boilerplate
+    4'hF:    spif_dout = {DATA_SIZE[3:0], CODE_SIZE[3:0], BASEBLOCK[7:0]};
     default: spif_dout = outword;
     endcase
   end

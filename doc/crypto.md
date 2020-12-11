@@ -15,13 +15,17 @@ since there are more regions that you don't care about being probed.
 You don't care if the flash and its ATE support can be accessed via JTAG.
 
 Chad uses compact hardware to decrypt data coming from the SPI flash.
-It uses a stream cypher that's a derivative of LIZARD.
+It uses a stream cypher that's a derivative of LIZARD. I call it `gecko`.
 It takes 48 clock cycles to initialize and then provides a new pseudorandom
 byte every 8 clocks.
 So, with a 200 MHz clock, an on-chip (or QSPI) flash would be read at 25 MBPS.
 
 The encryption hardware is limited to SPI flash decryption. It's not set up to
-encrypt messages, so it's not hardened for that use case.
+encrypt messages, so it's not hardened for that use case. It also allows
+a `0` key, which sets the keystream to all zeros. That's not something you want
+in a system that encrypts user data. Since Gecko only for IP protection,
+it is not in 5A002.a of US export control regulations. Key length doesn't matter.
+Gecko can take a key length of up to 15 bytes.
 
 The multi-cell keys are `bkey` for the boot record and `tkey` for text in flash.
 If non-zero, `bkey` encrypts the boot record when it gets written to flash memory.

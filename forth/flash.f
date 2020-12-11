@@ -18,6 +18,7 @@ hex
 ;
 
 \ The gecko key is loaded by writing to a register and then triggering a load.
+\ `fcmd24` is used for writing to flash, which isn't done currently
 
 : gkey                          \ n --
    [ 5 cells ] literal io!      \ shift in a new key
@@ -33,21 +34,6 @@ hex
    drop ispcmd                  \ addr[7:0]
 ;
 
-\ Read from SPI flash
-\ Primitives for string reading using double address
-
-: @f(                           \ 2.4000 df-addr --
-   0B  4 fcmd24  0 ispcmd       \ start 0B read command
-;
-: _c@f                          \ 2.4010 -- c
-   60 ispcmd                    \ trigger SPI transfer
-   [ 3 cells ] literal io@      \ read SPI result
-;
-: _@f                           \ 2.4020 -- n
-   0 [ cellbits 7 + 8 / ] literal for
-      256* _c@f +               \ read cell from flash
-   next
-;
 : )@f  ( -- )                   \ 2.4030 --
    80 _isp                      \ end read (raise CS#)
 ;
@@ -68,14 +54,21 @@ decimal
    fwait
    [ 11 cells ] literal io@     \ get result
 ;
-: @f>  ( -- x )
+: c@f>  ( -- c )
+   [ 2 2* 2* ] literal
+   [ 6 cells ] literal io!      \ flash read setup
+[ ;
+: @f>  ( -- x )                 \ read using the default setup
    [ 10 cells ] literal dup io! \ trigger a read-next
    fwait
    [ 11 cells ] literal io@     \ get result
 ;
-: @f  ( df-addr -- x )          \ 3-byte big-endian read
+: @f(  ( df-addr -- x )         \ 3-byte big-endian read
    [ 2 2* 2*  2 + ] literal     \ format=2, size=2
-   _x@f  )@f                    \ raise CS afterwards
+   _x@f
+;
+: @f  ( df-addr -- x )          \ 3-byte big-endian read
+   @f(  )@f                     \ raise CS afterwards
 ;
 : w@f(  ( df-addr -- x )        \ first 2-byte big-endian read
    [ 2 2* 2*  1 + ] literal
@@ -84,9 +77,12 @@ decimal
 : w@f  ( df-addr -- x )         \ 2-byte big-endian read
    w@f(  )@f
 ;
-: c@f  ( df-addr -- x )         \ 1-byte read
+: c@f(  ( df-addr -- x )        \ first 1-byte read
    [ 2 2* 2* ] literal
-   _x@f  )@f
+   _x@f
+;
+: c@f  ( df-addr -- x )         \ 1-byte read
+   c@f(  )@f
 ;
 
 : d@f    @f 0 ;                 \ 2.4055 df-addr -- d
@@ -103,9 +99,11 @@ decimal
 \ `fbuf` moves a string from flash to RAM.
 \ The keystream is assumed to be in sync.
 
-:noname _c@f over c! 1+ ;      ( a -- a+1 )
 : fbuf                         \ 2.4060 df-addr c-addr u --
-   2swap @f(  literal times drop  )@f
+   >r >r  c@f(  r@ c!  r> r>   ( c-addr u ) \ 1st char
+   begin  1 /string  dup while
+      over @f> swap c!
+   repeat  2drop  )@f
 ;
 
 256 equ |pad|
@@ -149,7 +147,7 @@ decimal
    wid    dup                           \ get the pointer
    begin  nip dup /text @f              \ skip to beginning
    dup 0= until  drop
-   )gkey (.wid) space                   \ use plaintext
+   (.wid) space
 ;
 
 \ | Length  | Name  | Usage                |
@@ -170,7 +168,7 @@ decimal
 
 : match  \ addr len -- found?
    for                                  \ addr' | len'
-      count ( tolower ) _c@f xor if
+      count ( tolower ) @f> xor if
          rdrop dup xor exit             \ mismatch in string
       then
    next  drop 1                         \ all bytes have been read
@@ -182,11 +180,13 @@ decimal
    over 0= if dup xor exit then         \ addr 0 0   zero length string
    begin
       dup>r  /text
-      @f(  _@f >r  _c@f                 \ addr len1 len2 | head link
+      @f( >r  c@f>                      \ addr len1 len2 | head link
       over = if
          2dup match if                  \ found
             rdrop dup r> +              \ 'link + NameLength + 1 + cellbytes
             [ cellbits 7 + 8 /  1 + ] literal +
+            [ 2 2* 2*  2 + ] literal    \ next reads will be 24-bit
+            [ 6 cells ] literal io!
             exit                        \ don't end the read yet
          then
       then )@f r>  rdrop                \ end flash read

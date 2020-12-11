@@ -52,10 +52,5 @@ there
 : 2over  >r >r 2dup r> r> 2swap ;
 : 3drop  drop 2drop ;
 
-\ fixed left shifts
-
-: 16*   2* 2* 2* 2* ;
-: 256*  16* 16* ; \ faster than setting up the hardware shifter
-
 there swap - . .( instructions used by core ext) cr
 

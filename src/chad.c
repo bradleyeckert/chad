@@ -1186,17 +1186,15 @@ SV LoadFlash(void) {                    // ( dest -- )
     error = LoadFlashMem(tok, Dpop());
 }
 
-SV SaveFlash(void) {                    // chad format ( d_pid baseblock -- )
+// d_pid is a double cell PID16:KEYID8
+
+SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
     ParseFilename();
     int baseblock = Dpop();
     uint64_t d = (uint64_t)Dpop() << CELLBITS;   d += Dpop();
-    d = (d << 8) + baseblock;           // lowest byte = BASEBLOCK
-    error = SaveFlashMem(tok, (uint32_t)d); // {BASEBLOCK, KeyID, PIDlo, PIDhi}
-}
-
-SV SaveFlashHex(void) {                 // format for SPI flash Verilog model
-    ParseFilename();                    // ( -- baseblock )
-    error = SaveFlashMemHex(tok, Dpop());
+    int format = Dpop();
+    d = (d << 8) + baseblock;           // {BASEBLOCK, KeyID, PIDlo, PIDhi}
+    error = SaveFlashMem(tok, (uint32_t)d, format);
 }
 
 // Start a new definition at the code boundary specified by CodeAlignment.
@@ -1950,8 +1948,7 @@ SV LoadKeywords(void) {
     AddKeyword("+tkey",       "1.0094 u --",          AddTextKey,    noCompile);
     AddKeyword("tkey",        "1.0095 -- ud",         ExecTextKey, CompTextKey);
     AddKeyword("load-flash",  "1.0134 <filename> a --", LoadFlash,   noCompile);
-    AddKeyword("save-flash-h","1.0135 <filename> --", SaveFlashHex,  noCompile);
-    AddKeyword("save-flash", "1.0136 pid bit <filename> --", SaveFlash, noCompile);
+    AddKeyword("save-flash", "1.0136  fmt d_pid bit <name> --", SaveFlash, noCompile);
     AddKeyword("boot",        "1.0138 <filename> --", BootNrun,      noCompile);
     AddKeyword("boot-test",   "1.0139 <filename> --", Boot,          noCompile);
     AddKeyword("make-heads",  "1.0140 --",            MakeHeaders,   noCompile);

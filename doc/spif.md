@@ -267,7 +267,8 @@ Read:
 - 5: Boot transfer status: 1 = loading memory from flash
 - 6: Raw clock cycle count
 - 7: Upper bits of a 32-bit Wishbone Bus read if cells are less than 32-bit 
-- B: Get flash read-word result
+- A: Get flash read-word result, upper cell if a cell is less than 32 bits
+- B: Get flash read-word result, lower cell
 
 Write:
 
@@ -279,6 +280,7 @@ Write:
 - 5: Write key: key = key<<cellbits + n
 - 6: Set the lower address to n\[11:0] and data size for flash read to n\[13:12]+1 bytes
 - 7: Set the upper bits of the next 32-bit Wishbone Bus write
+- A: Trigger flash read of next word
 - B: Trigger flash read starting at address (n<<12) using format n\[14:12]
 
 ### Jamming ISP bytes

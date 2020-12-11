@@ -1,0 +1,2 @@
+write_cfgmem  -format mcs -size 16 -interface SPIx4 -loadbit {up 0x00000000 "C:/Users/User/mcu_arty/mcu_arty.runs/impl_2/mcu_arty.bit" } -loaddata {up 0x00220000 "D:/Apps/chad/myapp/myappraw.bin" } -force -file "C:/Users/User/mcu_arty/mcu_arty.runs/impl_2/demo2"
+

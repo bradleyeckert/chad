@@ -7,10 +7,13 @@
 `default_nettype none
 module mcu
 #(
-  parameter WIDTH = 20,                 // data cell size in bits
+  parameter BASEBLOCK = 0,              // First 64K block of flash
   parameter URATE = 32,                 // 96 MHz / 32 = 3MBPS baud rate
+  parameter WIDTH = 24,                 // data cell size in bits
   parameter CODE_SIZE = 12,             // log2 of # of 16-bit instruction words
-  parameter DATA_SIZE = 11              // log2 of # of cells in data memory
+  parameter DATA_SIZE = 11,             // log2 of # of cells in data memory
+  parameter GPO_BITS = 16,              // bits of general purpose output
+  parameter GPI_BITS = 4                // bits of general purpose input
 )(
   input wire               clk,
   input wire               rst_n,
@@ -22,7 +25,10 @@ module mcu
   output wire  [3:0]       oe,          // output enable for qdo
 // UART connection
   input wire               rxd,         // Async input
-  output wire              txd
+  output wire              txd,
+// GPIO
+  output reg [GPO_BITS-1:0] gp_o,
+  input wire [GPI_BITS-1:0] gp_i
 );
 
   localparam PID = 0;                   // product ID
@@ -160,11 +166,13 @@ module mcu
 
 // Wishbone master
   wire [14:0] adr_o;
-  wire [31:0] dat_o, dat_i;
-  wire we_o, stb_o, ack_i;
+  wire [31:0] dat_o;
+  reg  [31:0] dat_i;
+  wire we_o, stb_o;
+  reg ack_i;
 
 // spif is the SPI flash controller and ISP hub
-  spif #(CODE_SIZE, WIDTH, DATA_SIZE, 0, PID, KEY_LENGTH) bridge (
+  spif #(CODE_SIZE, WIDTH, DATA_SIZE, BASEBLOCK, PID, KEY_LENGTH) bridge (
     .clk      (clk      ),
     .arstn    (rst_n    ),
     .io_rd    (io_rd    ),
@@ -248,22 +256,33 @@ module mcu
   );
 
 // Put your Wishbone peripherals here.
-// For testing, we loop back stb_o to ack_i.
 
-  reg [31:0] wbreg;
-  reg stb_od;
-  always @(posedge clk or negedge rst_n) begin
-    if (!rst_n)
-      wbreg <= 'b0;
-    else begin
-      if ((stb_o) && (we_o))
-        wbreg <= dat_o;
-      stb_od <= stb_o; // delayed stb
+// Route stb_o and ack_i to the individual peripherals.
+
+  reg [3:0] wbstb;
+  always @*
+    casez (adr_o[7:2])
+    6'b000101: {wbstb, ack_i} <= {4'b0001, 1'b1};
+    default:   {wbstb, ack_i} <= {4'b0000, 1'b1};
+    endcase
+
+  always @*
+    casez (adr_o[7:0])
+    default:   dat_i <= gp_i;
+    endcase
+
+// A simple peripheral for GPIO
+
+  always @(posedge clk, negedge rst_n) begin
+    if (!rst_n) begin
+      gp_o <= 0;
+    end else begin
+      if (wbstb[0] & we_o) begin
+        if (adr_o[0] == 0)
+          gp_o <= dat_o[GPO_BITS-1:0];  // GP out
+      end
     end
   end
-
-  assign dat_i = wbreg;
-  assign ack_i = stb_od;
 
 endmodule
 `default_nettype wire

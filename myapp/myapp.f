@@ -9,16 +9,15 @@
 \ To include the GUI stuff,
 \ ..\bin\gui include myapp.f
 
-
 \ Put text high enough in flash memory that it won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
 
-$4000 forg                              \ strings in flash start here
-$6000 equ fontDB                        \ font database location
+$6000 forg                              \ strings in flash start here
+$8000 equ fontDB                        \ font database location
 
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
-0 equ BASEBLOCK                         \ space reserved for FPGA bitstream
+34 equ BASEBLOCK                        \ space reserved for FPGA bitstream
 
 include ../forth/core.f
 include ../forth/coreext.f
@@ -28,9 +27,9 @@ include ../forth/numout.f
 include ../forth/compile.f
 include ../forth/flash.f
 include ../forth/interpret.f
-\ include ../forth/tftlcd.f
+include ../forth/tftlcd.f
+include ../forth/bignum.f
 \ include ../forth/ctea.f
-\ include ../forth/bignum.f
 
 variable hicycles
 
@@ -63,8 +62,8 @@ variable hicycles
 [defined] quit [if]
 
 : myapp  ( -- )
-    1000 [ 100 cells ] literal io!      \ test wishbone write
-    [ 100 cells ] literal io@ drop      \ test wishbone read
+    [ $14 cells ] literal dup io@       \ read gp_i
+    swap io!                            \ write top gp_o
     ." May the Forth be with you."
     0 quit
 ;
@@ -91,8 +90,9 @@ variable hicycles
 $2000 forg  make-heads                  \ build headers in flash
 $0000 forg  make-boot                   \ create a boot record in flash
 fontDB load-flash ../forth/myfont.bin   \ add the fonts in raw binary
-0. BASEBLOCK save-flash myapp.bin       \ save to a 'chad' file you can boot
-BASEBLOCK save-flash-h myapp.txt        \ save in hex for flash memory model
+1 0. BASEBLOCK save-flash myapp.bin     \ save to a 'chad' file you can boot
+2 0. BASEBLOCK save-flash myapp.txt     \ save in hex for flash memory model
+0 0. BASEBLOCK save-flash myappraw.bin  \ save without boilerplate
 
 \ You can now run the app with "boot myapp.bin" or a Verilog simulator.
 

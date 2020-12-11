@@ -283,6 +283,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 6: return (uint32_t)chadCycles();
     case 7: return WishboneUpperRx;
     case 11: return FlashReadResult;
+    case 0x14: return 0;                // GP input
     default: chadError(BAD_IOADDR);
     }
     return 0;
@@ -342,8 +343,9 @@ int writeIOmap (uint32_t addr, uint32_t x) {
     case 0x12: TFTLCDend();  break;
     case 0x13: TFTLCDdata(WHOLE18, x);  break;
 #endif
+    case 0x14: break;                   // GP output
 #ifdef HAS_LEDSTRIP
-    case 0x14: LEDstripWrite(x);  break;
+    case 0x18: LEDstripWrite(x);  break;
 #endif
     case 0x100: nohostAPI = x;  break;
     case 0x4000:                        // trigger an error

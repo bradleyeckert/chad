@@ -206,7 +206,7 @@ variable dpl
             state @ if lit, then
          then
       else
-         2drop _@f _@f _@f )@f          ( w xte xtc )
+         2drop  @f> @f> @f>  )@f        ( w xte xtc )
          state @ if swap then drop execute
       then
    repeat 2drop

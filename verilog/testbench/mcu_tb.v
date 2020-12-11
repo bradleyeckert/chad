@@ -22,6 +22,8 @@ module mcu_tb();
   wire  [3:0]   qdo;
   wire  [3:0]   oe;             // output enable for qdo
   wire  [3:0]   qd;             // quad data bus
+  wire  [15:0]  gp_o;           // output LEDs
+  reg   [3:0]   gp_i = 2;       // input switches
 
   assign qdi = qd;
   assign qd[0] = (oe[0]) ? qdo[0] : 1'bZ;
@@ -48,7 +50,7 @@ module mcu_tb();
   pullup(qd[0]);
   pullup(cs_n);
 
-  mcu #(24, UBAUD) u1 (
+  mcu #(34, UBAUD) u1 (
     .clk      (clk     ),
     .rst_n    (rst_n   ),
     .rxd      (rxd     ),
@@ -57,7 +59,9 @@ module mcu_tb();
     .cs_n     (cs_n    ),
     .qdi      (qdi     ),
     .qdo      (qdo     ),
-    .oe       (oe      )
+    .oe       (oe      ),
+    .gp_o     (gp_o    ),
+    .gp_i     (gp_i    )
   );
 
   always #(CLKPERIOD / 2) clk <= !clk;
@@ -90,6 +94,7 @@ module mcu_tb();
       UART_TX(8'h2E);
       UART_TX(8'h73);
       UART_TX(8'h0A);
+      $display("\"5 .s\" entered at %0t", $time);
       repeat (400000) @(posedge clk);
       // Demonstrate ISP by reading the 3-byte JDID (9F command).
       // A more modern method of getting flash characteristics is with the

@@ -86,7 +86,6 @@ of read into a software version that writes to the LCD panel. The tokens are:
 - `MONO15  1xxxxxxx_xxxxxxxx`  Output 15 monochrome pixels, LSB first.
 
 The cost to interpret tokens in hardware (MAX10) is 345 LEs and 145 registers.
-It runs at about the same clock speed as the `chad` processor.
 What do we gain from this compared to a software implementation?
 The inner loops of most tokens are pretty tight - they just repeat the pixel.
 Grayscale is the exception because it uses six multiplies in the interpolation.

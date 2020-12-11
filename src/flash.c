@@ -78,7 +78,7 @@ int LoadFlashMem(char* filename, uint32_t origin) {
 // A little extra is saved in case the last byte(s) are unintentional 0xFF
 // caused by the PRNG xoring.
 // the low byte of pid is the BASEBLOCK number, other bytes are product ID.
-int SaveFlashMem(char* filename, uint32_t pid) {
+int SaveFlashMem(char* filename, uint32_t pid, int format) {
 	BASEBLOCK = (uint8_t)pid;
 	uint32_t i = FlashMemorySize;
 	while ((i) && (mem[--i] == 0)) {}   // trim
@@ -92,34 +92,24 @@ int SaveFlashMem(char* filename, uint32_t pid) {
 	fp = fopen(filename, "wb");
 #endif
 	if (fp == NULL) return BAD_CREATEFILE;
-	fwrite("chad", 1, 4, fp);			// boilerplate: "chad"
-	fwrite(&pid, 1, 4, fp);			    // product ID
-	fwrite(&i, 1, 4, fp);			    // length
+	if (format & 1) {
+		fwrite("chad", 1, 4, fp);		// boilerplate: "chad"
+		fwrite(&pid, 1, 4, fp);			// product ID
+		fwrite(&i, 1, 4, fp);			// length
+	}
 	invertMem(mem, i);
 	uint32_t crc = crc32b(mem, i);
-	fwrite(&crc, 1, 4, fp);			    // crc
-	fwrite(mem, 1, i, fp);
-	invertMem(mem, i);
-	fclose(fp);
-	return 0;
-};
-
-int SaveFlashMemHex(char* filename, int baseblock) {
-	int i = FlashMemorySize;
-	while ((i) && (mem[--i] == 0)) {}   // trim
-	if (!i) return 0;                   // nothing to save
-	i++;								// include both endpoints
-	FILE* fp;
-#ifdef MORESAFE
-	errno_t err = fopen_s(&fp, filename, "w");
-#else
-	fp = fopen(filename, "w");
-#endif
-	if (fp == NULL) return BAD_CREATEFILE;
-	invertMem(mem, i);
-	fprintf(fp, "@%02X0000\n", baseblock);
-	for (int n = 0; n < i; n++)
-		fprintf(fp, "%02X\n", mem[n]);
+	if (format & 1) {
+		fwrite(&crc, 1, 4, fp);			// crc
+	}
+	if (format & 2) {					// hex
+		fprintf(fp, "@%02X0000\n", (uint8_t)pid);
+		for (uint32_t n = 0; n < i; n++)
+			fprintf(fp, "%02X\n", mem[n]);
+	}
+	else {								// binary
+		fwrite(mem, 1, i, fp);
+	}
 	invertMem(mem, i);
 	fclose(fp);
 	return 0;
