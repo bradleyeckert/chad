@@ -21,7 +21,7 @@ a simple CPU, the SPI controller morphed into a central hub for handling
 memory decryption, in-system-programming, and boot-from-flash. Chad is:
 
 - Secure. Flash memory is encrypted.
-- Fast. 100 MHz on the slowest MAX10 FPGA. Single-cycle instructions.
+- Fast. 100 MHz on a MAX10 FPGA. Single-cycle instructions.
 - Efficient. Forth provides excellent semantic density.
 - Low-power. In an ASIC, hardware stacks are power-efficient.
 - Portable. Runs on small FPGAs but is easily ported to ASIC.
@@ -129,7 +129,7 @@ We have web browsers now.
 It's built for security. The ISA doesn't support random read of code memory,
 which makes reverse engineering and hacking the code an exercise in chip
 probing if it can even be done.
-The MCU boots from SPI flash, which may be encrypted using a stream cipher.
+The MCU boots from SPI flash, which is encrypted using a stream cipher.
 The weak spot then becomes key management: How secure are keys,
 how hard can you make it to probe memory busses on the ASIC die, etc.
 
@@ -160,3 +160,5 @@ performs the following:
 - `spif` loads RAMs from SPI flash (S25FL064L) using FMF model
 - `chad` starts running the "myapp" demo after bootup
 - The demo runs a Forth interpreter (ok> prompt) via the UART.
+
+It's silicon-proven on Digilent's Arty A7-35T board: 100 MHz, 10% of the chip.
