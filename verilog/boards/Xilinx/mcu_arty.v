@@ -6,6 +6,7 @@
 // Arty-A7 shorting block factory settings: JP1 and JP2 are ON.
 // JP1 = boot mode: ON = SPIflash, OFF = JTAG.
 // JP2 = reset over USB: ON = connect FT2232H (BDBUS4) to FPGA reset.
+//       JP2 causes the FPGA to be reset when the COM port is opened.
 
 // An Artix-7 35T bitstream is typically 17,536,096 bits, 21728Ch bytes.
 // The BASEBLOCK for user flash is 22h.

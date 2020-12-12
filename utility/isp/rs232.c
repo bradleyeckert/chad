@@ -644,7 +644,7 @@ https://docs.microsoft.com/en-us/windows/desktop/api/winbase/ns-winbase-_dcb
 
   if(Cport[comport_number]==INVALID_HANDLE_VALUE)
   {
-    printf("unable to open comport\n");
+//    printf("unable to open comport\n");
     return(1);
   }
 
