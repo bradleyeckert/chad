@@ -8,4 +8,4 @@
 - `isa` Instruction Set Architecture
 - `lcd` LCD module (ILI9341) simulator
 - `manifesto` Ramblings of a madman
-- `spif` SPI controller intelligent hub
+- `spif` SPI flash controller intelligent hub
