@@ -7,6 +7,8 @@ Xilinx makes it easy to add user data to the input file.
 The `myapp` project generates `myappraw.bin`, which is the boot code and dictionary.
 The board's flash part is `s25fl128sxxxxxx0-spi-x1_x2_x4`.
 With the implementation open, the bitstream properties has additional options you can set
-such as the SCLK speed, SPI width, etc.
+such as the SCLK speed, SPI width, etc. You need to set those properties if you want
+a usable bitstream. For example, the default SPI clock is 3 MHz.
 
 Set your serial terminal to 3M baud, echo locally.
+Chad'e `term` utility works from the command line, leveraging the terminal's cooked mode.

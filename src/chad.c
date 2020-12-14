@@ -1192,8 +1192,8 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
     ParseFilename();
     int baseblock = Dpop();
     uint64_t d = (uint64_t)Dpop() << CELLBITS;   d += Dpop();
-    int format = Dpop();
-    d = (d << 8) + baseblock;           // {BASEBLOCK, KeyID, PIDlo, PIDhi}
+    int format = Dpop();                //  v--- 1st byte of 32-bit pid
+    d = (d << 8) + baseblock;           // {BASEBLOCK, PIDlo, PIDhi, KeyID}
     error = SaveFlashMem(tok, (uint32_t)d, format);
 }
 

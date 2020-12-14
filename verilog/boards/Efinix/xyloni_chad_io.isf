@@ -1,0 +1,83 @@
+# Efinity GPIO Pin Assignment
+# Version: 2020.2.299
+# Date: 2020-12-13 02:01
+#
+# Copyright (C) 2017 - 2020 Efinix Inc. All rights reserved.
+#
+# Device: T8F81
+# Package: 81-ball FBGA (final)
+# Project: xyloni_chad
+# Configuration mode: active (x1)
+# Timing Model: C2 (final)
+
+
+# Create instance
+design.create_output_gpio("leds",3,0)
+design.create_output_gpio("SD_CS")
+design.create_output_gpio("SD_DI")
+design.create_output_gpio("SD_DO")
+design.create_output_gpio("SD_SCLK")
+design.create_input_gpio("btn")
+design.create_pll_input_clock_gpio("my_pll_refclk")
+design.create_input_gpio("rst_n")
+design.create_output_gpio("spi_cs")
+design.create_inout_gpio("spi_data_0")
+design.create_inout_gpio("spi_data_1")
+design.create_output_gpio("spi_sck")
+design.create_input_gpio("uart_rxd")
+design.create_output_gpio("uart_txd")
+design.create_block("pll_inst1","PLL")
+
+# Set property, non-defaults
+design.set_property("SD_CS","OUT_PIN","system_spi_1_io_ss")
+design.set_property("SD_CS","OUT_CLK_PIN","io_systemClk")
+design.set_property("SD_SCLK","OUT_PIN","system_spi_1_io_sclk_write")
+design.set_property("SD_SCLK","OUT_CLK_PIN","io_systemClk")
+design.set_property("btn","PULL_OPTION","WEAK_PULLUP")
+design.set_property("rst_n","PULL_OPTION","WEAK_PULLUP")
+design.set_property("spi_cs","OUT_PIN","spi_ss")
+design.set_property("spi_cs","OUT_CLK_PIN","spi_ss")
+design.set_property("spi_data_0","IN_PIN","spi_di0")
+design.set_property("spi_data_0","OUT_PIN","spi_do0")
+design.set_property("spi_data_0","OUT_CLK_PIN","io_systemClk")
+design.set_property("spi_data_0","OE_PIN","spi_oe0")
+design.set_property("spi_data_0","OE_CLK_PIN","io_systemClk")
+design.set_property("spi_data_1","IN_PIN","spi_di1")
+design.set_property("spi_data_1","OUT_PIN","spi_do1")
+design.set_property("spi_data_1","OUT_CLK_PIN","io_systemClk")
+design.set_property("spi_data_1","OE_PIN","spi_oe1")
+design.set_property("spi_data_1","OE_CLK_PIN","io_systemClk")
+design.set_property("spi_sck","OUT_CLK_PIN","spi_spi_sck")
+design.set_property("uart_rxd","PULL_OPTION","WEAK_PULLUP")
+design.set_property("uart_txd","DRIVE_STRENGTH","4")
+design.set_property("pll_inst1","CLKOUT0_EN","1","PLL")
+design.set_property("pll_inst1","CLKOUT1_EN","0","PLL")
+design.set_property("pll_inst1","CLKOUT2_EN","0","PLL")
+design.set_property("pll_inst1","CLKOUT0_DIV","32","PLL")
+design.set_property("pll_inst1","CLKOUT0_PIN","clk","PLL")
+design.set_property("pll_inst1","LOCKED_PIN","","PLL")
+design.set_property("pll_inst1","M","69","PLL")
+design.set_property("pll_inst1","N","2","PLL")
+design.set_property("pll_inst1","O","1","PLL")
+design.set_property("pll_inst1","REFCLK_FREQ","33.33","PLL")
+design.set_property("pll_inst1","RSTN_PIN","","PLL")
+
+# Set resource assignment
+design.assign_pkg_pin("leds[0]","E7")
+design.assign_pkg_pin("leds[1]","J6")
+design.assign_pkg_pin("leds[2]","D7")
+design.assign_pkg_pin("leds[3]","D8")
+design.assign_pkg_pin("SD_CS","G5")
+design.assign_pkg_pin("SD_DI","G4")
+design.assign_pkg_pin("SD_DO","J3")
+design.assign_pkg_pin("SD_SCLK","J2")
+design.assign_pkg_pin("btn","C9")
+design.assign_pkg_pin("my_pll_refclk","C3")
+design.assign_pkg_pin("rst_n","C5")
+design.assign_pkg_pin("spi_cs","J4")
+design.assign_pkg_pin("spi_data_0","F4")
+design.assign_pkg_pin("spi_data_1","H3")
+design.assign_pkg_pin("spi_sck","H4")
+design.assign_pkg_pin("uart_rxd","H2")
+design.assign_pkg_pin("uart_txd","F3")
+design.assign_resource("pll_inst1","PLL_0","PLL")

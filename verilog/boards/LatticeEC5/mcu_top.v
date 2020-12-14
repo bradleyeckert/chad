@@ -1,23 +1,13 @@
-// Wrapper for the MCU                           12/1/2020 BNE
+// Wrapper for the MCU                           10/18/2020 BNE
 
-// This runs on a Digilent Arty-A7-35 board
-// FPGA p/n XC7A35T-1CSG324C
-
-// Arty-A7 shorting block factory settings: JP1 and JP2 are ON.
-// JP1 = boot mode: ON = SPIflash, OFF = JTAG.
-// JP2 = reset over USB: ON = connect FT2232H (BDBUS4) to FPGA reset.
-//       JP2 causes the FPGA to be reset when the COM port is opened.
-
-// An Artix-7 35T bitstream is typically 17,536,096 bits, 21728Ch bytes.
-// The BASEBLOCK for user flash is 22h.
-// The Arty A7 has a S25FL128SAGMFI00 (16MB) flash.
+// This synthesizes for a ECP5.
 
 `default_nettype none
-module mcu_arty
+module mcu_top
 (
   input wire          clk_in,
   input wire          rst_n,
-  output wire [3:0]   led,      // test LEDs, green LD4 to LD7, 1=on
+  output wire [3:0]   led,      // test LEDs, red LD4 to LD7, 1=on
   input  wire [3:0]   sw,       // slide switches
   input  wire [3:0]   btn,      // pushbuttons
   output wire [2:0]   RGB0,     // color LEDs
@@ -33,20 +23,21 @@ module mcu_arty
   output wire         uart_txd
 );
 
-  localparam BAUD_DIV = (100 / 3);      // Divisor for 3MBPS UART
-  localparam BASEBLOCK = 34;            // for Artix-7 35T
+  localparam BAUD_DIV = (96 / 3);       // Divisor for 3MBPS UART
+  localparam BASEBLOCK = 0;             // External SPI flash
 
-// The STARTUPE2 primitive can, in theory, supply CCLK to the SPI flash so that
-// the qspi_sck pin is not needed. I couldn't make it work, but Arty supplies the pin.
-
-  wire clk, locked;
+  wire clk = clk_in;
+  wire locked = 1'b1;
   reg arst_n = 1'b0;
   reg rst_n1 = 1'b0;
 
-  assign clk = clk_in;                  // No PLL, the oscillator input is 100 MHz
-  assign locked = 1'b1;
+//  clkgen clkgen_inst (
+//	.inclk0 ( clk_in ),
+//	.c0 ( clk ),
+//	.locked ( locked )
+//	);
 
-  always @(posedge clk) begin           // provide a synced reset at power-up
+  always @(posedge clk) begin
     arst_n <= rst_n1;
     rst_n1 <= rst_n & locked;
   end
@@ -83,4 +74,3 @@ module mcu_arty
   );
 
 endmodule
-`default_nettype wire

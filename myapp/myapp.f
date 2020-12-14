@@ -17,7 +17,8 @@ $8000 equ fontDB                        \ font database location
 
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
-34 equ BASEBLOCK                        \ space reserved for FPGA bitstream
+\ 34 equ BASEBLOCK                      \ leave space for A7-35T FPGA bitstream
+0 equ BASEBLOCK
 
 include ../forth/core.f
 include ../forth/coreext.f

@@ -11,7 +11,7 @@ module mcu
   parameter URATE = 32,                 // 96 MHz / 32 = 3MBPS baud rate
   parameter WIDTH = 24,                 // data cell size in bits
   parameter CODE_SIZE = 12,             // log2 of # of 16-bit instruction words
-  parameter DATA_SIZE = 11,             // log2 of # of cells in data memory
+  parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
   parameter GPO_BITS = 16,              // bits of general purpose output
   parameter GPI_BITS = 4                // bits of general purpose input
 )(
@@ -181,7 +181,7 @@ module mcu
     .mem_wr   (mem_wr   ),
     .mem_addr (mem_addr ),
     .din      (din      ),
-    .io_dout  (io_dout),
+    .io_dout  (io_dout  ),
     .code_addr(code_addr),
     .p_hold   (p_hold   ),
     .p_reset  (p_reset  ),

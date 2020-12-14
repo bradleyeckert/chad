@@ -26,9 +26,11 @@ Serial communication uses https://gitlab.com/Teuniz/RS-232/ for cross-platform
 abstraction. Ports are numbered for this. Numbering starts at 0, so COM4 is 3.
 */
 
-#define DEFAULTBAUD 1000000L
-#define DEFAULTPORT 3
+#define DEFAULTBAUD 3000000L
+#define DEFAULTPORT 12
 #define MemorySize  (1024*1024)
+#define MAXPORTS 31
+//#define VERBOSE
 
 uint32_t crc32b(uint8_t* message, size_t length) {
     uint32_t crc = 0xFFFFFFFF;			// compute CRC32
@@ -67,8 +69,37 @@ void Dump(uint8_t* p, int length) {
 }
 
 void ISP_TX(uint8_t* cstr) {            // send counted string
-//    printf("ISP_TX ");  Dump(&cstr[1], cstr[0]);
+    #ifdef VERBOSE
+    printf("ISP_TX ");  Dump(&cstr[1], cstr[0]);
+    #endif
     RS232_SendBuf(portnum, &cstr[1], cstr[0]);
+}
+
+// SPIF replaces 10h-13h with {10h, 0-3}.
+int GetResponse(int length) {           // get data from the RX buffer
+    uint8_t *p = response;
+    uint8_t c;
+    int tally = 0;
+    #ifdef VERBOSE
+    printf("ISP_RX");
+    #endif // VERBOSE
+    for (int i = 0; i < length; i++) {
+        int len = RS232_PollComport(portnum, &c, 1);
+        if (len == 0) break;
+        if (c == 0x10) {
+            RS232_PollComport(portnum, &c, 1);
+            c = 0x10 + (c & 3);
+        }
+        *p++ = c;
+        tally ++;
+        #ifdef VERBOSE
+        printf(" %02X", c);
+        #endif // VERBOSE
+    }
+    #ifdef VERBOSE
+    printf("\n");
+    #endif // VERBOSE
+    return tally;
 }
 
 void PingOn(void) {
@@ -78,7 +109,7 @@ void PingOn(void) {
 void GetRJID(void) {                    // get 3-byte RJID
     ISP_TX(ISP_RJID);
     ms(50);
-    if (RS232_PollComport(portnum, response, 3) != 3) {
+    if (GetResponse(3) != 3) {
         memset(response, 0, 3);
     }
 }
@@ -88,7 +119,7 @@ int TestWIP(void) {                     // read status register
     int retry = 100;
     while (retry--) {
         ms(2);
-        if (RS232_PollComport(portnum, response, 1)) {
+        if (GetResponse(1)) {
             return response[0];
         }
     }
@@ -139,15 +170,19 @@ void EndSPI(int n) {
         *p++ = lo;
     }
     RS232_SendBuf(portnum, pagebuf, pagelen);
-//    printf("EndSPI ");  Dump(pagebuf, pagelen);
+    #ifdef VERBOSE
+    printf("EndSPI ");  Dump(pagebuf, pagelen);
+    #endif
 }
+
+int baseblock;
 
 // 00 00 03 82 20 ss s0 00 80
 void Erase4K(int sector) {
     ISP_TX(ISP_WREN);
     BeginSPI();
     AddToBuf(0x20);
-    AddToBuf(sector >> 4);
+    AddToBuf(baseblock + (sector >> 4));
     AddToBuf(sector << 4);
     AddToBuf(0);
     EndSPI(3);
@@ -160,7 +195,7 @@ void ProgramPage(int page) {
     ISP_TX(ISP_WREN);
     BeginSPI();
     AddToBuf(0x02);
-    AddToBuf(page >> 8);
+    AddToBuf(baseblock + (page >> 8));
     AddToBuf(page);
     AddToBuf(0);
     uint8_t* src = &mem[page << 8];
@@ -176,7 +211,7 @@ void ProgramPage(int page) {
 int ReadPage(int page) {
     BeginSPI();
     AddToBuf(0x0B);
-    AddToBuf(page >> 8);
+    AddToBuf(baseblock + (page >> 8));
     AddToBuf(page);
     AddToBuf(0);
     AddToBuf(0);            // dummy byte
@@ -185,7 +220,7 @@ int ReadPage(int page) {
     AddToBuf(0xC2);
     EndSPI(4);
     ms(20);
-    int x = RS232_PollComport(portnum, response, 256);
+    int x = GetResponse(256);
     if (x == 256)
          return 1 & memcmp(&mem[page<<8], response, 256);
     return -1;
@@ -195,7 +230,14 @@ int main(int argc, char *argv[])
 {
     int baudrate = DEFAULTBAUD;
     if (argc < 2) {
-		printf("Usage: 'isp filename [port#] [baud]'\n\n");
+		printf("Usage: 'isp filename [port#] [baud]'\n");
+		printf("Possible port#:");
+		for (int i = 0; i < MAXPORTS; i++) {
+            if (RS232_OpenComport(i, baudrate, "8N1", 0) == 0) {
+                RS232_CloseComport(i);
+                printf(" %d", i);
+            }
+		}
 		return 1;
 	}
 	FILE* inf = fopen(argv[1], "rb");
@@ -239,31 +281,35 @@ int main(int argc, char *argv[])
         return 3;
     }
 
+    printf("Opened port %d at %d BPS\n", portnum, baudrate);
+
 /*
 At this point, the file has been read-in and checked. The serial port is open.
 Now we want to ping the target to make sure it's there and to match it up with
 the pid number.
 */
     PingOn();
-    if (RS232_PollComport(portnum, response, 5) != 5) {
+    int pingLength = GetResponse(7);
+    if (pingLength != 7) {
         printf("No ping\n");
         return 4;
     }
 /*
 The PING byte of ISP_enable (0x42) sends 5 bytes out the UART:
 BASEBLOCK    first 64KB sector of user flash
-KEY_ID       key ID, 8-bit
 PRODUCT_ID   product ID, 16-bit little-endian
+KEY_ID       key ID, 8-bit
+SERIALNUM    16-bit serial number
 SANITY       0xAA constant
 */
-    if (response[4] != 0xAA) {
+    if (response[6] != 0xAA) {
         printf("Ping failure\n");
         ISP_TX(ISP_disable);
         return 5;
     }
 /*
-Firmware has hardware dependencies requiring BASEBLOCK, PRODUCT_ID0, and
-PRODUCT_ID1 to match up.
+Firmware has hardware dependencies requiring BASEBLOCK, PRODUCT_ID, and
+KEY_ID to match up.
 */
     if (memcmp(&pid, response, 4)) {
         printf("Firmware does not match hardware\n");
@@ -280,8 +326,10 @@ Program length/4096 sectors
 
     int sectors = (length + 4095) >> 12;
     int errors = 0;
+    baseblock = (uint8_t)pid;
 
-    printf("Programming %d 4KB sectors", sectors);
+    printf("Programming %d 4KB sectors starting at addr %02X0000", sectors, baseblock);
+
     for (int i=0; i < sectors; i++) {
         printf("\nSector %d ", i);
         Erase4K(i);
