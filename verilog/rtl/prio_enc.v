@@ -2,9 +2,10 @@
 // see https://github.com/yugr/primogen/blob/master/src/prio_enc.v
 
 // `y` = bit number of the highest `a` bit, 0 if none.
+// `a` has 2^WIDTH - 1 usable inputs.
 
 module prio_enc #(
-  parameter WIDTH = 4
+  parameter WIDTH = 4   // 2^WIDTH inputs --> WIDTH outputs
 )(
   input wire [(1<<WIDTH)-1:0] a,
   output reg [WIDTH - 1:0] y

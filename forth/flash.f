@@ -8,10 +8,10 @@ there
 hex
 
 : _isp  ( c -- )                \ write ISP byte to SPIF
-   [ 4 cells ] literal io!
+   io'isp io!
 ;
 : ispwait  ( -- )               \ wait for ISP command to finish
-   begin  [ 4 cells ] literal io@  while  noop  repeat
+   begin  io'isp io@  while  noop  repeat
 ;
 : ispcmd  ( c -- )              \ c --
    _isp ispwait                 \ write ISP command
@@ -21,7 +21,7 @@ hex
 \ `fcmd24` is used for writing to flash, which isn't done currently
 
 : gkey                          \ n --
-   [ 5 cells ] literal io!      \ shift in a new key
+   io'gkey io!                  \ shift in a new key
 ;
 : )gkey  ( -- )                 \ --
    48 ispcmd                    \ re-key the gecko keystream
@@ -45,23 +45,20 @@ decimal
 \ you can add code to handle the upper half of the address.
 
 : fwait  ( -- )                 \ wait for flash read to finish
-   begin  [ 5 cells ] literal io@  while  noop  repeat
+   begin  io'gkey io@  while  noop  repeat
 ;
 : _x@f  ( df-addr cfg -- x )    \ hardware flash read
-   nip
-   [ 6 cells ] literal io!      \ flash read setup
-   [ 11 cells ] literal io!     \ trigger a read
-   fwait
-   [ 11 cells ] literal io@     \ get result
+   nip  io'fcfg io!             \ flash read setup
+   io'fread io!                 \ trigger a read
+   fwait  io'fread io@          \ get result
 ;
 : c@f>  ( -- c )
    [ 2 2* 2* ] literal
-   [ 6 cells ] literal io!      \ flash read setup
+   io'fcfg io!                  \ flash read setup
 [ ;
 : @f>  ( -- x )                 \ read using the default setup
-   [ 10 cells ] literal dup io! \ trigger a read-next
-   fwait
-   [ 11 cells ] literal io@     \ get result
+   io'fnext dup io!             \ trigger a read-next
+   fwait  io'fread io@          \ get result
 ;
 : @f(  ( df-addr -- x )         \ 3-byte big-endian read
    [ 2 2* 2*  2 + ] literal     \ format=2, size=2
@@ -112,11 +109,17 @@ decimal
 : ftype                         \ 2.4070 df-addr u --
    >r pad r@ fbuf  pad r> type
 ;
+
+tkey or [if]
 : /text  ( f-addr -- df-addr )  \ synchronize keystream
-   tkey 2dup or 0= if 2drop exit then
-   gkey gkey dup gkey )gkey
+   tkey gkey gkey  dup gkey )gkey  0
+;
+[else]
+: /text  ( f-addr -- df-addr )
    0
 ;
+[then]
+
 : f$type                        \ 2.4080 f-addr --
    /text  fcount  ftype         \ emit the "flash string"
 ;
@@ -186,8 +189,7 @@ decimal
             rdrop dup r> +              \ 'link + NameLength + 1 + cellbytes
             [ cellbits 7 + 8 /  1 + ] literal +
             [ 2 2* 2*  2 + ] literal    \ next reads will be 24-bit
-            [ 6 cells ] literal io!
-            exit                        \ don't end the read yet
+            io'fcfg io!   exit          \ don't end the read yet
          then
       then )@f r>  rdrop                \ end flash read
    dup 0= until                         \ not found

@@ -58,7 +58,7 @@ module spif
   output reg  [2:0]           f_format, // Flash format
   output reg  [3:0]           f_rate,   // Flash SCLK divisor
   input  wire [7:0]           f_din,    // Flash received data
-// Wishbone master
+// Wishbone Alice
   output reg  [14:0]          adr_o,    // address
   output reg  [31:0]          dat_o,    // data out
   input wire  [31:0]          dat_i,    // data in
@@ -71,7 +71,7 @@ module spif
   output wire                 utxirq    // UART ready strobe
 );
 
-// Wishbone bus master
+// Wishbone bus Alice (connects to Bob)
 
   wire internal = (mem_addr[14:4] == 0);// anything above 0x000F is Wishbone
   wire wbbusy = stb_o;                  // waiting for wishbone bus

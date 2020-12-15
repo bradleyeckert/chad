@@ -8,10 +8,10 @@ there
 
 : LCDdimensions  ( -- x y )  320 480 ;  \ physical dimensions, datasheet view
 
-: LCDcommand [ $10 cells ] literal io! ; \ c -- \ write command byte
-: LCDdata    [ $11 cells ] literal io! ; \ c -- \ write data byte
-: LCDend   0 [ $12 cells ] literal io! ; \ --   \ chip select high
-: LCDgram    [ $13 cells ] literal io! ; \ n -- \ write data cell (6:6:6 GRAM)
+: LCDcommand io'lcmd  io! ; \ c -- \ write command byte
+: LCDdata    io'ldata io! ; \ c -- \ write data byte
+: LCDend   0 io'lend  io! ; \ --   \ chip select high
+: LCDgram    io'lgram io! ; \ n -- \ write data cell (6:6:6 GRAM)
 
 hwoptions 8 and [if]                    \ TFT support?
 

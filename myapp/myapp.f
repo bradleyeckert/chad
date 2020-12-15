@@ -22,6 +22,7 @@ $8000 equ fontDB                        \ font database location
 
 include ../forth/core.f
 include ../forth/coreext.f
+include ../forth/io_equs.f
 include ../forth/redirect.f
 include ../forth/frame.f
 include ../forth/numout.f
@@ -88,12 +89,14 @@ variable hicycles
 .( Total instructions: ) there . cr
 
 \ Save to a flash memory image
+[defined] lit, [if]                     \ if there's code for it...
 $2000 forg  make-heads                  \ build headers in flash
 $0000 forg  make-boot                   \ create a boot record in flash
 fontDB load-flash ../forth/myfont.bin   \ add the fonts in raw binary
 1 0. BASEBLOCK save-flash myapp.bin     \ save to a 'chad' file you can boot
 2 0. BASEBLOCK save-flash myapp.txt     \ save in hex for flash memory model
 0 0. BASEBLOCK save-flash myappraw.bin  \ save without boilerplate
+[then]
 
 \ You can now run the app with "boot myapp.bin" or a Verilog simulator.
 

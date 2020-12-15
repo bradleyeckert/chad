@@ -7,8 +7,8 @@ there
 \ Compile to code RAM
 
 : !c     ( n addr -- )
-   [ 1 cells ] literal io!              \ set address
-   [ 2 cells ] literal io!              \ write data
+   io'rxbusy io!              \ set address
+   io'txbusy io!              \ write data
 ;
 
 variable lastinst \ load with $100 to inhibit exit change

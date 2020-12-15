@@ -51,7 +51,7 @@ To keep the J1 naming conventions, the ports on the processor side are:
 
 A streaming byte interface is intended to connect to a host PC. This is usually
 a UART. The baud rate is not programmable so that software can't block access.
-A simple protocol is used to act as a system master from the PC to:
+A simple protocol in hardware lets a PC:
 
 - Hold the CPU in reset
 - Control the SPI flash chip over UART
@@ -76,7 +76,7 @@ The latter isn't cheap, but it only takes 4 pins to transfer data at
 The SPI flash may be shared with a FPGA bitstream.
 It may also be virtual, so low-level control is in a separate module.
 The handshaking scheme for the flash is similar to that of the UART
-except that receive is tied to transmit as is the case with a SPI master.
+except that receive is tied to transmit as is the case with a SPI transaction.
 Flash ports are:
 
 | Name     | Dir | Bits | Usage                           |
@@ -126,7 +126,7 @@ received by `spif`. `0x10 n` is interpreted as:
 - 0x10 0x03 = 0x13
 
 Outgoing bytes use the same scheme. Although a UART can send all 256 codes,
-you might want to replace the UART with a SPI slave or a JTAG register.
+you might want to replace the UART with a SPI Bob or a JTAG register.
 In that case, you'll need a `sync` character, which can be `12h` meaning
 no data. That would be implemented in the module that replaces the UART.
 
@@ -292,10 +292,15 @@ and trigger a DMA memory load.
 
 Make sure to poll io\[4] to wait until the jammed command has been processed.
 
-### Wishbone Bus Master
+### Wishbone Bus Alice
+
+Since the terms *master* and *slave* are being phased out of the tech lexicon,
+I took the liberty of replacing them with *Alice* and *Bob* respectively.
+*Bob* attaches to *Alice* and then *Alice* tells *Bob* what to do, so it's easy to remember.
+In SPI terminology, *mosi* and *miso* become *aobi* and *aibo*.
 
 The I/O space starting at address 16 (byte address 32 or 64) is mapped to a
-Wishbone Bus Master.
+Wishbone Alice.
 To handle 32-bit data when the processor cell size is less than that,
 a couple of registers handle the extra bits.
 
@@ -316,21 +321,6 @@ That won't happen in this architecture, the way `chad` is set up.
 
 ![MCU Image](doc/mcu.png)
 
-## Why spif?
-
-Should I have stuck with a boot ROM for this? The advantages of `spif` are:
-
-- No ROM required: RAMs are loaded from SPI flash by hardware at bootup.
-- No extra mux in the `inst` datapath, which would slow instruction decoding.
-- The UART can be used for programming flash memory without a ROM.
-- Decryption hardware protects code stored in easily accessed flash.
-- Code may stream in flash data using DMA instead of code.
-
-Thanks to the DMA, the processor can work on data streamed in from flash while
-loading the next data it's going to use.
-So, spending 10% to 20% more on logic frees up processing power that would otherwise
-be spent spinning in a loop waiting for bytes to move through the SPI.
-
 ### Encryption
 
 The easiest method of encryption is to use a stream cypher to
@@ -338,12 +328,13 @@ decrypt the boot stream inside of `spif` as SPI flash data is loaded.
 I went ahead and put this in, adding 200 LEs to the size. Not bad.
 There are some very compact stream ciphers. LIZARD is one of the smallest.
 This use case didn't need the sophisticated key initialization sequence of
-LIZARD, so I simplified it and named the module "gecko".
+LIZARD, so I simplified it and named the module `gecko`.
 
 Along with the fact that random read of code space isn't supported by hardware,
 making the plaintext unavailable, attacks will likely have to be brute-force.
 A 56-bit key is used so that publication of source code isn't an export problem.
 A large network of FPGAs could crack it if it's used as-is.
+The hardware easily supports up to 120-bit keys.
 
 A fixed key has its downsides, which
 should be addressed if the design moves to ASIC.
@@ -360,12 +351,7 @@ Just keep the SPI flash contents in plaintext.
 ### Synthesis results
 
 A demo MCU with UART, SPI flash interface, 16-deep stacks, and the
-`chad` processor produced these synthesis results for small FPGAs.
-Note that Fmax varies with synthesis tool settings.
-These were with out-of-the-box defaults. Consider them approximations.
-Also, the numbers don't keep up with feature creep.
-
-| FPGA part#      | Vendor  | 16-bit | 18-bit | 24-bit | 32-bit | Fmax|
-|-----------------|:-------:|-------:|-------:|-------:|-------:|----:|
-| 10M04SCE144C8G  | Intel   | 1731   | 1842   | 2169   | 3544   | 105 |
-| LFXP2-5E-TN144C | Lattice | 1503   | 1614   | 1876   | 2254   |  90 |
+`chad` processor with 24-bit cells and hardware multiplication and division
+comes to about 3.5K LUT4s and 80 to 100 MHz on low-end FPGAs.
+`chad` itself is pretty small. The rest of the MCU, needed to make a useful
+system, uses most of those LUTs. I think they are worth it.

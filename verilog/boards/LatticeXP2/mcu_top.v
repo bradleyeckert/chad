@@ -47,17 +47,40 @@ module mcu_top
   assign holdn    = (qoe[3]) ? qdo[3] : 1'bZ;
   wire [7:0] ledn = ~led ;
 
-// MCU
-  mcu #(BASEBLOCK, BAUD_DIV, 24, 12, 10, 8, 8) small_mcu (
+  // Wishbone Alice
+  wire  [14:0]  adr_o;
+  wire  [31:0]  dat_o, dat_i;
+  wire          we_o, stb_o, ack_i;
+
+  // MCU
+  mcu #(BASEBLOCK, BAUD_DIV, 24, 12, 10) small_mcu (
     .clk      (clk     ),
     .rst_n    (arst_n  ),
-    .sclk     (spi_sclk),
-    .cs_n     (spi_csn ),
+    .sclk     (qspi_sck),
+    .cs_n     (qspi_cs ),
     .qdi      (qdi     ),
     .qdo      (qdo     ),
-    .oe       (qoe     ),
-    .rxd      (uart_rx ),
-    .txd      (uart_tx ),
+    .qoe      (qoe     ),
+    .rxd      (uart_rxd),
+    .txd      (uart_txd),
+    .adr_o    (adr_o   ),
+    .dat_o    (dat_o   ),
+    .dat_i    (dat_i   ),
+    .we_o     (we_o    ),
+    .stb_o    (stb_o   ),
+    .ack_i    (ack_i   ),
+    .irqs     (2'b00   )
+  );
+
+  demo_io #(32, 8, 8) simple_io (
+    .clk      (clk     ),
+    .rst_n    (rst_n   ),
+    .adr_i    (adr_o   ),
+    .dat_o    (dat_i   ),
+    .dat_i    (dat_o   ),
+    .we_i     (we_o    ),
+    .stb_i    (stb_o   ),
+    .ack_o    (ack_i   ),
     .gp_o     (ledn    ),
     .gp_i     (sw      )
   );

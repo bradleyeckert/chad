@@ -2,10 +2,6 @@
 
 there
 
-\ Equates take up no code space. Have as many as you want.
-0 cells equ 'TXbuf                      \ 2.2000 -- ioa \ output register
-2 cells equ 'TXbusy                     \ 2.2010 -- ioa \ tx busy flag
-
 variable ScreenProfile                  \ 2.2100 -- addr
 : ExecScreen  ( n -- )
     2 min  ScreenProfile @ execute execute
@@ -16,7 +12,7 @@ variable ScreenProfile                  \ 2.2100 -- addr
 
 \ stdout is the screen:
 
-: _emit  begin 'TXbusy io@ while noop repeat 'TXbuf io! ;
+: _emit  begin io'txbusy io@ while noop repeat  io'udata io! ;
 : _cr    13 _emit 10 _emit ;            \ --
 : esc[x  27 emit  [char] [ emit  emit ;
 : _page  [char] 2 esc[x  [char] J emit ; \ "\e[2J" for VT100/VT220

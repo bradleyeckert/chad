@@ -753,18 +753,6 @@ SI AddWordlist(char *name) {
     return wordlists;
 }
 
-SV ListWords(int wid) {                 // in a given wordlist
-    uint16_t i = wordlist[wid];
-    while (i) {
-        printf("%s ", Header[i].name);
-        i = Header[i].link;             // traverse from oldest
-    }
-}
-SV Words(void) {
-    ListWords(context());               // top of wordlist
-    printf("\n");
-}
-
 SV OrderPush(uint8_t n) {
     ORDER(15 & ORDERS++) = n;
     if (ORDERS == 9) error = BAD_ORDER_OVER;
@@ -786,7 +774,7 @@ SV Also       (void) { int v = OrderPop();  OrderPush(v);  OrderPush(v); }
 SV SetCurrent (void) { CURRENT = Dpop(); }
 SV GetCurrent (void) { Dpush(CURRENT); }
 
-SV GetOrder(void) {
+SV GetOrder(void) { // widn .. wid1 --> ORDER[widn .. wid1]
     for (cell i = 0; i < ORDERS; i++)
         Dpush(ORDER(i));
     Dpush(ORDERS);
@@ -794,12 +782,13 @@ SV GetOrder(void) {
 
 SV SetOrder(void) {
     int8_t len = Dpop();
-    ORDERS = 0;
     if (len < 0)
         Only();
-    else
-        for (int i = 0; i < len; i++)
-            OrderPush(Dpop());
+    else {
+        ORDERS = len;
+        for (int i = len; i > 0; i--)
+            ORDER(i - 1) = Dpop();
+    }
 }
 
 SI NotKeyword (char *key) {             // do a command, return 0 if found
@@ -1309,6 +1298,22 @@ SV Marker (void) {
         SaveMarker(pad);
         LogColor(COLOR_DEF, 0, tok);
     }
+}
+
+SV ListWords(int wid) {                 // in a given wordlist
+    uint16_t i = wordlist[wid];
+    while (i) {
+        size_t len = strlen(tok);       // filter by substring
+        char* s = strstr(Header[i].name, tok);
+        if ((s != NULL) || (len == 0))
+            printf("%s ", Header[i].name);
+        i = Header[i].link;             // traverse from oldest
+    }
+}
+SV Words(void) {
+    parseword(' ');                     // tok is the search key (none=ALL)
+    ListWords(context());               // top of wordlist
+    printf("\n");
 }
 
 SI Ctick(char* name) {
@@ -1962,6 +1967,7 @@ SV LoadKeywords(void) {
     AddKeyword("sstep",       "1.0230 xt len --",     Steps,         noCompile);
     AddKeyword("cold",        "1.0235 --",            Cold,          noCompile);
     AddKeyword("words",       "1.0240 --",            Words,         noCompile);
+    AddKeyword("Words",       "1.0241 --",            Words,         noCompile);
     AddKeyword("bye",         "1.0250 --",            Bye,           noCompile);
     AddKeyword("[if]",        "1.0260 flag --",       BrackIf,       noCompile);
     AddKeyword("[then]",      "1.0270 --",            Nothing,       noCompile);

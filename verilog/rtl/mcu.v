@@ -1,5 +1,5 @@
-// Minimal MCU based on J1-type CPU                             11/22/2020 BNE
-// License: This code is a gift to the divine.
+// MCU based on J1-type CPU                             12/15/2020 BNE
+// This code is a gift to the divine.
 
 // This is expected to be wrapped by an I/O ring that steers bidirectional
 // signals, conditions the reset signal, and supplies a clock.
@@ -12,8 +12,7 @@ module mcu
   parameter WIDTH = 24,                 // data cell size in bits
   parameter CODE_SIZE = 12,             // log2 of # of 16-bit instruction words
   parameter DATA_SIZE = 10,             // log2 of # of cells in data memory
-  parameter GPO_BITS = 16,              // bits of general purpose output
-  parameter GPI_BITS = 4                // bits of general purpose input
+  parameter IRQS = 2                    // interrupt requests (up to 12)
 )(
   input wire               clk,
   input wire               rst_n,
@@ -22,13 +21,19 @@ module mcu
   output wire              cs_n,
   input wire   [3:0]       qdi,
   output wire  [3:0]       qdo,
-  output wire  [3:0]       oe,          // output enable for qdo
+  output wire  [3:0]       qoe,         // output enable for qdo
 // UART connection
-  input wire               rxd,         // Async input
+  input wire               rxd,         // async input
   output wire              txd,
-// GPIO
-  output reg [GPO_BITS-1:0] gp_o,
-  input wire [GPI_BITS-1:0] gp_i
+// Wishbone Alice
+  output wire  [14:0]      adr_o,       // address
+  output wire  [31:0]      dat_o,       // data out
+  input wire   [31:0]      dat_i,       // data in
+  output wire              we_o,        // 1 = write, 0 = read
+  output wire              stb_o,       // strobe
+  input wire               ack_i,       // acknowledge
+// Interrupt request strobes
+  input wire  [IRQS-1:0]   irqs
 );
 
   localparam PID = 0;                   // product ID
@@ -150,7 +155,7 @@ module mcu
   prio_enc #(4) pe (.a(ipending), .y(ivec));
   assign irq = (ivec != 0);
 
-// Handle interrupt request strobes, edges, etc.
+// Handle interrupt request strobes
 
   always @(negedge p_reset_n or posedge clk)
   begin
@@ -160,16 +165,10 @@ module mcu
       ipending[1] <= ipending[1] | cyclev;
       ipending[2] <= ipending[2] | utxirq;
       ipending[3] <= ipending[3] | urxirq;
+      ipending[IRQS+3:4] <= ipending[IRQS+3:4] | irqs;
       if (iack)   ipending[ivec] <= 1'b0;
     end
   end
-
-// Wishbone master
-  wire [14:0] adr_o;
-  wire [31:0] dat_o;
-  reg  [31:0] dat_i;
-  wire we_o, stb_o;
-  reg ack_i;
 
 // spif is the SPI flash controller and ISP hub
   spif #(CODE_SIZE, WIDTH, DATA_SIZE, BASEBLOCK, PID, KEY_LENGTH) bridge (
@@ -232,7 +231,7 @@ module mcu
     .cs_n     (cs_n     ),
     .qdi      (qdi      ),
     .qdo      (qdo      ),
-    .oe       (oe       )
+    .oe       (qoe      )
   );
 
   wire rxd_s;
@@ -254,35 +253,6 @@ module mcu
     .rxd      (rxd_s   ),
     .txd      (txd     )
   );
-
-// Put your Wishbone peripherals here.
-
-// Route stb_o and ack_i to the individual peripherals.
-
-  reg [3:0] wbstb;
-  always @*
-    casez (adr_o[7:2])
-    6'b000101: {wbstb, ack_i} <= {4'b0001, 1'b1};
-    default:   {wbstb, ack_i} <= {4'b0000, 1'b1};
-    endcase
-
-  always @*
-    casez (adr_o[7:0])
-    default:   dat_i <= gp_i;
-    endcase
-
-// A simple peripheral for GPIO
-
-  always @(posedge clk, negedge rst_n) begin
-    if (!rst_n) begin
-      gp_o <= 0;
-    end else begin
-      if (wbstb[0] & we_o) begin
-        if (adr_o[0] == 0)
-          gp_o <= dat_o[GPO_BITS-1:0];  // GP out
-      end
-    end
-  end
 
 endmodule
 `default_nettype wire

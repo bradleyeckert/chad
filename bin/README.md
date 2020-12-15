@@ -3,10 +3,11 @@
 You should compile these executables yourself, which isn't too hard,
 rather than download them. But maybe you're lazy.
 Hopefully not too lazy to use a sandbox or a VM.
-If you're at a company, there are rules. Or at least there should be.
+An executable might not run on your computer if you didn't compile it there.
+Better to break out the old C compiler.
 
 - **chad.exe** is the `chad` simulator and Forth environment.
-- **gui.exe** is `chad` with a graphic window included.
+- **gui.exe** is `chad` with a graphic window included. It's a VS19 project.
 - **term.exe** is a simple terminal emulator that you can run from the command line.
 - **isp.exe** is an In System Programming utility that uses the UART and SPIF.
 

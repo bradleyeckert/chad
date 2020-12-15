@@ -20,16 +20,28 @@ module mcu_tb();
   wire          cs_n;
   wire  [3:0]   qdi;
   wire  [3:0]   qdo;
-  wire  [3:0]   oe;             // output enable for qdo
+  wire  [3:0]   qoe;            // output enable for qdo
   wire  [3:0]   qd;             // quad data bus
+
+// Wishbone Alice
+  wire  [14:0]  adr_o;
+  wire  [31:0]  dat_o;
+  wire  [31:0]  dat_i;
+  wire          we_o;
+  wire          stb_o;
+  wire          ack_i;
+
+// Interrupt request strobes
+  reg   [1:0]   irqs = 2'b00;
+
   wire  [15:0]  gp_o;           // output LEDs
   reg   [3:0]   gp_i = 2;       // input switches
 
   assign qdi = qd;
-  assign qd[0] = (oe[0]) ? qdo[0] : 1'bZ;
-  assign qd[1] = (oe[1]) ? qdo[1] : 1'bZ;
-  assign qd[2] = (oe[2]) ? qdo[2] : 1'bZ;
-  assign qd[3] = (oe[3]) ? qdo[3] : 1'bZ;
+  assign qd[0] = (qoe[0]) ? qdo[0] : 1'bZ;
+  assign qd[1] = (qoe[1]) ? qdo[1] : 1'bZ;
+  assign qd[2] = (qoe[2]) ? qdo[2] : 1'bZ;
+  assign qd[3] = (qoe[3]) ? qdo[3] : 1'bZ;
 
   s25fl064l #(
     .mem_file_name ("myapp.txt"),
@@ -59,7 +71,25 @@ module mcu_tb();
     .cs_n     (cs_n    ),
     .qdi      (qdi     ),
     .qdo      (qdo     ),
-    .oe       (oe      ),
+    .qoe      (qoe     ),
+    .adr_o    (adr_o   ),
+    .dat_o    (dat_o   ),
+    .dat_i    (dat_i   ),
+    .we_o     (we_o    ),
+    .stb_o    (stb_o   ),
+    .ack_i    (ack_i   ),
+    .irqs     (irqs    )
+  );
+
+  demo_io #(32, 16, 4) simple_io (
+    .clk      (clk     ),
+    .rst_n    (rst_n   ),
+    .adr_i    (adr_o   ),
+    .dat_o    (dat_i   ),
+    .dat_i    (dat_o   ),
+    .we_i     (we_o    ),
+    .stb_i    (stb_o   ),
+    .ack_o    (ack_i   ),
     .gp_o     (gp_o    ),
     .gp_i     (gp_i    )
   );

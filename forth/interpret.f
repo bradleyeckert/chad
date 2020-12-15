@@ -48,13 +48,8 @@ there
 \ sending it, at which point it sends the string all at once with an ending LF.
 \ The EOL chars are stripped. If you fill the input buffer, `accept` terminates.
 
-: key?                                  \ 2.6100 -- n
-   [ 1 cells ] literal io@
-;
-: key                                   \ 2.6120 -- c
-   begin key? until
-   [ 0 cells ] literal io@
-;
+: key?   io'rxbusy io@ ;                \ 2.6100 -- n
+: key  begin key? until  io'udata io@ ; \ 2.6120 -- c
 
 variable echoing                        \ 2.6130 -- a-addr
 
@@ -136,10 +131,14 @@ variable dpl
       cell -  swap 1- >r  tuck !  r> swap
    repeat  2drop
 ;
-
+: +order ( wid -- )
+   >r get-order r> swap 1+ set-order
+;
 : set-current  current ! ;              \ 2.6200 wid --
 : get-current  current @ ;              \ 2.6210 -- wid
+root set-current                        \ escape hatch from root
 : only         -1 set-order ;           \ 2.6220 --
+forth-wordlist set-current
 : also         get-order over swap 1+   \ 2.6230 --
                set-order
 ;
@@ -160,8 +159,7 @@ variable dpl
    cr ."  Current: " current @ .wid  cr
 ;
 
-\ `words` overrides the host version, which is in `root` so you can still
-\ use it if you don't have `forth` (forth-wordlist) in the search order.
+\ `words` overrides the host version, which is in `root`.
 
 : _words  ( wordlist -- )
    begin dup while
