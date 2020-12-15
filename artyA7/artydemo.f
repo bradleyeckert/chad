@@ -1,22 +1,21 @@
-﻿\ Application example
+﻿\ Application example for Arty A7 board with 320 x 480 LCD.     12/15/20
 
 \ To load: With your working directory here, type:
-\ ..\bin\chad include myapp.f  (in Windows), or
-\ ../bin/chad include myapp.f  (in Linux)
+\ ..\bin\gui include artydemo.f  (in Windows), or
+\ ../bin/gui include artydemo.f  (in Linux)
 \ If SPI flash is encrypted, for example, with `1 +bkey`, launch with:
-\ ..\bin\chad 1 +bkey boot myapp.bin
+\ ..\bin\chad 1 +bkey boot artydemo.bin
 
-\ To include the GUI stuff,
-\ ..\bin\gui include myapp.f
 
 \ Put text high enough in flash memory that it won't get clobbered by
 \ boot code and headers. Should be a multiple of 4096.
 
 $6000 forg                              \ strings in flash start here
+$8000 equ fontDB                        \ font database location
 
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
-0 equ BASEBLOCK
+34 equ BASEBLOCK                        \ leave space for A7-35T FPGA bitstream
 
 include ../forth/core.f
 include ../forth/coreext.f
@@ -27,7 +26,8 @@ include ../forth/numout.f
 include ../forth/compile.f
 include ../forth/flash.f
 include ../forth/interpret.f
-\ include ../forth/bignum.f
+include ../forth/tftlcd.f
+include ../forth/bignum.f
 \ include ../forth/ctea.f
 
 variable hicycles
@@ -60,10 +60,10 @@ variable hicycles
 [defined] quit [if]
 
 : myapp  ( -- )
-   [ $14 cells ] literal dup io@        \ read gp_i
-   swap io!                             \ write top gp_o
-   ." May the Forth be with you."
-   0 quit
+    [ $14 cells ] literal dup io@       \ read gp_i
+    swap io!                            \ write top gp_o
+    ." May the Forth be with you."
+    0 quit
 ;
 
 ' myapp resolves coldboot
@@ -77,10 +77,9 @@ variable hicycles
 \ Examples
 
 : fib ( n1 -- n2 )
-   dup 2 < if drop 1 exit then
-   dup  1 - recurse
-   swap 2 - recurse  +
-;
+    dup 2 < if drop 1 exit then
+    dup  1 - recurse
+    swap 2 - recurse  + ;
 
 \ Try 25 fib, then stats
 .( Total instructions: ) there . cr
@@ -89,9 +88,9 @@ variable hicycles
 [defined] lit, [if]                     \ if there's code for it...
 $2000 forg  make-heads                  \ build headers in flash
 $0000 forg  make-boot                   \ create a boot record in flash
-1 0. BASEBLOCK save-flash myapp.bin     \ save to a 'chad' file you can boot
-2 0. BASEBLOCK save-flash myapp.txt     \ save in hex for flash memory model
-0 0. BASEBLOCK save-flash myappraw.bin  \ save without boilerplate
+fontDB load-flash ../forth/myfont.bin   \ add the fonts in raw binary
+1 0. BASEBLOCK save-flash app.bin       \ save to a 'chad' file you can boot
+0 0. BASEBLOCK save-flash appraw.bin    \ without boilerplate for Vivado
 [then]
 
 \ You can now run the app with "boot myapp.bin" or a Verilog simulator.
