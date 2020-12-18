@@ -106,7 +106,6 @@ variable g_MADCTL                       \ state of Memory Access Control bits
 variable g_cdims                        \ packed char field width:height
 variable g_corner                       \ packed char field x:y corner
 variable kerning     1 kerning !        \ amount of horizontal kerning (signed)
-variable linepitch  24 linepitch !      \ amount of vertical spacing for CR
 variable FontID                         \ 0 = main font
 
 : g_setmac  ( c -- )
@@ -193,9 +192,18 @@ variable FontID                         \ 0 = main font
    dup swapb $FF and  swap $FF and
 ;
 
+: linepitch  ( -- n )                   \ line pitch in pixels
+   FontID @ if 44 else 24 then
+;
+: g_Xspace  ( -- n )                   \ pixels in a space
+   kerning @  abs
+   linepitch 2/ 2/ +
+   kerning @ 0< if negate then
+;
+
 : g_cr  ( -- )
    0 cursorX !
-   linepitch @  cursorY +!
+   linepitch  cursorY +!
 ;
 
 : g_emit  ( xchar -- )
@@ -212,10 +220,10 @@ variable FontID                         \ 0 = main font
          for  @f> g_bitcmd  next        \ process 16-bit bitmap commands
          LCDend
       then
-      )@f
-   else  2drop
-   then
-   g_Xnext cursorX !                    \ bump cursor
+      )@f    g_Xnext
+   else
+      2drop  g_Xspace cursorX @ +
+   then  cursorX !                      \ bump cursor
 ;
 
 : lcdout_table  exec2: [
@@ -315,3 +323,10 @@ there swap - . .( instructions used by LCD) cr
 \ Add some compact fixed fonts for programming stuff.
 \ For example: 5x7 chars on a 6 pixel pitch would fit 53 chars in 320 pels or
 \ 80 chars in 480 pels. Enough for a terminal.
+
+\ g_emit should emit tofu for unknown characters.
+
+\ There should be a word that calculates the width in pixels of a string
+\ without displaying it.
+
+

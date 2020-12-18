@@ -49,7 +49,8 @@ include ../forth/bignum.f
 : myapp  ( -- )
     [ $18 cells ] literal dup io@       \ read gp_i
     swap io!                            \ write top gp_o
-    /tft  lcd page 120 test con         \ test screem
+    /tft  dkred pink set-colors
+    lcd page 140 test con         \ test screem
     ." May the Forth be with you!"
     0 quit
 ;

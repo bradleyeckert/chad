@@ -24,7 +24,7 @@ The encryption hardware is limited to SPI flash decryption. It's not set up to
 encrypt messages, so it's not hardened for that use case. It also allows
 a `0` key, which sets the keystream to all zeros. That's not something you want
 in a system that encrypts user data. Since Gecko only for IP protection,
-it is not in 5A002.a of US export control regulations. Key length doesn't matter.
+it is not under 5A002.a of US export control regulations. Key length doesn't matter.
 Gecko can take a key length of up to 15 bytes.
 
 The multi-cell keys are `bkey` for the boot record and `tkey` for text in flash.
@@ -63,3 +63,19 @@ into the cypher for a total key length of 3 cells or 56 bits whichever is smalle
 `+tkey` *( n -- )* shifts one cell into `tkey` from the right.
 
 `tkey` is a software feature. Hardware instantiation doesn't involve it.
+
+## FPGA-based systems
+
+Over-building is a concern with RAM-based FPGAs. Most modern RAM-based FPGAs have
+fuses to encrypt the bitstream. You could compile a reduced feature set version
+of your application to be used for board manufacturing.
+Then, the CM (or SPI flash vendor) can leak it into the wild without serious consequences.
+It works with blank-key FPGAs enough to test the board.
+Then, at your site, you program the crypto fuses in the FPGAs and load the full app into flash.
+
+Suppose you don't trust fuses. Maybe planned obsolescence is a solution to that.
+At some point you stop supporting old hardware, so there's no incentive to clone it.
+Some FPGAs store keys in battery-backed RAM, for the truly paranoid.
+
+The other option is to use Flash-based FPGAs. Is flash readback protection more secure than fuses?
+Who knows?

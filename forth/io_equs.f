@@ -16,7 +16,7 @@ $10 cells equ io'lcmd   \ write command byte
 $11 cells equ io'ldata  \ write data byte
 $12 cells equ io'lend   \ chip select high
 $13 cells equ io'lgram  \ write data cell (6:6:6 GRAM)
-$14 cells equ io'lraw   \ raw data to LCD pins
+\ $14 cells equ io'lraw   \ raw data to LCD pins
 $15 cells equ io'lwtime \ write cycle timing
 $16 cells equ io'lrtime \ read cycle timing
 $17 cells equ io'lreset \ reset pin control
