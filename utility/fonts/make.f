@@ -12,7 +12,9 @@ include fontcmp.f
 revision 2 /FONTS
 
 cr .( ASCII in H4 size )
-/msg HasASCII
+/msg HasASCII           \ minimum set of glyphs
+\ MSGfile test.txt        \ include glyphs for this text
+\ ^--- this hangs MakeFont. Need to debug.
 H4 MakeFont
 0 maketable
 

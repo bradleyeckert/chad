@@ -4,7 +4,7 @@
 \ ..\bin\gui include artydemo.f  (in Windows), or
 \ ../bin/gui include artydemo.f  (in Linux)
 \ If SPI flash is encrypted, for example, with `1 +bkey`, launch with:
-\ ..\bin\chad 1 +bkey boot artydemo.bin
+\ ..\bin\gui 1 +bkey boot artydemo.bin
 
 
 \ Put text high enough in flash memory that it won't get clobbered by
@@ -30,19 +30,6 @@ include ../forth/tftlcd.f
 include ../forth/bignum.f
 \ include ../forth/ctea.f
 
-variable hicycles
-
-:noname ( -- )
-   hicycles @ 1 +
-   hicycles !
-; resolves irqtick \ clock cycle counter overflow interrupt
-
-\ Read raw cycle count. Since io@ returns after the lower count is read,
-\ it will service iqrtick if it has rolled over. hicycles is safe to read.
-
-: rawcycles ( -- ud )
-   io'cycles io@  hicycles @
-;
 
 \ Error handling
 
@@ -60,9 +47,10 @@ variable hicycles
 [defined] quit [if]
 
 : myapp  ( -- )
-    [ $14 cells ] literal dup io@       \ read gp_i
+    [ $18 cells ] literal dup io@       \ read gp_i
     swap io!                            \ write top gp_o
-    ." May the Forth be with you."
+    /tft  lcd page 120 test con         \ test screem
+    ." May the Forth be with you!"
     0 quit
 ;
 
@@ -91,6 +79,7 @@ $0000 forg  make-boot                   \ create a boot record in flash
 fontDB load-flash ../forth/myfont.bin   \ add the fonts in raw binary
 1 0. BASEBLOCK save-flash app.bin       \ save to a 'chad' file you can boot
 0 0. BASEBLOCK save-flash appraw.bin    \ without boilerplate for Vivado
+2 0. BASEBLOCK save-flash app.txt       \ save as hex for flash sim model
 [then]
 
 \ You can now run the app with "boot myapp.bin" or a Verilog simulator.

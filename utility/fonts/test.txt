@@ -1,0 +1,6 @@
+This file is not empty
+And this is the second line.
+: hi ." 多么美丽的世界 " ;
+: heb ."תהילה לאלוהים ושלום עלי אדמות" ;
+Note: Amazingly, utf-8 editors show right-to-left languages in reverse order of the actual binary.
+So, the utf-8 is parsed normally and characters are rendered as parsed moving left.

@@ -24,6 +24,8 @@ baud is an optional baud rate.
 
 Serial communication uses https://gitlab.com/Teuniz/RS-232/ for cross-platform
 abstraction. Ports are numbered for this. Numbering starts at 0, so COM4 is 3.
+
+Flash programming used the DEh sector erase and 02h page program commands.
 */
 
 #define DEFAULTBAUD 3000000L
@@ -177,13 +179,13 @@ void EndSPI(int n) {
 
 int baseblock;
 
-// 00 00 03 82 20 ss s0 00 80
-void Erase4K(int sector) {
+// 00 00 03 82 D8 ss 00 00 80
+void Erase64K(int sector) {
     ISP_TX(ISP_WREN);
     BeginSPI();
-    AddToBuf(0x20);
-    AddToBuf(baseblock + (sector >> 4));
-    AddToBuf(sector << 4);
+    AddToBuf(0xD8); // erase 64K sector
+    AddToBuf(baseblock + sector);
+    AddToBuf(0);
     AddToBuf(0);
     EndSPI(3);
     ms(50);         // typical erase time is about 50 ms
@@ -324,24 +326,27 @@ Program length/4096 sectors
     GetRJID();
     printf("RJID = %d, %d, %d\n", response[0], response[1], response[2]);
 
-    int sectors = (length + 4095) >> 12;
+    int sectors = (length + 65535) >> 16;
     int errors = 0;
     baseblock = (uint8_t)pid;
 
-    printf("Programming %d 4KB sectors starting at addr %02X0000", sectors, baseblock);
+    printf("Programming %d 64KB sectors starting at addr %02X0000", sectors, baseblock);
 
     for (int i=0; i < sectors; i++) {
         printf("\nSector %d ", i);
-        Erase4K(i);
-        for (int j = 0; j < 16; j++) {
-            int page = (i << 4) + j;
+        Erase64K(i);
+        for (int j = 0; j < 256; j++) {
+            int page = (i << 8) + j;
             ProgramPage(page);
             if (ReadPage(page))
                 { printf("?"); errors++; }
             else
                 { printf("."); }
+            if ((page << 8) > (length + 256))
+                goto quitpgm;
         }
     }
+    quitpgm:
     printf("\n%d errors", errors);
 
     ISP_TX(ISP_disable);

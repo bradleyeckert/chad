@@ -239,14 +239,18 @@ create scores                           \ TRIAL populates the length fields.
 : /MSG  ( -- )                          \ reset the message list
    usedchars |usedchars| cells erase    \ clear all tags
 ;
-: HasNumeric  ( -- )                    \ tag the numbers
-   [char] ; [char] . do                 \ ./0123456789:
-      1  i [usedchars] !
+
+: range  ( lo hi -- )                   \ specify a range to include
+   2dup < if swap then  swap 1+ swap    \ include endpoint
+   ?do  1  i [usedchars] !
    loop
 ;
+
+: HasNumeric  ( -- )                    \ tag the numbers
+   [char] . [char] : range              \ ./0123456789:
+;
 : HasASCII  ( -- )                      \ tag ASCII
-   128 33 do  1  i [usedchars] !
-   loop
+   33 127 range
 ;
 
 : HighestChar  ( -- xchar )             \ find the max used xchar

@@ -1682,6 +1682,17 @@ SV flashCC(uint32_t w) {                // append big endian cell with bytes
     }
 }
 
+SV fcByte(void) { flashC8(Dpop()); }    // ( c8 -- )
+SV fcHalf(void) { flashC16(Dpop()); }   // ( n16 -- )
+SV fcCell(void) { flashCC(Dpop()); }    // ( n -- )
+
+SV fc32(void) {                         // ( d -- )
+    uint32_t w = Dpop() << CELLBITS;
+    w |= Dpop();
+    flashC16(w >> 16);  flashC16(w);
+}
+
+
 SV flashStr(char* s, int escaped) {     // compile string to flash
     size_t length = strlen(s);
     char hex[4];
@@ -1713,7 +1724,8 @@ SV flashStr(char* s, int escaped) {     // compile string to flash
 }
 
 // Strings in flash use a text encryption key in combination with the 
-// flash address to set the key. f$type needs to load this key.
+// flash address to set the key. f$type needs to load this key
+// unless the string is plaintext, in which case no key is needed.
 
 uint64_t ChadTextKey = 0;
 
@@ -1728,7 +1740,7 @@ SV NewTextKey(void) {
 
 SV xfcQuote(int escaped) {
     NewTextKey();
-    if (flashPtr > CELLMASK)
+    if (flashPtr > CELLMASK)            // string must be 1-cell addressable
         error = BAD_FSOVERFLOW;
     parseword('"');
     flashC8((uint8_t)strlen(tok));      // string length 
@@ -2000,6 +2012,11 @@ SV LoadKeywords(void) {
     AddKeyword(",\"",         "1.1036 ccc> --",       fcQuote,       CfcQuote);
     AddKeyword(".\\\"",       "1.1037 ccc> --",       noExecute,     desQuote);
     AddKeyword(",\\\"",       "1.1038 ccc> --",       feQuote,       CfeQuote);
+    AddKeyword("/,",          "1.1500 --",            NewTextKey,    noCompile);
+    AddKeyword("8,",          "1.1501 c --",          fcByte,        noCompile);
+    AddKeyword("16,",         "1.1502 n --",          fcHalf,        noCompile);
+    AddKeyword("f,",          "1.1503 n --",          fcCell,        noCompile);
+    AddKeyword("32,",         "1.1504 d --",          fc32,          noCompile);
     AddKeyword("constant",    "1.1040 x <name> --",   Constant,      noCompile);
     AddKeyword("aligned",     "1.1050 addr -- a-addr", Aligned,      noCompile);
     AddKeyword("align",       "1.1060 --",            Align,         noCompile);

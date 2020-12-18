@@ -113,7 +113,7 @@ static void plotColor(void) {
 	int w = LCDwidth;
 	int h = LCDheight;
 	int t;
-	if (MX)
+	if (!MX)
 		x = w - x - 1;
 	if (MY)
 		y = h - y - 1;

@@ -29,9 +29,9 @@ module gpu_tb();
 
   // Trigger GPU operation
   task TEST;
-    input [17:0] ain;
-    input [17:0] bin;
-    input [2:0] selin;
+    input [17:0] ain;   // TOS
+    input [17:0] bin;   // NOS
+    input [2:0] selin;  // select
     begin
       @(posedge clk);
       a <= ain;  b <= bin;  sel <= selin;

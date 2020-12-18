@@ -10,7 +10,7 @@
 
 // An Artix-7 35T bitstream is typically 17,536,096 bits, 21728Ch bytes.
 // The BASEBLOCK for user flash is 22h.
-// The Arty A7 has a S25FL128SAGMFI00 (16MB) flash.
+// The Arty A7 has a S25FL128SAGMFI00 (16MB) flash, which is mostly 64K sectors.
 
 `default_nettype none
 module mcu_arty
@@ -24,6 +24,13 @@ module mcu_arty
   output wire [2:0]   RGB1,
   output wire [2:0]   RGB2,
   output wire [2:0]   RGB3,
+// LCD module with 8-bit bus and internal frame buffer
+  inout wire  [7:0]   lcd_d,            // read data
+  wire                lcd_rd,           // RDX pin
+  wire                lcd_wr,           // WRX pin
+  wire                lcd_rs,           // DCX pin
+  wire                lcd_cs,           // CSX pin
+  wire                lcd_rst,          // RESET pin, active low
 // 6-wire connection to SPI flash chip
   output wire         qspi_sck,
   output wire         qspi_cs,
@@ -66,6 +73,10 @@ module mcu_arty
   wire [11:0] gp_o;
   assign {RGB0, RGB1, RGB2, RGB3} = gp_o;
 
+  wire  [7:0]  lcd_do;
+  wire         lcd_oe;
+  assign lcd_d = (lcd_oe) ? lcd_do : 8'bZ;
+
   // Wishbone Alice
   wire  [14:0]  adr_o;
   wire  [31:0]  dat_o, dat_i;
@@ -91,7 +102,7 @@ module mcu_arty
     .irqs     (2'b00   )
   );
 
-  demo_io #(32, 16, 4) simple_io (
+  demo_io #(32, 12, 4) simple_io (
     .clk      (clk     ),
     .rst_n    (rst_n   ),
     .adr_i    (adr_o   ),
@@ -100,6 +111,14 @@ module mcu_arty
     .we_i     (we_o    ),
     .stb_i    (stb_o   ),
     .ack_o    (ack_i   ),
+    .lcd_di   (lcd_d   ),
+    .lcd_do   (lcd_do  ),
+    .lcd_oe   (lcd_oe  ),
+    .lcd_rd   (lcd_rd  ),
+    .lcd_wr   (lcd_wr  ),
+    .lcd_rs   (lcd_rs  ),
+    .lcd_cs   (lcd_cs  ),
+    .lcd_rst  (lcd_rst ),
     .gp_o     (gp_o    ),
     .gp_i     (btn     )
   );

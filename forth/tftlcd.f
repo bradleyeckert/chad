@@ -1,17 +1,18 @@
 \ TFT LCD drawing                               12/9/20 BNE
 
-\ Font data is stored in SPI flash in compressed format. It uses 16-bit tokens
-\ for various encoding types to handle glyph bitmaps that are mostly black and
-\ white but with 4-bit grayscale at the edges.
-
 there
 
 : LCDdimensions  ( -- x y )  320 480 ;  \ physical dimensions, datasheet view
 
-: LCDcommand io'lcmd  io! ; \ c -- \ write command byte
-: LCDdata    io'ldata io! ; \ c -- \ write data byte
-: LCDend   0 io'lend  io! ; \ --   \ chip select high
-: LCDgram    io'lgram io! ; \ n -- \ write data cell (6:6:6 GRAM)
+: LCDcommand  io'lcmd   io! ;    \ c -- \ write command byte
+: LCDdata   $FF and io'ldata  io! ;    \ c -- \ write data byte
+: LCDend    0 io'lend   io! ;    \ --   \ chip select high
+: LCDgram     io'lgram  io! ;    \ n -- \ write data cell (6:6:6 GRAM)
+: LCDreset    io'lreset io! ;    \ c -- \ write command byte
+
+\ Font data is stored in SPI flash in compressed format. It uses 16-bit tokens
+\ for various encoding types to handle glyph bitmaps that are mostly black and
+\ white but with 4-bit grayscale at the edges.
 
 hwoptions 8 and [if]                    \ TFT support?
 
@@ -22,13 +23,13 @@ hwoptions 8 and [if]                    \ TFT support?
 ;
 : get-colors  ( -- background foreground )
    2 [ $38 cotrig ] drop                \ mload with %10
-   [ $58 cotrig ]  costat               \ background color
-   [ $58 cotrig ]  costat               \ foreground color
+   [ $58 cotrig ]  noop costat          \ background color
+   [ $58 cotrig ]  noop costat          \ foreground color
 ;
 : g_mono  ( pattern length -- )         \ output a monochrome bit pattern
    dup if                               \ something to draw?
       swap [ $38 cotrig ] drop          \ mload the pattern
-      for  [ $58 cotrig ]  costat       \ get pixel
+      for  [ $58 cotrig ] noop costat   \ get pixel
          LCDgram
       next  exit
    then  2drop
@@ -36,7 +37,7 @@ hwoptions 8 and [if]                    \ TFT support?
 : g_gray  ( scale -- color )
    [ $78 cotrig ] drop                  \ trigger interpolation
    cowait
-   [ 8 cotrig ]  costat                 \ read color
+   [ 8 cotrig ]  noop costat            \ read color
 ;
 
 [then]
@@ -89,10 +90,10 @@ hwoptions 8 and [if]                    \ TFT support?
    dup  swapb 2/ 2/ $3C and bitcmd_table execute
 ;
 
-: LCDrowcol  ( z0 z1 cmd -- )            \ set row or column entry limits
+: LCDrowcol  ( z0 z1 cmd -- )           \ set row or column entry limits
    LCDcommand  >r
    dup swapb LCDdata  LCDdata  r>
-   dup swapb LCDdata  LCDdata  LCDend
+   dup swapb LCDdata  LCDdata
 ;
 
 variable cursorY                        \ cursor Y position
@@ -104,8 +105,9 @@ variable g_W                            \ current field width
 variable g_MADCTL                       \ state of Memory Access Control bits
 variable g_cdims                        \ packed char field width:height
 variable g_corner                       \ packed char field x:y corner
-variable kerning                        \ amount of horizontal kerning (signed)
-variable linepitch                      \ amount of vertical spacing for CR
+variable kerning     1 kerning !        \ amount of horizontal kerning (signed)
+variable linepitch  24 linepitch !      \ amount of vertical spacing for CR
+variable FontID                         \ 0 = main font
 
 : g_setmac  ( c -- )
    dup g_MADCTL !
@@ -153,6 +155,7 @@ variable linepitch                      \ amount of vertical spacing for CR
 
 \ After a xchar has been drawn, its width is known. Calculate the amount to
 \ advance the cursor. It may be negative to handle right-to-left languages.
+\ Set kerning negative for that use case.
 
 : g_Xpitch  ( -- n )
    [ g_corner 1 + ] literal c@          \ left edge of glyph
@@ -161,7 +164,9 @@ variable linepitch                      \ amount of vertical spacing for CR
    r> 0< if negate then
 ;
 
-variable FontID                         \ 0 = main font
+: g_Xnext  ( -- n )                     \ X cursor after rendering
+   g_Xpitch cursorX @ +
+;
 
 : havefont  ( -- flag )                 \ is FontID okay?
    fontDB 0 c@f  FontID @ >
@@ -188,12 +193,19 @@ variable FontID                         \ 0 = main font
    dup swapb $FF and  swap $FF and
 ;
 
+: g_cr  ( -- )
+   0 cursorX !
+   linepitch @  cursorY +!
+;
+
 : g_emit  ( xchar -- )
    faddr over if
-      fontDB 0 d+ w@f(                  \ get packed width:height
+      fontDB 0 d+ w@f(                  \ get packed x:y
+      @f>  g_cdims !                    \ get packed width:height
       dup g_corner !
+      g_Xnext g_width > if g_cr then    \ if it walks off the edge, cr first
       byte-split  cursorY 2@  d+  g_at  \ offset from cursor
-      @f>  dup g_cdims !
+      g_cdims @
       byte-split g_box                  \ set bitmap dimensions
       @f> ?dup if                       \ get number of commands
          $2C LCDcommand
@@ -203,8 +215,17 @@ variable FontID                         \ 0 = main font
       )@f
    else  2drop
    then
-   g_Xpitch cursorX +!                  \ bump cursor
+   g_Xnext cursorX !                    \ bump cursor
 ;
+
+: lcdout_table  exec2: [
+    ' g_emit | ' g_cr | ' g_page
+] literal ;
+
+: lcd  ( -- )                           \ direct to LCD
+   ['] lcdout_table ScreenProfile !
+;
+
 
 : qq  \ test dump 10 digits 9 to 0
    g_page
@@ -222,7 +243,71 @@ variable FontID                         \ 0 = main font
 776063 equ pink    407777 equ ltcyan 774077 equ ltmagenta 777740 equ ltyellow
 decimal
 
-black white set-colors \ for testing
+\ The initialization sequence for the LCD uses the above commands plus `ms`.
+\ SPI flash is used for the initialization table for the driver chip.
+\ A simple interpreter reads 16-bit words from flash and dispatches on the
+\ upper byte, which means:
+
+\ 0 = command
+\ 1 = data
+\ 2 = delay in ms
+\ 3 = set reset state
+\ other = end of table
+
+hex fhere equ ILI9486table  /,          \ new table in text space
+   300 16,  20A 16,  301 16,  278 16,   \ reset the LCD module
+   011 16,  20A 16,                     \ sleep out, allow 10ms
+   036 16,  148 16,                     \ my,mx,mv,ml,BGR,mh,0.0
+   03A 16,  166 16,                     \ 18-bit pixels
+   0C2 16,  144 16,                     \ Power Control 3 (For Normal Mode)
+\ ----------------Gamma---------------------------------
+   0E0 16,                              \ positive gamma correction
+   10F 16,  11F 16,  11C 16,  10C 16,  10F 16,  108 16,  148 16,  198 16,
+   137 16,  10A 16,  113 16,  104 16,  111 16,  10D 16,  100 16,
+   0E1 16,                              \ negative gamma correction
+   10F 16,  132 16,  12E 16,  10B 16,  10D 16,  105 16,  147 16,  175 16,
+   137 16,  106 16,  110 16,  103 16,  124 16,  120 16,  100 16,
+   0E2 16,                              \ digital gamma 1
+   10F 16,  132 16,  12E 16,  10B 16,  10D 16,  105 16,  147 16,  175 16,
+   137 16,  106 16,  110 16,  103 16,  124 16,  120 16,  100 16,
+\ -----------------display---------------------
+   011 16,  029 16,  20A 16,            \ sleep out, display on
+   404 16,
+decimal
+
+: lint_table  3 and exec2: [
+    ' LCDcommand  | ' LCDdata  | ' ms  | ' LCDreset
+] literal ;
+
+: tftinit  ( f-addr -- )
+   /text w@f(                           \ get the first init code
+   begin  byte-split  over $FC and 0=   ( hi lo )
+   while  swap lint_table execute  @f>
+   repeat  2drop  )@f
+   LCDend
+;
+
+\ The module didn't like the minimum write time of 66ns. Glitching was
+\ dependent on screen position, making controller timing suspect.
+\ A cycle time of 140ns is used instead, which fixed the glitches.
+
+: /tft  ( -- )
+   $0186 io'lwtime io!
+   ILI9486table tftinit
+   black white set-colors
+;
+: set18  ( -- )                         \ use 3-byte pixels (default)
+   $0186  $66
+[ ;
+: set1618  ( timing c -- )
+   $3A LCDcommand  LCDdata
+   io'lwtime io! LCDend
+;
+: set16  ( -- )                         \ use 2-byte pixels (a little faster)
+   $1186  $55  set1618
+;
+
+: test  ( n -- )  for r@ . next ;       \ dump a bunch of numbers
 
 there swap - . .( instructions used by LCD) cr
 

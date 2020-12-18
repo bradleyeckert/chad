@@ -117,13 +117,13 @@ state cell + dp ! \ skip shared variables, new variables can now be defined.
 
 : execute  2* >r ; no-tail-recursion    \ 2.0320 i*x xt -- j*x
 : ?dup   dup if dup then ;              \ 2.0325 x -- 0 | x x
-: 2dup   over over ; macro              \ 2.0330 d -- d d
+: 2dup   over over ; ( macro )          \ 2.0330 d -- d d
 : 2drop  drop drop ;                    \ 2.0340 d --
 : char+ [ ;                             \ 2.0350 c-addr1 -- c-addr2
-: 1+     1 + ;  macro                   \ 2.0360 n -- n+1
-: 1-     1 - ;  macro                   \ 2.0370 n -- n-1
+: 1+     1 + ;  ( macro )               \ 2.0360 n -- n+1
+: 1-     1 - ;  ( macro )               \ 2.0370 n -- n-1
 : negate invert 1+ ;                    \ 2.0380 n -- -n
-: tuck   swap over ; macro              \ 2.0390 n1 n2 -- n2 n1 n2
+: tuck   swap over ;  ( macro )         \ 2.0390 n1 n2 -- n2 n1 n2
 : +!     tuck @ + swap ! ;              \ 2.0400 n a-addr --
 : ?exit  if rdrop then ; no-tail-recursion \ flag --
 

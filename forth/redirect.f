@@ -22,8 +22,30 @@ variable ScreenProfile                  \ 2.2100 -- addr
     ' _emit | ' _cr | ' _page
 ] literal ;
 
-: /profile  ['] stdout_table ScreenProfile ! ;
+: con   ( -- )                          \ direct to console
+   ['] stdout_table ScreenProfile !
+; con
 
-/profile
+\ I/O sometimes needs timing, so here it is.
+
+variable hicycles
+
+:noname ( -- )
+   hicycles @ 1 +
+   hicycles !
+; resolves irqtick \ clock cycle counter overflow interrupt
+
+\ Read raw cycle count. Since io@ returns after the lower count is read,
+\ it will service iqrtick if it has rolled over. hicycles is safe to read.
+
+: rawcycles ( -- ud )
+   io'cycles io@  hicycles @
+;
+
+: ms  ( n -- )
+   100000 um* rawcycles d+              \ cycle count to wait for
+   begin  2dup rawcycles du<            \ spin until time elapsed
+   until  2drop
+;
 
 there swap - . .( instructions used by I/O redirect) cr

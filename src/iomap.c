@@ -342,10 +342,14 @@ int writeIOmap (uint32_t addr, uint32_t x) {
     case 0x11: TFTLCDdata(SERIAL8, x);  break;
     case 0x12: TFTLCDend();  break;
     case 0x13: TFTLCDdata(WHOLE18, x);  break;
+    case 0x14:
+    case 0x15:
+    case 0x16:
+    case 0x17: break;
 #endif
-    case 0x14: break;                   // GP output
+    case 0x18: break;                   // GP output
 #ifdef HAS_LEDSTRIP
-    case 0x18: LEDstripWrite(x);  break;
+    case 0x20: LEDstripWrite(x);  break;
 #endif
     case 0x100: nohostAPI = x;  break;
     case 0x4000:                        // trigger an error

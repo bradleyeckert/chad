@@ -34,9 +34,6 @@ module mcu_tb();
 // Interrupt request strobes
   reg   [1:0]   irqs = 2'b00;
 
-  wire  [15:0]  gp_o;           // output LEDs
-  reg   [3:0]   gp_i = 2;       // input switches
-
   assign qdi = qd;
   assign qd[0] = (qoe[0]) ? qdo[0] : 1'bZ;
   assign qd[1] = (qoe[1]) ? qdo[1] : 1'bZ;
@@ -79,19 +76,6 @@ module mcu_tb();
     .stb_o    (stb_o   ),
     .ack_i    (ack_i   ),
     .irqs     (irqs    )
-  );
-
-  demo_io #(32, 16, 4) simple_io (
-    .clk      (clk     ),
-    .rst_n    (rst_n   ),
-    .adr_i    (adr_o   ),
-    .dat_o    (dat_i   ),
-    .dat_i    (dat_o   ),
-    .we_i     (we_o    ),
-    .stb_i    (stb_o   ),
-    .ack_o    (ack_i   ),
-    .gp_o     (gp_o    ),
-    .gp_i     (gp_i    )
   );
 
   always #(CLKPERIOD / 2) clk <= !clk;
@@ -158,7 +142,7 @@ module mcu_tb();
       $stop();
     end
 
-  // Capture UART data puttering along at 2 MBPS
+  // Capture UART data
   reg [7:0] uart_rxdata;
   always @(negedge txd) begin   // wait for start bit
     #(CLKPERIOD * UBAUD / 2)
@@ -169,6 +153,18 @@ module mcu_tb();
     end
     #(CLKPERIOD * UBAUD)
     $display("UART: %02Xh = %c at %0t", uart_rxdata, uart_rxdata, $time);
+  end
+
+  // Capture Wishbone Alice writes
+  assign ack_i = stb_o;
+  assign dat_i = dat_o + 1;
+
+  always @(negedge stb_o) begin   // wait for Alice
+    if ($time)
+      if (we_o)
+        $display("Wishbone Write %Xh to [%Xh] at %0t", dat_o, adr_o, $time);
+      else
+        $display("Wishbone Read [%Xh] = %Xh at %0t", adr_o, dat_i, $time);
   end
 
   // Dump signals for EPWave, a free waveform viewer on Github.
