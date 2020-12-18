@@ -164,6 +164,6 @@ performs the following:
 It's silicon-proven on Digilent's Arty A7-35T board: 100 MHz, 10% of the chip.
 Here's what text rendering looks like on a TFT LCD module:
 
-![ArtyA7 Image](doc/artyLCD.png)
+![ArtyA7 Image](doc/artyLCD.jpg)
 
 
