@@ -27,7 +27,7 @@ module demo_io
   output wire               lcd_oe,     // lcd_d output enable
   output wire               lcd_rd,     // RDX pin
   output wire               lcd_wr,     // WRX pin
-  output wire               lcd_rs,     // DCX pin
+  output wire               lcd_rs,     // D/CX pin
   output wire               lcd_cs,     // CSX pin
   output wire               lcd_rst,    // RESET pin, active low
 // GPIO

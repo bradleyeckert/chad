@@ -213,3 +213,18 @@ You can't `see` a compiled word unless it has been copied to flash memory
 for later loading into code RAM.
 The `forg` field points to the flash version.
 If `len` is 0, `forg` may be omitted.
+
+## To Do
+
+Catch and Throw should use the features of `frame.f` to set up `catch` frames.
+Maybe leave more stack space for the frame stack in data RAM.
+
+A cooperative multitasker can likewise use `frame.f` words to move hardware
+stacks to and from tasks. This makes a context switch more unwieldy, but still
+in the microsecond range.
+
+Put a larger data space in the hardware. The code space is 4K x 16.
+Data space should be 2K or 4K words.
+
+
+

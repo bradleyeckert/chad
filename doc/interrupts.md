@@ -3,7 +3,7 @@
 Interrupts are handled by modifying the return instruction.
 I call this method "lazy interrupts".
 
-IRQs in a lazy-interrupt system trade latency time for overhead.
+IRQs in a lazy-interrupt system trade latency for overhead.
 Since an interrupt only happens upon a return,
 registers (such as carry flags) are free to be trashed.
 Critical sections don't need interrupt disabling.
