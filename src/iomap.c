@@ -7,7 +7,7 @@
 #include "chad.h"
 #include "flash.h"
 #include "gecko.h"
-#ifdef __linux__
+#if defined __linux__ || defined __APPLE__
 /**
  Linux (POSIX) implementation of _kbhit().
  Morgan McGuire, morgan@cs.brown.edu
