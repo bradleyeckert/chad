@@ -8,32 +8,31 @@
 #include "flash.h"
 #include "gecko.h"
 #ifdef __linux__
-#include <unistd.h>
 /**
  Linux (POSIX) implementation of _kbhit().
  Morgan McGuire, morgan@cs.brown.edu
  */
-#include <stdio.h>
-#include <sys/select.h>
+#include <stdbool.h>
+#include <sys/ioctl.h>
 #include <termios.h>
-#include <stropts.h>
+#include <time.h>
 
 int KbHit(void) { // _kbhit in Linux
-    static const int STDIN = 0;
     static bool initialized = false;
+    int fd = fileno(stdin);
 
     if (!initialized) {
         // Use termios to turn off line buffering
-        termios term;
-        tcgetattr(STDIN, &term);
+        struct termios term;
+        tcgetattr(fd, &term);
         term.c_lflag &= ~ICANON;
-        tcsetattr(STDIN, TCSANOW, &term);
+        tcsetattr(fd, TCSANOW, &term);
         setbuf(stdin, NULL);
         initialized = true;
     }
 
     int bytesWaiting;
-    ioctl(STDIN, FIONREAD, &bytesWaiting);
+    ioctl(fd, FIONREAD, &bytesWaiting);
     return bytesWaiting;
 }
 #else
@@ -220,7 +219,7 @@ static void JamISP(uint8_t c) {
         FlashSPI(c);
         if (n) n--; else { state = 0; }
         break;
-    case 3: printf("ISP: read-to-UART not supported\n");
+    case 3: printf("ISP: read-to-UART not supported\n"); // fall through
     default: state = 0; // weird state
     }
 }
@@ -309,14 +308,14 @@ int writeIOmap (uint32_t addr, uint32_t x) {
         putchar(x);
 #ifdef __linux__
     fflush(stdout);
-    usleep(1000);
+    nanosleep(&(struct timespec){ 0, 1000000 }, NULL);
 #endif
         break;
     case 0x01: codeAddr = x;  break;
     case 0x02: chadToCode(codeAddr++, x);  break;
     case 0x03: FlashInterpret();  break;
     case 0x04: JamISP(x);  break;       // Jam ISP byte
-    case 0x05: gkey = (gkey << CELLBITS) + x;
+    case 0x05: gkey = (gkey << CELLBITS) + x; // fall through
     case 0x06: 
         read_bytes = (x & 3) + 1;
         boot_format = (x >> 2) & 7;
@@ -329,6 +328,7 @@ int writeIOmap (uint32_t addr, uint32_t x) {
         FlashSPI(x >> 8);
         FlashSPI(x);
         FlashSPI(0);
+        // fall through
     case 0x0A:
         FlashReadResult = 0;
         for (int i = 0; i < read_bytes; i++) {

@@ -67,7 +67,7 @@ int LoadFlashMem(char* filename, uint32_t origin) {
 #endif
 	if (fp == NULL) return BAD_OPENFILE;
 	if (origin == 0)
-		fread(boilerplate, 1, 16, fp);	// get boilerplate
+		(void)(fread(boilerplate, 1, 16, fp) == 16); // get boilerplate
 	uint32_t length = fread(&mem[origin], 1, FlashMemorySize - origin, fp);
 	invertMem(&mem[origin], length);
 	fclose(fp);
@@ -181,7 +181,7 @@ int FlashMemSPI8(uint8_t cin) {
 		case 0x35: state = rdsrh;               break;
 		case 0x05: state = rdsr;                break;
 		case 0xEB: // quad rate commands must have QE set
-		case 0x32: if (qe == 0) { break; }
+		case 0x32: if (qe == 0) { break; }      // fall through
 		case 0x0B: /* FR  opcd A2 A1 A0 xx -- data... */
 		case 0x02: /* PP  opcd A2 A1 A0 d0 d1 d2 ... */
 		case 0x20: /* SER4K */  state = addr2;  break;
@@ -214,11 +214,11 @@ int FlashMemSPI8(uint8_t cin) {
 				} break;
 			case 0x03: // slow read
 				state = read;  break;
-			case 0xEB:  dummy = 2;
+			case 0xEB:  dummy = 2; // fall through
 			case 0x0B: // fast read
 				state = fastread;  break;
 			case 0x32: // QDR page write
-				if (qe == 0) { goto notenabled; }
+				if (qe == 0) { goto notenabled; } // fall through
 			case 0x02: // page write
 				if (wen) {
 					mark = chadCycles() + (uint64_t)BYTE0_DELAY;
