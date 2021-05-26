@@ -1,7 +1,8 @@
 TARGET ?= ./forth/chad
 SRC_DIRS ?= ./src
 
-SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.c -or -name *.s)
+SRCS := $(shell \
+	find $(SRC_DIRS) -name [!_]*.cpp -or -name [!_]*.c -or -name [!_]*.s)
 OBJS := $(addsuffix .o,$(basename $(SRCS)))
 DEPS := $(OBJS:.o=.d)
 

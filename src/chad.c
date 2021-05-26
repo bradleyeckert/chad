@@ -162,7 +162,7 @@ void chadToData(uint32_t addr, uint32_t x) {
 // Time-critical code starts here. Code is manually included to keep it
 // all together for cache-friendliness (hopefully).
 
-#include "coproc.c"                     // include coprocessor code
+#include "_coproc.c"                    // include coprocessor code
 
 SV Dpush(cell v)                        // push to on the data stack
 {
