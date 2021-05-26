@@ -162,7 +162,7 @@ void chadToData(uint32_t addr, uint32_t x) {
 // Time-critical code starts here. Code is manually included to keep it
 // all together for cache-friendliness (hopefully).
 
-#include "coproc.c"                     // include coprocessor code
+#include "_coproc.c"                    // include coprocessor code
 
 SV Dpush(cell v)                        // push to on the data stack
 {
@@ -572,7 +572,7 @@ SI fileID = 0;                          // cumulative file ID
 struct FileRec FileStack[MaxFiles];
 struct FilePath FilePaths[MaxFilePaths];
 SI filedepth = 0;                       // file stack
-static int logcolor = 0;
+static uint32_t logcolor = 0;
 static int leadingblanks = 0;
 
 SV LogR(char* s) {                      // raw text to HTML file
@@ -1094,7 +1094,7 @@ static char* RefPath(char* filename) {  // convert filename format
 
 SV SwallowBOM(FILE *fp) {               // swallow leading UTF8 BOM marker
     char BOM[4];                        // to support utf-8 files on Windows
-    fgets(BOM, 4, fp);
+    (void)(fgets(BOM, 4, fp) != NULL);
     if (strcmp(BOM, BOMmarker)) {
         rewind(fp);                     // keep beginning of file if no BOM
     }
