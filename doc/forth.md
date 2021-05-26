@@ -2,7 +2,7 @@
 
 A lot fewer words. You can define an ANS Forth in `chad`, but why?
 Code space is limited on purpose. Don't clutter it up with stuff you
-don't need. If your code needs an ANS word, then copy and paste.
+don't need. If your code needs an ANS word then copy and paste.
 There is so much beautiful ANS Forth code out there.
 You don't have to reinvent the wheel, but you do have to think.
 
@@ -214,17 +214,51 @@ for later loading into code RAM.
 The `forg` field points to the flash version.
 If `len` is 0, `forg` may be omitted.
 
+## Applets
+
+The usual way to handle large programs is to provide a large memory from which
+to execute. Although execution from SPI flash is a possibility, it breaks the
+encryption scheme. Code would have to be plaintext.
+So, SPIF (the flash controller) doesn't support that.
+
+Instead, the application reserves sections of code and data RAM for applets.
+Conceptually, an applet is a chunk of code in manually managed cache.
+When applet functionality is needed, its code and data are loaded from flash
+in a manner very similar to the boot load. SPIF does the transfer in hardware.
+Software can either spin until the load is finished or do something useful.
+After loading, the applet's API can be used to do whatever is needed.
+
+A global variable holds the applet ID, which can be its flash memory address
+or an index into a table of such addresses. The index as well as an API call ID
+can be packed into a literal, which is pushed onto the stack before calling
+`aplfn`. `aplfn` checks if the applet is in code memory.
+If a different applet is there, an error is thrown.
+The applet should be 0, meaning the space is free. 
+Applets should be closed after use to avoid collisions.
+
+An example of an applet is a file system.
+It may use 2KB of code space, which would load in 150 usec when decrypting
+using a 100 MHz clock.
+Compare to a sector read of a SD card in SPI mode: 25 MBPS x 4096 bits = 164 usec.
+The file system could be distributed among several applets to optimize the load time.
+
+A historical analog can be seen in the Europay Smart Card payment system.
+It operated over POTS phone lines and used MCUs from the 2000 time frame
+to implement a Forth token interpreter.
+Within that severely constrained environment, load-on-demand applets worked very well.
+Chad's load rate and execution speed are a couple of orders of magnitude faster
+than what Europay had to work with.
+
 ## To Do
 
 Catch and Throw should use the features of `frame.f` to set up `catch` frames.
 Maybe leave more stack space for the frame stack in data RAM.
 
 A cooperative multitasker can likewise use `frame.f` words to move hardware
-stacks to and from tasks. This makes a context switch more unwieldy, but still
+stacks to and from task buffers. This makes a context switch more unwieldy, but still
 in the microsecond range.
 
 Put a larger data space in the hardware. The code space is 4K x 16.
 Data space should be 2K or 4K words.
 
-
-
+Support applets.

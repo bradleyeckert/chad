@@ -294,7 +294,8 @@ Make sure to poll io\[4] to wait until the jammed command has been processed.
 
 ### Wishbone Bus Alice
 
-Since the terms *master* and *slave* are being phased out of the tech lexicon,
+Since the terms *master* and *slave* are being phased out of the tech lexicon
+because of wokeness run amok,
 I took the liberty of replacing them with *Alice* and *Bob* respectively.
 *Bob* attaches to *Alice* and then *Alice* tells *Bob* what to do, so it's easy to remember.
 In SPI terminology, *mosi* and *miso* become *aobi* and *aibo*.
@@ -332,7 +333,6 @@ LIZARD, so I simplified it and named the module `gecko`.
 
 Along with the fact that random read of code space isn't supported by hardware,
 making the plaintext unavailable, attacks will likely have to be brute-force.
-A 56-bit key is used so that publication of source code isn't an export problem.
 A large network of FPGAs could crack it if it's used as-is.
 The hardware easily supports up to 120-bit keys.
 

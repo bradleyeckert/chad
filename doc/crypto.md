@@ -22,9 +22,10 @@ So, with a 200 MHz clock, an on-chip (or QSPI) flash would be read at 25 MBPS.
 
 The encryption hardware is limited to SPI flash decryption. It's not set up to
 encrypt messages, so it's not hardened for that use case. It also allows
-a `0` key, which sets the keystream to all zeros. That's not something you want
-in a system that encrypts user data. Since Gecko only for IP protection,
-it is not under 5A002.a of US export control regulations. Key length doesn't matter.
+a `0` key, which sets the keystream to all zeros.
+That makes it effectively useless for encryption of user data,
+which means it is not under 5A002.a of US export control regulations.
+Key length doesn't matter.
 Gecko can take a key length of up to 15 bytes.
 
 The multi-cell keys are `bkey` for the boot record and `tkey` for text in flash.
