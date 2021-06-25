@@ -50,9 +50,9 @@ module mcu_top
   // MCU
   mcu #(BASEBLOCK, BAUD_DIV, 24, 12, 10) small_mcu (
     .clk      (clk     ),
-    .rst_n    (arst_n  ),
-    .sclk     (qspi_sck),
-    .cs_n     (qspi_cs ),
+    .rst_n    (rst_n   ),
+    .sclk     (spi_sck ),
+    .cs_n     (spi_cs  ),
     .qdi      (qdi     ),
     .qdo      (qdo     ),
     .qoe      (qoe     ),

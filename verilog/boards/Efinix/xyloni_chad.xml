@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<efx:project name="xyloni_chad" description="" last_change_date="Sun December 13 2020 13:42:37" location="C:/Efinity/2020.2/project/xyloni_chad" sw_version="2020.2.299" last_run_state="pass" last_run_tool="efx_pgm" last_run_flow="bitstream" config_result_in_sync="true" design_ood="sync" place_ood="sync" route_ood="sync" xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
+<efx:project name="xyloni_chad" description="" last_change_date="Wed June 23 2021 03:15:24" location="C:/Efinity/2020.2/project/xyloni_chad" sw_version="2020.2.299" last_run_state="pass" last_run_tool="efx_pgm" last_run_flow="bitstream" config_result_in_sync="true" design_ood="sync" place_ood="sync" route_ood="change" xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
     <efx:device_info>
         <efx:family name="Trion"/>
-        <efx:device name="T8F81"/>
-        <efx:timing_model name="C2"/>
+        <efx:device name="T13F256"/>
+        <efx:timing_model name="C3"/>
     </efx:device_info>
     <efx:design_info def_veri_version="verilog_2k" def_vhdl_version="vhdl_2008">
         <efx:top_module name="mcu_top"/>
-        <efx:design_file name="../../rtl/cdc.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/chad.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/coproc.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/gecko.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/gpu.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/idivu.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/imultf.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/ishift.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/mcu.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/prio_enc.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/sflash.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/spif.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/spram.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/stack.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../rtl/uart.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../boards/Efinix/demo_io.v" version="verilog_2k" library="default"/>
-        <efx:design_file name="../../boards/Efinix/mcu_top.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/cdc.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/chad.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/coproc.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/gecko.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/gpu.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/idivu.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/imultf.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/ishift.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/mcu.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/prio_enc.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/sflash.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/spif.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/spram.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/stack.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/rtl/uart.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/boards/Efinix/mcu_top.v" version="verilog_2k" library="default"/>
+        <efx:design_file name="D:/Apps/chad/verilog/boards/Efinix/demo_io.v" version="default" library="default"/>
         <efx:top_vhdl_arch name="mcu_top"/>
     </efx:design_info>
     <efx:constraint_info>
@@ -52,8 +52,8 @@
         <efx:param name="qp_options=anneal_random_seed=" value="1" value_type="e_integer"/>
     </efx:place_and_route>
     <efx:bitstream_generation tool_name="efx_pgm">
-        <efx:param name="mode" value="active" value_type="e_string"/>
-        <efx:param name="width" value="1" value_type="e_string"/>
+        <efx:param name="mode" value="active" value_type="e_option"/>
+        <efx:param name="width" value="1" value_type="e_option"/>
         <efx:param name="cold_boot" value="off" value_type="e_bool"/>
         <efx:param name="cascade" value="off" value_type="e_option"/>
         <efx:param name="enable_roms" value="on" value_type="e_option"/>

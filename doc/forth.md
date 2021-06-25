@@ -233,7 +233,7 @@ or an index into a table of such addresses. The index as well as an API call ID
 can be packed into a literal, which is pushed onto the stack before calling
 `aplfn`. `aplfn` checks if the applet is in code memory.
 If a different applet is there, an error is thrown.
-The applet should be 0, meaning the space is free. 
+The applet ID should be 0, meaning the space is free. 
 Applets should be closed after use to avoid collisions.
 
 An example of an applet is a file system.
