@@ -166,4 +166,28 @@ Here's what text rendering looks like on a TFT LCD module:
 
 ![ArtyA7 Image](doc/artyLCD.jpg)
 
+## To-do
 
+The ISP protocol's "ISP enable" needs to be beefed up for cyber security reasons.
+See `spif.md`.
+
+The ISP utility should have the terminal code merged in.
+Although it's written in C, it should be translated to Forth and 8th.
+
+SPI should default to dual data rate mode. 
+Dual rate takes 5 SPI clocks or 10 system clocks per byte.
+This matches the 9 cycles per byte overhead of decryption.
+QSPI doesn't add anything.
+You lose the WP pin and it costs you 2 extra I/O pins.
+
+Catch and Throw should use the features of `frame.f` to set up `catch` frames.
+Maybe leave more stack space for the frame stack in data RAM.
+
+A cooperative multitasker can likewise use `frame.f` words to move hardware
+stacks to and from task buffers. This makes a context switch more unwieldy, but still
+in the microsecond range.
+
+Put a larger data space in the hardware. The code space is 4K x 16.
+Data space should be 2K or 4K words.
+
+Support applets. See `forth.md`.

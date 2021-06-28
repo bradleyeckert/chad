@@ -214,7 +214,7 @@ for later loading into code RAM.
 The `forg` field points to the flash version.
 If `len` is 0, `forg` may be omitted.
 
-## Applets
+## Applets (to be implemented)
 
 The usual way to handle large programs is to provide a large memory from which
 to execute. Although execution from SPI flash is a possibility, it breaks the
@@ -228,13 +228,30 @@ in a manner very similar to the boot load. SPIF does the transfer in hardware.
 Software can either spin until the load is finished or do something useful.
 After loading, the applet's API can be used to do whatever is needed.
 
-A global variable holds the applet ID, which can be its flash memory address
-or an index into a table of such addresses. The index as well as an API call ID
-can be packed into a literal, which is pushed onto the stack before calling
+A global variable holds the previous and current applet IDs,
+which can be the applet's flash memory 4K sector number. 
+That as well as an API call ID can be packed into a literal,
+which is pushed onto the stack before calling
 `aplfn`. `aplfn` checks if the applet is in code memory.
-If a different applet is there, an error is thrown.
-The applet ID should be 0, meaning the space is free. 
-Applets should be closed after use to avoid collisions.
+If a different applet is there, it saves the new applet's ID and loads it from flash.
+This conceptually similar to a "cache miss".
+
+While a normal Forth would put immediate data right after the call and manipulate the
+return stack to get it, code space is unreadable for security reasons.
+So, the data is just passed on the stack as a literal.
+Applets will be aligned on 4K boundaries to match the flash sector size.
+An 11-bit literal can pack a 6-bit sector number and a 5-bit call ID.
+That allows for a 256 KB of applet storage and 32 different API calls per applet.
+`aplfn` jumps to the location in applet code indexed by call ID.
+The code at that location is a jump instruction.
+
+If `aplfn` handles a cache miss (before jumping to the code), after that code returns
+control to `aplfn` the previous applet is restored so that the code after it is safe.
+So, applets can call other applets and still use normal jumps and calls internally.
+The data space of applets is a different story.
+Global variables used by applets can be trashed unless saved.
+The easiest solution to the problem is to not put long-term data in applets.
+Use handles for that.
 
 An example of an applet is a file system.
 It may use 2KB of code space, which would load in 150 usec when decrypting
@@ -248,17 +265,3 @@ to implement a Forth token interpreter.
 Within that severely constrained environment, load-on-demand applets worked very well.
 Chad's load rate and execution speed are a couple of orders of magnitude faster
 than what Europay had to work with.
-
-## To Do
-
-Catch and Throw should use the features of `frame.f` to set up `catch` frames.
-Maybe leave more stack space for the frame stack in data RAM.
-
-A cooperative multitasker can likewise use `frame.f` words to move hardware
-stacks to and from task buffers. This makes a context switch more unwieldy, but still
-in the microsecond range.
-
-Put a larger data space in the hardware. The code space is 4K x 16.
-Data space should be 2K or 4K words.
-
-Support applets.

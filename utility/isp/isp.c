@@ -297,7 +297,7 @@ the pid number.
         return 4;
     }
 /*
-The PING byte of ISP_enable (0x42) sends 5 bytes out the UART:
+The PING byte of ISP_enable (0x42) sends 7 bytes out the UART:
 BASEBLOCK    first 64KB sector of user flash
 PRODUCT_ID   product ID, 16-bit little-endian
 KEY_ID       key ID, 8-bit

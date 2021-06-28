@@ -192,9 +192,9 @@ A 'ping' command (0x42) sends 7 bytes out the UART:
 - BASEBLOCK, first 64KB sector of user flash
 - Product ID\[7:0]
 - Product ID\[15:8]
-- SerialNumber\[7:0];
-- SerialNumber\[15:8];
-- SerialNumber\[23:16];
+- SerialNumber\[7:0] or key ID
+- SerialNumber\[15:8]
+- SerialNumber\[23:16]
 - 0xAA, indicates a valid ping format
 
 The SerialNumber is 0 if there is no serialization.
@@ -213,6 +213,29 @@ of `chad`, add it to this list and do a pull request:
 
 - 0, Demonstration models for `chad`
 - 1 to 99, Reserved for Brad Eckert's commercial projects
+
+### Rollback attacks
+
+The ISP is designed to be un-brickable. The programming utility checks the first
+four bytes of the PING to make sure you are programming the expected device.
+Encryption is built into the flash image, but today's regulatory standards often
+require protection against rollback attacks.
+
+The ISP enable command starts with `12 A5 5A` by default (see `spif.v`).
+You can change the `A5 5A` to anything, so that your device only works with your
+programming utility. A 16-bit key is kind of useless since it takes maybe
+20 us to check a key with decent hardware.
+A 45-bit key would stretch that out to 20 years.
+`spif.v` should be modified for a 48-bit programming-enable key.
+The `ispActive` bit should only be resolved after the whole key is received.
+This is a to-do item.
+
+To prevent rollbacks, the ISP utility would check the version number held at a fixed
+address in the flash.
+The ISP utility would, of course, have a hidden key.
+Executables are lousy places to hide keys. An encrypted executable is possible.
+The ISP utility could be written in 8th, which would then support many platforms.
+8th executables support strong encryption, which would hide the key as well as whatever else.
 
 ## Boot Loader
 
