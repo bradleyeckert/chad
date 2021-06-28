@@ -80,3 +80,4 @@ Some FPGAs store keys in battery-backed RAM, for the truly paranoid.
 
 The other option is to use Flash-based FPGAs. Is flash readback protection more secure than fuses?
 Who knows?
+

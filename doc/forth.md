@@ -265,3 +265,14 @@ to implement a Forth token interpreter.
 Within that severely constrained environment, load-on-demand applets worked very well.
 Chad's load rate and execution speed are a couple of orders of magnitude faster
 than what Europay had to work with.
+
+## Securing the terminal (to be implemented)
+
+Cybersecurity advisories are starting to address things like terminal access.
+If the system is accessed over Ethernet, a Telnet to UART bridge could handle encryption.
+
+### Password protection
+
+Boot up with the search order containing only a `public` vocabulary that contains very
+few words. One of these is `login`, which accepts a password.
+Once logged in, `logout` and `change-password` would be visible.
