@@ -15,7 +15,7 @@ since there are more regions that you don't care about being probed.
 You don't care if the flash and its ATE support can be accessed via JTAG.
 
 Chad uses compact hardware to decrypt data coming from the SPI flash.
-It uses a stream cypher that's a derivative of LIZARD. I call it `gecko`.
+It uses a stream cipher that's a derivative of LIZARD. I call it `gecko`.
 It takes 48 clock cycles to initialize and then provides a new pseudorandom
 byte every 8 clocks.
 So, with a 200 MHz clock, an on-chip (or QSPI) flash would be read at 25 MBPS.
@@ -41,7 +41,7 @@ image is in plaintext.
 ## Boot Key
 
 The boot record key, referred to as `bkey`, is 56 bits by default. It is used once,
-at bootup. The stream cypher key's reset value is `bkey`. 
+at bootup. The stream cipher key's reset value is `bkey`. 
 Although the key is somewhat diffused, it isn't thoroughly diffused because that 
 would require more clock cycles than I want to spend.
 So, don't use simple keys such as `1` in a real application.
@@ -56,10 +56,10 @@ For example, to set a `bkey` of 0x12345687654321 using 16-bit cells you would us
 ## Text Key
 
 The text key, referred to as `tkey`, is 56 bits by default. It is used every time
-a string or header record is read from flash. The actual cypher key concatenates
+a string or header record is read from flash. The actual cipher key concatenates
 `tkey` and the address of the text. `tkey` *( -- ud )* is a word that behaves as a
 double constant. `/text` synchronizes the keystream by loading it and the address
-into the cypher for a total key length of 3 cells or 56 bits whichever is smaller.
+into the cipher for a total key length of 3 cells or 56 bits whichever is smaller.
 
 `+tkey` *( n -- )* shifts one cell into `tkey` from the right.
 
@@ -81,3 +81,34 @@ Some FPGAs store keys in battery-backed RAM, for the truly paranoid.
 The other option is to use Flash-based FPGAs. Is flash readback protection more secure than fuses?
 Who knows?
 
+## Boot security standards compliance
+
+Boot image cryptographic signing is starting to be mandated by standards.
+The `spif` bootloader executes commands (streamed from SPI flash) to load data into on-chip RAM
+while decrypting it. To enhance security, on-chip code RAM is not randomly readable.
+
+Stream ciphers, where plaintext bits are XORed with a cipher bit stream, can be
+very secure if used properly:
+
+- Keys must never be used twice
+- Valid decryption should never be relied on to indicate authenticity
+
+This means that keys should be programmable (in an ASIC) or changed often (in an FPGA)
+by changing the bitstream between PCB lots.
+
+Cryptographic signing is handled by a CRC of plaintext. The signature is itself encrypted
+using the boot key. If the boot code is to be hacked, a brute force search for the CRC will be
+needed to make the hacked code boot. This search is restricted by the boot time, which is on the
+order of milliseconds. The impracticality of messing with the code isn't worth the effort it
+would take to target just a few PCBs at the most.
+
+UART-based ISP is a replacement for JTAG. Since UART connectivity via cable is a usual feature,
+the ISP feature should be able to be turned off by setting the `ISPenable` wire on `spif.v` low.
+This lowers cybersecurity risk and puts it in a less onerous compliance category.
+Firmware should warn of inadvertent ISP enable.
+
+Firmware revision rollback is tricky to detect with a SPI flash that is easily cloned.
+That is beyond the scope of `spif`.
+Compliance with that part of a cybersecurity standard is more of a system problem that depends
+on what kinds of secure non-volatile memory are available.
+Startup code should ensure proper revision level before running the app.

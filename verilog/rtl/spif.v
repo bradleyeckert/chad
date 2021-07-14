@@ -1,4 +1,4 @@
-// Serial Flash Controller for Chad                  		12/11/2020 BNE
+// Serial Flash Controller for Chad                  		7/14/2021 BNE
 // This code is a gift to the divine.
 
 // SPIF is an I/O processor that loads memories from SPI flash at boot time,
@@ -44,6 +44,8 @@ module spif
 // Boot key
   input wire [KEY_LENGTH*8-1:0] key,    // Boot code decrypt key, 0 if plaintext
   input wire [23:0]           sernum,   // Serial number or boot key ID
+// Enable ISP
+  input wire                  ISPenable,
 // UART interface
   input  wire                 u_ready,  // Ready for next byte to send
   output reg                  u_wr,     // UART transmit strobe
@@ -223,7 +225,7 @@ module spif
           begin
             u_rd <= 1'b1;
             if (u_din == unlockbyte1)
-              ispActive <= 1'b1;
+              ispActive <= ISPenable;
             r_state <= UART_RX_IDLE;
           end
         default:
@@ -334,16 +336,41 @@ module spif
   );
 
 //==============================================================================
+// CRC32 logic (crc32.v)
+//==============================================================================
+
+  reg [31:0] crcIn;
+  wire [31:0] crcOut;
+  reg [3:0]  b_state;                   // boot FSM state
+  reg signing, testsig, sig_ok, sig_last;         // test signature
+
+  crc32 signature (
+    .crcIn      (crcIn),
+    .data       (plain),
+    .crcOut     (crcOut)
+  );
+
+  always @(posedge clk or negedge arstn)
+    if (!arstn) begin
+      crcIn <= 32'hFFFFFFFF;
+    end else begin
+      if (b_state[2:0] == 3'd2)
+        crcIn <= 32'hFFFFFFFF;
+      else if (!signing)
+        if (g_next)
+          crcIn <= crcOut;
+    end
+
+//==============================================================================
 // Boot Loader and ISP FSM
 // The boot loader can be disabled by forcing CS# high with a jumper so it
 // reads blank.
 //==============================================================================
 
   localparam FAST_READ = 8'h0B;
-  reg [3:0]  b_state;                   // boot FSM state
   reg [15:0] b_count;                   // length of byte run
   reg [15:0] b_dest;                    // address register for boot load destination
-  reg [2:0]  rd_format;               // boot load SPI mode
+  reg [2:0]  rd_format;                 // boot load SPI mode
   reg [23:0] rd_addr;                   // flash read address
   reg [1:0]  rd_bytes, rd_bcnt;         // byte count for multibyte read
 
@@ -364,6 +391,7 @@ module spif
   wire b_txok = uo_ready & ~uo_wr;      // okay to send to UART
   wire f_ok = f_ready & ~f_wr & g_ready;
   reg init;                             // initialize memory at POR
+  reg [7:0] sig_ex;                    // signature byte to check
 
 // Strobes to trigger writes
 
@@ -373,10 +401,10 @@ module spif
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
-      f_dout <= 8'h00;    f_wr <= 1'b0;
+      f_dout <= 8'h00;    f_wr <= 1'b0;      sig_ok <= 1'b0;
       b_dest <= 16'd0;    f_rate <= 4'h7;    wbxo <= 0;
       b_count <= 16'd0;   b_data <= 0;       ISPack <= 1'b0;
-      b_mode <= 4'd0;     bumpDest <= 1'b0;
+      b_mode <= 4'd0;     bumpDest <= 1'b0;  signing <= 1'b0;
       b_bytes  <= 2'd0;   dataWr <= 1'b0;    i_usel <= 3'd7;
       b_bcnt <= 2'd0;     codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 4'd1;    f_format <= 3'd0;  g_load <= 1'b0;
@@ -397,6 +425,8 @@ module spif
       g_next <= 1'b0;
       g_load <= 1'b0;
       g_reset_n <= 1'b1;
+      testsig <= 1'b0;
+      sig_last <= 1'b0;
       if (init) begin
         codeWr <= 1'b1;                 // clear RAMs
         dataWr <= 1'b1;
@@ -510,16 +540,24 @@ module spif
                 2'b11:               	// blank = "end"
                   begin
                     if (plain[5]) begin
-                      f_wr <= 1'b0;
-                      f_format <= 3'd0;	// raise CS#
-                      p_reset  <= plain[4];
-                      b_state  <= 3'd0; // reset FSM
+                      p_reset <= 1'b1;
+                      if (plain[4]) begin
+                        f_wr <= 1'b0;   // 1111xxxx = end interpret
+                        f_format <= 3'd0; // raise CS#
+                        b_state  <= 4'd0;
+                      end else begin    // 1110xxxx = finish booting
+                        b_count <= 16'd4;
+                        rd_bcnt <= 2'd3;
+                        b_state <= 4'hF;
+                        signing <= 1'b1;
+                        sig_ok  <= 1'b1;
+                      end
                     end else
                       b_mode <= {2'b01, plain[1:0]};
                   end
                 2'b10:               	// SCLK frequency
                   begin
-          	        f_rate <= plain[3:0];
+          	    f_rate <= plain[3:0];
                   end
                 default:             	// data mode
                   begin
@@ -568,6 +606,20 @@ module spif
             end
           4'b1111:                      // ========== Read a word
             begin
+              testsig <= signing;
+              case (rd_bcnt)
+              2'b11: sig_ex <= crcIn[31:24];
+              2'b10: sig_ex <= crcIn[23:16];
+              2'b01: sig_ex <= crcIn[15:8];
+              2'b00: begin
+                  sig_ex <= crcIn[7:0];
+                  if (signing) begin    // end of signature testing
+                    sig_last <= 1'b1;
+                    signing <= 1'b0;
+                    f_format <= 3'd0;   // raise CS#
+                  end
+                end
+              endcase
               fr_data <= {fr_data[WIDTH-9:0], plain};
               if (rd_bcnt) begin
                 rd_bcnt <= rd_bcnt - 2'd1;
@@ -616,6 +668,12 @@ module spif
             rd_addr <= din;
           end
         endcase
+      if (testsig) begin                // test the boot signature bytes
+        if (fr_data[7:0] != sig_ex)
+          sig_ok <= 1'b0;
+        if (sig_last)
+          p_reset <= ~sig_ok;
+      end
     end
 
   wire booting = (b_state) ? 1'b1 : 1'b0;
@@ -636,6 +694,7 @@ module spif
     4'hA:    spif_dout = fr_data[31:WIDTH]; // flash read word
 `endif
     4'hB:    spif_dout = fr_data[WIDTH-1:0];
+    4'hC:    spif_dout = ISPenable;     // other status bits
     4'hE:    spif_dout = PRODUCT_ID;    // basic versioning boilerplate
     4'hF:    spif_dout = {DATA_SIZE[3:0], CODE_SIZE[3:0], BASEBLOCK[7:0]};
     default: spif_dout = outword;

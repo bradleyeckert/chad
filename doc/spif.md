@@ -140,7 +140,7 @@ ISP command bytes:
 `01sfgbpr` detail:
 
 - s = SPI cycle: write byte again, reading the result.
-- g = Load the cypher with the new key.
+- g = Load the cipher with the new key.
 - f = set flash bus rate from N. 0 is fastest.
 - b = Reboot from flash.
 - p = Trigger a ping. It will send boilerplate out the UART.
@@ -347,7 +347,7 @@ That won't happen in this architecture, the way `chad` is set up.
 
 ### Encryption
 
-The easiest method of encryption is to use a stream cypher to
+The easiest method of encryption is to use a stream cipher to
 decrypt the boot stream inside of `spif` as SPI flash data is loaded.
 I went ahead and put this in, adding 200 LEs to the size. Not bad.
 There are some very compact stream ciphers. LIZARD is one of the smallest.

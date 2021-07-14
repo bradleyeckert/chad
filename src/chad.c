@@ -55,7 +55,7 @@ SI error;                               // simulator and interpreter error code
 #define order   (orders + 1)            // search order stack
 #define current (order + 9)             // wid of the current definition
 #define state   (current + 1)           // this the shared last variable
-                
+
 #define TOIN    Data[toin]
 #define TIBS    Data[tibs]
 #define ATIB    Data[atib]
@@ -185,7 +185,7 @@ SV Rpush(cell v)                        // push to the return stack
     Rstack[RP] = v;
 }
 
-// Interrupts are handled by modifying the return instruction 
+// Interrupts are handled by modifying the return instruction
 
 static uint8_t Iack(void) {             // priority encoder
     uint8_t r = 0;
@@ -280,7 +280,7 @@ SI CPUsim(int single) {
                     if (insn & 0x800)                               /* coproc */
                         coprocGo(insn & 0x7FF,
                             t & CELLMASK, s & CELLMASK, w & CELLMASK);
-                    else 
+                    else
                         _lex = (lex << 11) | (insn & 0x7FF);        /*   litx */
                 }
             }
@@ -699,9 +699,9 @@ SI wordlists;                           // number of defined wordlists
 SI root_wid;                            // the basic wordlists
 SI forth_wid;
 SI asm_wid;
-SI context(void) { 
+SI context(void) {
     if (ORDERS == 0) return 0;
-    return CONTEXT; 
+    return CONTEXT;
 }
 
 SV printWID(int wid) {
@@ -950,7 +950,7 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
     if (IR & 0x8000) {
         int target = IR & 0x1FFF;
         switch ((IR>>12) & 7) {
-        case 6: 
+        case 6:
             target = IR & 0x7FF;  HexToDA(target);
             if (IR & 0x800) {
                 appendDA("cop");
@@ -1662,12 +1662,18 @@ endparagraph:               if (found > 1)
 
 // The gecko key must be set up before calling GeckoByte.
 // MakeBootList uses all the same key, to be the key's reset value on the target.
+// Output to flash is via flashC8.
 
-static uint32_t flashPtr;
+static uint32_t signature, flashPtr;
+
+SV flashC8(uint8_t c) {
+    signature = crcbyte(c, signature);
+    FlashMemStore(flashPtr++, c ^ GeckoByte());
+}
+
 SV AddBootKey(void)     { ChadBootKey = (ChadBootKey << CELLBITS) + Dpop(); }
 SV forg(void)           { flashPtr = Dpop(); }
 SV fhere(void)          { Dpush(flashPtr); }
-SV flashC8(uint8_t c)   { FlashMemStore(flashPtr++, c ^ GeckoByte()); }
 SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
 SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
 
@@ -1691,7 +1697,6 @@ SV fc32(void) {                         // ( d -- )
     w |= Dpop();
     flashC16(w >> 16);  flashC16(w);
 }
-
 
 SV flashStr(char* s, int escaped) {     // compile string to flash
     size_t length = strlen(s);
@@ -1723,7 +1728,7 @@ SV flashStr(char* s, int escaped) {     // compile string to flash
     }
 }
 
-// Strings in flash use a text encryption key in combination with the 
+// Strings in flash use a text encryption key in combination with the
 // flash address to set the key. f$type needs to load this key
 // unless the string is plaintext, in which case no key is needed.
 
@@ -1743,7 +1748,7 @@ SV xfcQuote(int escaped) {
     if (flashPtr > CELLMASK)            // string must be 1-cell addressable
         error = BAD_FSOVERFLOW;
     parseword('"');
-    flashC8((uint8_t)strlen(tok));      // string length 
+    flashC8((uint8_t)strlen(tok));      // string length
     flashStr(tok, escaped);             // string
 }
 SV fcQuote(void) { xfcQuote(0); }
@@ -1756,16 +1761,17 @@ SV desQuote(void) { Literal(flashPtr);  feQuote();  CompCall(Ctick("f$type")); }
 SV AddTextKey(void) {
     ChadTextKey = (ChadTextKey << CELLBITS) + Dpop();
 }
-SV ExecTextKey(void) { 
+SV ExecTextKey(void) {
     Dpush(ChadTextKey & CELLMASK);  Dpush((cell)(ChadTextKey >> CELLBITS));
 }
-SV CompTextKey(void) { 
+SV CompTextKey(void) {
     Literal(ChadTextKey & CELLMASK);  Literal((cell)(ChadTextKey >> CELLBITS));
 }
 
 // Write boot data to flash memory image in `flash.c`
 SV MakeBootList(void) {
     GeckoLoad(ChadBootKey);
+    signature = 0xFFFFFFFF;
     flashC8(0x80);                      // speed up SCLK
     flashAN(CP);
     flashC8(1);                         // 16-bit code write
@@ -1782,7 +1788,11 @@ SV MakeBootList(void) {
         while (j)
             flashC8((uint8_t)(x >> (8 * --j)));
     }
+    uint16_t sig_hi = signature >> 16;
+    uint16_t sig_lo = signature & 0xFFFF;
     flashC8(0xE0);                      // end bootup
+    flashC16(sig_hi);                   // 32-bit signature
+    flashC16(sig_lo);
 }
 
 SV BootNrun(void) {
@@ -1819,7 +1829,7 @@ static char* FnTargetName(void (*fn)()) { // target: ( w -- )
 // at the bottom, taking the longest to reach through traversal. This is good.
 // Common Forth primitives will be found sooner.
 
-SV MakeHeaders(void) { 
+SV MakeHeaders(void) {
     for (uint8_t i = wordlists; i > 0; i--) {
         char* wname = &wordlistname[i][0];
         size_t len = strlen(wname);
@@ -1863,7 +1873,7 @@ SV MakeHeaders(void) {
 
 SV SaveChadState(void) {
     ParseFilename();
-    FILE* fp = fopenx(tok, "w");  
+    FILE* fp = fopenx(tok, "w");
     if (fp == NULL)
         error = BAD_CREATEFILE;
     else {
@@ -1918,7 +1928,7 @@ SV Twovariable(void) { Variable();  allot(CELLS); }
 SV Char       (void) { parseword(' ');  Dpush(getUTF8()); }
 SV BrackChar  (void) { parseword(' ');  Literal(getUTF8()); }
 
-SV HWoptions(void) { 
+SV HWoptions(void) {
     int n = COP_OPTIONS;
 #ifdef HAS_LCDMODULE
     n |= 0x100;
@@ -1969,7 +1979,7 @@ SV LoadKeywords(void) {
     AddKeyword("boot",        "1.0138 <filename> --", BootNrun,      noCompile);
     AddKeyword("boot-test",   "1.0139 <filename> --", Boot,          noCompile);
     AddKeyword("make-heads",  "1.0140 --",            MakeHeaders,   noCompile);
-    AddKeyword("make-boot",   "1.0145 --",            MakeBootList,  noCompile);    
+    AddKeyword("make-boot",   "1.0145 --",            MakeBootList,  noCompile);
     AddKeyword("equ",         "1.0150 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0160 n1 n2 --",      Assert,        noCompile);
     AddKeyword("hwoptions",   "1.0170 -- n",          HWoptions,     noCompile);
@@ -2234,13 +2244,13 @@ int chad(char * line, int maxlength) {
                     if (isfloat(tok)) {
                         char* eptr;
                         double y = strtod(tok, &eptr);
-                        if ((errno == ERANGE) || (errno == EINVAL)) 
+                        if ((errno == ERANGE) || (errno == EINVAL))
                             goto bogus;
                         if (STATE)
                             LiteralFP(y);
                         else
                             DpushFP(y);
-                    } else 
+                    } else
 #endif
                     {
                         int64_t x = 0;  int neg = 0;  int decimal = -1;
@@ -2310,7 +2320,7 @@ int chad(char * line, int maxlength) {
                     default: ErrorMessage (error, tok);
                     }
                     while (filedepth) {
-                        printf("%s, Line %d: ", 
+                        printf("%s, Line %d: ",
                             FilePaths[File.FID].filepath, File.LineNumber);
                         printf("%s\n", File.Line);
                         fclose(File.fp);

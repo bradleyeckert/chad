@@ -168,9 +168,6 @@ Here's what text rendering looks like on a TFT LCD module:
 
 ## To-do
 
-The ISP protocol's "ISP enable" needs to be beefed up for cyber security reasons.
-See `spif.md`.
-
 The ISP utility should have the terminal code merged in.
 Although it's written in C, it should be translated to Forth and 8th.
 

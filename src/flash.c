@@ -4,6 +4,8 @@
 #include "config.h"
 #include "flash.h"
 #include "chad.h"
+#include "gecko.h"
+#include "iomap.h"
 
 /*
 Flash Memory Simulator
@@ -36,14 +38,19 @@ static void invertMem(uint8_t* m, uint32_t n) {
 	}
 }
 
+uint32_t crcbyte(uint8_t byte, uint32_t CRCin) {
+	CRCin = CRCin ^ byte;
+	for (int j = 7; j >= 0; j--) {
+		uint32_t mask = -(signed)(CRCin & 1);
+		CRCin = (CRCin >> 1) ^ (0xEDB88320 & mask);
+	}
+	return CRCin;
+}
+
 static uint32_t crc32b(uint8_t* message, uint32_t length) {
 	uint32_t crc = 0xFFFFFFFF;			// compute CRC32
 	while (length--) {
-		crc = crc ^ (*message++);		// Get next byte.
-		for (int j = 7; j >= 0; j--) {	// Do eight times.
-			uint32_t mask = -(signed)(crc & 1);
-			crc = (crc >> 1) ^ (0xEDB88320 & mask);
-		}
+		crc = crcbyte(*message++, crc);
 	}
 	return ~crc;
 }
@@ -80,11 +87,11 @@ int LoadFlashMem(char* filename, uint32_t origin) {
 // the low byte of pid is the BASEBLOCK number, other bytes are product ID.
 int SaveFlashMem(char* filename, uint32_t pid, int format) {
 	BASEBLOCK = (uint8_t)pid;
-	uint32_t i = FlashMemorySize;
-	while ((i) && (mem[--i] == 0)) {}   // trim
-	i += 0x140;  
-	if (i > FlashMemorySize) i = FlashMemorySize;
-	i &= 0xFFFFFF00L;					// round to 256-byte page
+	uint32_t length = FlashMemorySize;
+	while ((length) && (mem[--length] == 0)) {}   // trim
+	length += 0x140;  
+	if (length > FlashMemorySize) length = FlashMemorySize;
+	length &= 0xFFFFFF00L;				// round to 256-byte page
 	FILE* fp;
 #ifdef MORESAFE
 	errno_t err = fopen_s(&fp, filename, "wb");
@@ -95,22 +102,22 @@ int SaveFlashMem(char* filename, uint32_t pid, int format) {
 	if (format & 1) {
 		fwrite("chad", 1, 4, fp);		// boilerplate: "chad"
 		fwrite(&pid, 1, 4, fp);			// product ID
-		fwrite(&i, 1, 4, fp);			// length
+		fwrite(&length, 1, 4, fp);		// length
 	}
-	invertMem(mem, i);
-	uint32_t crc = crc32b(mem, i);
+	invertMem(mem, length);
+	uint32_t crc = crc32b(mem, length);
 	if (format & 1) {
 		fwrite(&crc, 1, 4, fp);			// crc
 	}
 	if (format & 2) {					// hex
 		fprintf(fp, "@%02X0000\n", (uint8_t)pid);
-		for (uint32_t n = 0; n < i; n++)
+		for (uint32_t n = 0; n < length; n++)
 			fprintf(fp, "%02X\n", mem[n]);
 	}
 	else {								// binary
-		fwrite(mem, 1, i, fp);
+		fwrite(mem, 1, length, fp);
 	}
-	invertMem(mem, i);
+	invertMem(mem, length);
 	fclose(fp);
 	return 0;
 };

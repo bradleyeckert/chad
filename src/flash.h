@@ -17,6 +17,9 @@ void FlashMemSPIformat(int n);
 // 8-bit transfer via SPI: Send byte to SPI flash and receive the result byte.
 int FlashMemSPI8(uint8_t cin);
 
+// Calculate next CRC32 value
+uint32_t crcbyte(uint8_t byte, uint32_t CRCin);
+
 // Flash memory size in bytes
 #define FlashMemorySize 0x200000
 

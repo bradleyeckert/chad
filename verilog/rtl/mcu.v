@@ -194,6 +194,7 @@ module mcu
     .code_rd  (code_rd  ),
     .key      (key      ),
     .sernum   (sernum   ),
+    .ISPenable (1'b1    ),
     .u_ready  (u_ready  ),
     .u_wr     (u_wr     ),
     .u_dout   (u_dout   ),
