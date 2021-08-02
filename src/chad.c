@@ -50,11 +50,11 @@ SI error;                               // simulator and interpreter error code
 #define dp      (atib + 1)              // data space pointer
 #define cp      (dp   + 1)              // code space pointer
 #define base    (cp   + 1)              // use cells not bytes for compatibility
-#define wids    (base + 1)              // table of target wids
-#define orders  (wids + 9)              // # of wids in the search order
+#define orders  (base + 1)              // # of wids in the search order
 #define order   (orders + 1)            // search order stack
 #define current (order + 9)             // wid of the current definition
 #define state   (current + 1)           // this the shared last variable
+#define here    (state + 1)             // first free cell
 
 #define TOIN    Data[toin]
 #define TIBS    Data[tibs]
@@ -62,7 +62,6 @@ SI error;                               // simulator and interpreter error code
 #define DP      Data[dp]
 #define CP      Data[cp]
 #define BASE    Data[base]
-#define ORDERS  Data[orders]
 #define ORDERS  Data[orders]
 #define ORDER(x) Data[order + (x)]
 #define CURRENT Data[current]
@@ -218,7 +217,6 @@ SI CPUsim(int single) {
     uint16_t retMark = (uint16_t)cycles;
 #endif
     uint8_t mark = RDEPTH;
-    uint8_t ivec = 0;
     if (single == -1) {                 // run until error
         single = 0;
         mark = 0xFF;
@@ -228,7 +226,7 @@ SI CPUsim(int single) {
         goto once;
     }
     do {
-        insn = Code[pc & (CodeSize-1)];
+        insn = Code[pc & (CodeSize - 1)];
     once:
 #ifdef MoreInstrumentation
         if (verbose & VERBOSE_TRACE) {
@@ -236,6 +234,7 @@ SI CPUsim(int single) {
         }
 #endif
         _pc = pc + 1;
+        uint8_t ivec = 0;
         cell _lex = 0;
         cell s = Dstack[SP];
         cell temp;
@@ -258,7 +257,7 @@ SI CPUsim(int single) {
                 break;
             default:
                 if (insn & 0x1000) {                                /*    imm */
-                    Dpush((lex<<11) | ((insn&0xe00)>>1) | (insn&0xff));
+                    Dpush((lex << 11) | ((insn & 0xe00) >> 1) | (insn & 0xff));
                     if (insn & 0x100) {                             /*  r->pc */
                         ivec = Iack();
                         if (ivec) {
@@ -276,7 +275,8 @@ SI CPUsim(int single) {
                             latency = time;
 #endif
                     }
-                } else {
+                }
+                else {
                     if (insn & 0x800)                               /* coproc */
                         coprocGo(insn & 0x7FF,
                             t & CELLMASK, s & CELLMASK, w & CELLMASK);
@@ -284,7 +284,8 @@ SI CPUsim(int single) {
                         _lex = (lex << 11) | (insn & 0x7FF);        /*   litx */
                 }
             }
-        } else { // ALU
+        }
+        else { // ALU
             if (insn & 0x100) {                                     /*  r->pc */
                 ivec = Iack();
                 if (ivec) {
@@ -312,11 +313,11 @@ SI CPUsim(int single) {
             case 0x02: temp = (t & MSB);
                 _t = (t >> 1) | temp;                        break; /*    T2/ */
             case 0x12:
-                _t = (t >> 1) | (cy << (CELLBITS-1));        break; /*   cT2/ */
-            case 0x03: _c = t >> (CELLBITS-1);
-                       _t = t << 1;                          break; /*    T2* */
-            case 0x13: _c = t >> (CELLBITS-1);
-                       _t = (t << 1) | cy;                   break; /*   T2*c */
+                _t = (t >> 1) | (cy << (CELLBITS - 1));        break; /*   cT2/ */
+            case 0x03: _c = t >> (CELLBITS - 1);
+                _t = t << 1;                          break; /*    T2* */
+            case 0x13: _c = t >> (CELLBITS - 1);
+                _t = (t << 1) | cy;                   break; /*   T2*c */
             case 0x04: _t = s;                               break; /*      N */
             case 0x14: _t = w;                               break; /*      W */
             case 0x05: _t = s ^ t;                           break; /*    T^N */
@@ -338,7 +339,7 @@ SI CPUsim(int single) {
                     printf("Reading %Xh from cell %Xh\n", _t, Raddr);
                 } break;                                            /*    [T] */
             case 0x0E: _t = (t) ? 0 : -1;                    break; /*    T0= */
-            case 0x0F: _t = (RDEPTH<<8) + SDEPTH;            break; /* status */
+            case 0x0F: _t = (RDEPTH << 8) + SDEPTH;            break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
             }
             SP = SPMASK & (SP + sign2b[insn & 3]);                /* dstack+- */
@@ -356,7 +357,7 @@ SI CPUsim(int single) {
                 if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
             case  5: temp = writeIOmap(CELL_ADDR(t), s);          /* N->io[T] */
                 if (temp) { single = temp; }   break;
-               // 6 = IORD strobe
+                // 6 = IORD strobe
             case  7: cy = _c;  w = _w;                       break;   /*   co */
             default: break;
             }
@@ -364,8 +365,9 @@ SI CPUsim(int single) {
         }
         pc = _pc;  lex = _lex;
         cycles++;
-        if ((cycles & CELLMASK) == 0)   // raw counter overflow
+        if ((cycles & CELLMASK) == 0) {  // raw counter overflow
             irq |= (1 << 1);            // lowest priority interrupt
+        }
 #ifdef MoreInstrumentation
         if (sp > spMax) spMax = sp;
         if (rp > rpMax) rpMax = rp;
@@ -693,7 +695,8 @@ SV LogColor(uint32_t color, int ID, char* s) {
 // A wid points to a linked list of headers.
 // The head pointer of the list is created by WORDLIST.
 
-static cell wordlist[MaxWordlists];     // head pointers to linked lists
+static cell wordlistPtr[MaxWordlists];  // head pointers to linked lists
+static cell wordlist[MaxWordlists];     // head pointers to linked lists on host
 static char wordlistname[MaxWordlists][16];// optional name string
 SI wordlists;                           // number of defined wordlists
 SI root_wid;                            // the basic wordlists
@@ -704,12 +707,24 @@ SI context(void) {
     return CONTEXT;
 }
 
+// convert target wid to host wordlist index
+SI HostList(int wid) {
+    for (uint8_t i = wordlists; i > 0; i--) {
+        if (wordlistPtr[i] == wid) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 SV printWID(int wid) {
-    char* s = &wordlistname[wid][0];
-    if (*s)
-        printf("%s ", s);
-    else
-        printf("%d ", wid);
+    for (uint8_t i = wordlists; i > 0; i--) {
+        if (wid == wordlistPtr[i]) {
+            printf("%s ", &wordlistname[i][0]);
+            return;
+        }
+    }
+    Cdot(wid);
 }
 
 SV Order(void) {
@@ -718,8 +733,8 @@ SV Order(void) {
     printf("\n Current : ");  printWID(CURRENT);
 }
 
-SI findinWL(char* key, int wid) {       // find in wordlist
-    uint16_t i = wordlist[wid];
+SI findinWL(char* key, int hid) {       // find in host wordlist
+    uint16_t i = wordlist[hid];
     if (strlen(key) < MaxNameSize) {
         while (i) {
             if (strcmp(key, Header[i].name) == 0) {
@@ -746,11 +761,15 @@ SI FindWord(char* key) {                // find in context
     return -1;
 }
 
+SI NextVariable();
+
 SI AddWordlist(char *name) {
-    wordlist[++wordlists] = 0;          // start with empty wordlist
+    cell wid = NextVariable();
+    wordlistPtr[++wordlists] = wid;       // host's list of wordlists
+    wordlist[wordlists] = 0;            // start with empty wordlist
     strmove(&wordlistname[wordlists][0], name, 16);
     if (wordlists == (MaxWordlists - 1)) error = BAD_WID_OVER;
-    return wordlists;
+    return wid;                         // return the target version
 }
 
 SV OrderPush(uint8_t n) {
@@ -834,9 +853,9 @@ SI AddHead (char* name, char* anchor) { // add a header to the list
         Header[hp].isALU = 0;
         Header[hp].srcFile = File.FID;
         Header[hp].srcLine = File.LineNumber;
-        Header[hp].link = wordlist[CURRENT];
+        Header[hp].link = wordlist[HostList(CURRENT)];
         Header[hp].references = 0;
-        wordlist[CURRENT] = hp;
+        wordlist[HostList(CURRENT)] = hp;
     } else {
         printf("Please increase MaxKeywords and rebuild.\n");
         r = 0;  error = BYE;
@@ -1301,7 +1320,7 @@ SV Marker (void) {
 }
 
 SV ListWords(int wid) {                 // in a given wordlist
-    uint16_t i = wordlist[wid];
+    uint16_t i = wordlist[HostList(wid)];
     while (i) {
         size_t len = strlen(tok);       // filter by substring
         char* s = strstr(Header[i].name, tok);
@@ -1580,7 +1599,7 @@ SV GenerateDoc(void) {
         }
     } else
         fprintf(fpw, "<body>\n<h1>Chad Reference</h1>\n");
-    uint16_t i = wordlist[context()];
+    uint16_t i = wordlist[HostList(context())];
     while (i) {
         char* na = Header[i].name;
         uint8_t fid = Header[i].srcFile;
@@ -1865,7 +1884,7 @@ SV MakeHeaders(void) {
             }
             p = Header[p].link;
         }
-        Data[wids + i - 1] = link;
+        Data[CELL_ADDR(wordlistPtr[i])] = link;
     }
 }
 
@@ -1928,6 +1947,12 @@ SV Twovariable(void) { Variable();  allot(CELLS); }
 SV Char       (void) { parseword(' ');  Dpush(getUTF8()); }
 SV BrackChar  (void) { parseword(' ');  Literal(getUTF8()); }
 
+SI NextVariable(void) {
+    cell r = DP;
+    allot(CELLS);
+    return r;
+}
+
 SV HWoptions(void) {
     int n = COP_OPTIONS;
 #ifdef HAS_LCDMODULE
@@ -1944,6 +1969,7 @@ SV HWoptions(void) {
 SV LoadKeywords(void) {
     hp = 0; // start empty
     wordlists = 0;
+    DP = BYTE_ADDR(here);
     // Forth definitions
     root_wid = AddWordlist("root");
     forth_wid = AddWordlist("forth");
@@ -1963,7 +1989,6 @@ SV LoadKeywords(void) {
     AddEquate("dp",           "1.0073 -- addr",       BYTE_ADDR(dp));
     AddEquate("cp",           "1.0074 -- addr",       BYTE_ADDR(cp));
     AddEquate("base",         "1.0075 -- addr",       BYTE_ADDR(base));
-    AddEquate("wids",         "1.0076 -- addr",       BYTE_ADDR(wids));
     AddEquate("#order",       "1.0077 -- addr",       BYTE_ADDR(orders));
     AddEquate("orders",       "1.0078 -- addr",       BYTE_ADDR(order));
     AddEquate("current",      "1.0079 -- addr",       BYTE_ADDR(current));

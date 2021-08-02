@@ -42,6 +42,8 @@ variable hicycles
    io'cycles io@  hicycles @
 ;
 
+\ Assume 100 MHz clock
+
 : ms  ( n -- )
    100000 um* rawcycles d+              \ cycle count to wait for
    begin  2dup rawcycles du<            \ spin until time elapsed

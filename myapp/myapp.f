@@ -30,20 +30,6 @@ include ../forth/interpret.f
 \ include ../forth/bignum.f
 \ include ../forth/ctea.f
 
-variable hicycles
-
-:noname ( -- )
-   hicycles @ 1 +
-   hicycles !
-; resolves irqtick \ clock cycle counter overflow interrupt
-
-\ Read raw cycle count. Since io@ returns after the lower count is read,
-\ it will service iqrtick if it has rolled over. hicycles is safe to read.
-
-: rawcycles ( -- ud )
-   io'cycles io@  hicycles @
-;
-
 \ Error handling
 
 [defined] quit [if]
@@ -60,8 +46,8 @@ variable hicycles
 [defined] quit [if]
 
 : myapp  ( -- )
-   [ $14 cells ] literal dup io@        \ read gp_i
-   swap io!                             \ write top gp_o
+\   [ $14 cells ] literal dup io@        \ read gp_i
+\   swap io!                             \ write top gp_o
    ." May the Forth be with you."
    0 quit
 ;

@@ -109,8 +109,6 @@ cell 4 = [if]
     ;
 [then]
 
-state cell + dp ! \ skip shared variables, new variables can now be defined.
-
 \ Your code can usually use + instead of OR, but if it's needed:
 : or    invert swap invert and invert ; \ 2.0300 n m -- n|m
 : rot   >r swap r> swap ;               \ 2.0310 x1 x2 x3 -- x2 x3 x1

@@ -132,7 +132,7 @@ tkey or [if]
 ;
 
 \ Header structures are in flash. Up to 8 wordlists may be in the
-\ search order. WIDs are indices into `wids`, an array in data space.
+\ search order. WIDs are heads of singly-linked lists.
 \ The name of the wordlist is just before the first link.
 \ The count is after the name instead of before it so it's stored as plaintext.
 
@@ -141,13 +141,11 @@ tkey or [if]
    31 > if drop [char] ? emit exit then \ no name
    1-  f$type
 ;
-: [wid]   ( wid -- addr )               \ wid is indexed from 1
-   cells [ wids cell - ] literal +
-;
-: wid    [wid] @ ;                      \ wid -- f-addr
+
+\ All wordlists are assumed to be named.
 
 : .wid   \ wid --                       \ display WID identifier (for order)
-   wid    dup                           \ get the pointer
+   @ dup
    begin  nip dup /text @f              \ skip to beginning
    dup 0= until  drop
    (.wid) space
@@ -179,7 +177,7 @@ tkey or [if]
 
 \ Search one wordlist, returning the address of header data.
 : _hfind  \ 2.4100 addr len wid -- addr len 0 | addr len ht
-   wid  over 31 u> -19 and throw        \ name too long
+   @ over 31 u> -19 and throw           \ name too long
    over 0= if dup xor exit then         \ addr 0 0   zero length string
    begin
       dup>r  /text

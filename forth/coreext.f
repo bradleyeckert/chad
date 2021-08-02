@@ -40,8 +40,9 @@ there
 : d=   d- or 0= ;                       \ 2.1170 d1 d2 -- flag
 
 : du<                                   \ 2.1180 ud1 ud2 -- flag
-    >r swap >r     -c drop              \ | h2 h1  carry out of l1-l2
-    r> r> -  carry -c drop  carry 0= 0=
+    >r swap >r                          ( l1 l2 |R: h2 h1 )
+    -c drop  carry 0= 0=                \ borrow out of l1-l2
+    r> + r> -c  drop  carry 0= 0=
 ;
 
 \ 2nip saves 1 inst by using w. Same trick isn't used with 2swap

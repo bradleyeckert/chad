@@ -11,6 +11,12 @@ on your desktop or laptop.
 That's the ideal environment for Forth, the programming language of
 deep embedded computing.
 
+Forth hardware's claim to fame is its lack of a compiler in the traditional sense.
+It's both high-level and low-level, with both levels seamlessly integrated.
+Forth computers execute the language directly by implementing Forth instructions
+in hardware. If you disassemble code, it looks a lot like the source code.
+No compiler means no compiler bugs.
+
 Now you can build computing platforms almost without a processor.
 If you have an FPGA or ASIC, there's your computer.
 `chad` is the at-speed simulation model.
