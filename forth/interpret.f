@@ -115,7 +115,7 @@ variable dpl
    #order @ cells [ orders cell - ] literal +
 ;
 : context                               \ 2.6160 -- f-addr
-   'context @
+   'context @ wid
 ;
 
 :noname @+ swap ;
@@ -161,8 +161,8 @@ forth-wordlist set-current
 
 \ `words` overrides the host version, which is in `root`.
 
-: _words  ( wid  -- )
-   @ begin dup while
+: _words  ( wordlist -- )
+   begin dup while
       dup /text @f  swap                ( link ht )
       [ cellbits 8 / ] literal +
       0 fcount ftype space

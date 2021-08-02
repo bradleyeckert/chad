@@ -30,27 +30,15 @@ This brings the code space requirement to 4K. So, more sensible memory sizes are
 - 4K x 16 code memory
 - 2K x 24 data memory
 
-For reference, in 180nm memory density is about 160 Kb/mm<sup>2</sup>
-so designing for the 180nm node would give one `chad` core a die area of 1 mm<sup>2</sup>.
+For reference, in 130nm memory density is about 400 Kb/mm<sup>2</sup>
+so designing for the 130nm node would give one `chad` core a die area of 0.4 mm<sup>2</sup>.
+The 130nm node is attractive for several reasons:
 
-A chip with 3 mm<sup>2</sup> of usable die area (1.73mm on a side) would have room for 
-17 100um x 300um pad structures per side, which would give a 68-pad die with a size of
-2.5mm on a side.
-Supposedly, a mask set for 180nm is about $50K.
-An 8" wafer could yield 4500 chips, which at a cost of $3K per wafer would be about $0.67/chip.
-
-Reducing the active area area to 1 mm<sup>2</sup> has some impact.
-A 44-pin chip with a pad ring of 11 on a side is 1.7mm x 1.7mm (1.8mm with dicing lanes)
-so the cost would be $0.35/chip.
-Compared to 68 pins, those 24 extra I/O pins cost a lot if you're pad-limited:
-$0.57 at a penny a pin for packaging.
-QFN packages are economical if you can use them. The biggest QFNs are around 80 pins.
-
-For an ASIC with more than 60 pins, there is room for more memory at 180nm.
-For the `chad` simulator, I propose defaulting to these memory sizes:
-
-- 8K x 16 code memory
-- 4K x 24 data memory
+- The masks are affordable: No need for multi-layer reticles.
+- It's supported by 12" fabs, which is not the case with 180nm.
+- 180nm is cheaper, but the capacity crunch is hitting 8" hard. 
+- Due to the above, 130nm is best for new designs.
+- 130nm handles analog and mixed signal well too. 
 
 It's easy to forget the early days of computing, when RAM was separate from the CPU.
 On-chip RAM is taken for granted these days.
