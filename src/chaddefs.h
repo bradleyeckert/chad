@@ -83,6 +83,7 @@ struct Keyword {
     uint8_t srcFile;                    // source file ID
     uint16_t srcLine;                   // source line number
     uint32_t color;                     // HTML color
+    uint16_t applet;                    // applet ID
 };
 
 int chadSpinFunction(void);             // external function waiting for keyboard input

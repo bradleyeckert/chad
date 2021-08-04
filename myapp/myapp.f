@@ -30,6 +30,20 @@ include ../forth/interpret.f
 \ include ../forth/bignum.f
 \ include ../forth/ctea.f
 
+\ Test some locals
+ begin-locals
+ 0 cells local fooTest
+ 1 cells local barTest
+ : first   ." the first local is " fooTest ? cr ;
+ : second  ." the second local is " barTest ? cr ;
+ : testlocals ( bar foo -- )
+     2 0 /locals
+     first second
+     locals/
+ ;
+ end-locals
+
+
 \ Error handling
 
 [defined] quit [if]

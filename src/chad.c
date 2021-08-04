@@ -50,9 +50,9 @@ SI error;                               // simulator and interpreter error code
 #define dp      (atib + 1)              // data space pointer
 #define cp      (dp   + 1)              // code space pointer
 #define base    (cp   + 1)              // use cells not bytes for compatibility
-#define wids    (base + 1)              // table of target wids
+#define wids    (base + 1)              // table of target wids[8]
 #define orders  (wids + 9)              // # of wids in the search order
-#define order   (orders + 1)            // search order stack
+#define order   (orders + 1)            // search order stack[8]
 #define current (order + 9)             // wid of the current definition
 #define state   (current + 1)           // this the shared last variable
 #define here    (state + 1)             // first free cell
@@ -63,7 +63,6 @@ SI error;                               // simulator and interpreter error code
 #define DP      Data[dp]
 #define CP      Data[cp]
 #define BASE    Data[base]
-#define ORDERS  Data[orders]
 #define ORDERS  Data[orders]
 #define ORDER(x) Data[order + (x)]
 #define CURRENT Data[current]
@@ -740,7 +739,8 @@ SI findinWL(char* key, int wid) {       // find in wordlist
 
 SI FindWord(char* key) {                // find in context
     for (cell i = ORDERS; i > 0; i--) {
-        int id = findinWL(key, i);
+        int wid = ORDER(i - 1);
+        int id = findinWL(key, wid);
         if (id >= 0) {
             Header[me].references += 1; // bump reference counter
             foundWidName = &wordlistname[i][0];
@@ -748,6 +748,15 @@ SI FindWord(char* key) {                // find in context
         }
     }
     return -1;
+}
+
+SI Ctick(char* name) {
+    if (FindWord(name) < 0) {
+        error = UNRECOGNIZED;
+         printf("<%s> ", name);
+        return 0;
+    }
+    return Header[me].target;           // W field of found word
 }
 
 /* Wordlists are on the host. A copy of header space is made by MakeHeaders for
@@ -801,7 +810,7 @@ SV SetOrder(void) {
     }
 }
 
-SI NotKeyword (char *key) {             // do a command, return 0 if found
+SI EvalToken (char *key) {              // do a command, return 0 if found
     int i = FindWord(key);
     if (i < 0)
         return -1;                      // not found
@@ -830,6 +839,18 @@ SV Def_Exec   (void) {
     Simulate(my());
 }
 
+// Execute or compile a number and its API handler
+
+SV ApiWordExec(char* name, cell value) {
+    Dpush(value);
+    Simulate(Ctick(name));
+}
+
+SV ApiWordComp(char* name, cell value) {
+    Literal(value);
+    CompCall(Ctick(name));
+}
+
 SI AddHead (char* name, char* anchor) { // add a header to the list
     int r = 1;
     hp++;
@@ -846,6 +867,8 @@ SI AddHead (char* name, char* anchor) { // add a header to the list
         Header[hp].srcLine = File.LineNumber;
         Header[hp].link = wordlist[CURRENT];
         Header[hp].references = 0;
+        Header[hp].w2 = 0;
+        Header[hp].applet = 0;
         wordlist[CURRENT] = hp;
     } else {
         printf("Please increase MaxKeywords and rebuild.\n");
@@ -1196,6 +1219,18 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
     error = SaveFlashMem(tok, (uint32_t)d, format);
 }
 
+// The isAPI flag is set when applet code is being compiled.
+// When an applet word is compiled, CP is somewhere in cache space.
+// Before the call, a synchronization token is compiled to force the
+// cache to match the expected code.
+// (API) ( n -- ) ensures that applet page n is in cache.
+// The allowed range of n is 1 to 2047. A page size of 512 bytes
+// (256 instructions) covers the lower 1MB of SPI flash.
+
+SI isAPI;
+SV DefA_Exec(void) { ApiWordExec("(API)", my()); }
+SV DefA_Comp(void) { ApiWordComp("(API)", my()); }
+
 // Start a new definition at the code boundary specified by CodeAlignment.
 // Use CodeAlignment > 1 for Code memory (ROM) that's slow.
 // For example, a ROM with a 64-bit prefetch buffer would have
@@ -1206,6 +1241,10 @@ SV Colon(void) {
     if (AddHead(tok, "")) {             // start a definition
         CP = (CP + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
         LogColor(COLOR_DEF, 0, tok);
+        if (isAPI) {
+            Header[hp].applet = isAPI;
+            SetFns(isAPI, DefA_Exec, DefA_Comp);
+        }
         SetFns(CP, Def_Exec, Def_Comp);
         Header[hp].target = CP;
         Header[hp].color = COLOR_WORD;
@@ -1326,15 +1365,6 @@ SV Words(void) {
     printf("\n");
 }
 
-SI Ctick(char* name) {
-    if (FindWord(name) < 0) {
-        error = UNRECOGNIZED;
-//      printf("<%s> ", name);
-        return 0;
-    }
-    return Header[me].target;           // W field of found word
-}
-
 SI tick (void) {                        // get the w field of the word
     parseword(' ');
     int xt = Ctick(tok);
@@ -1430,6 +1460,26 @@ SV Postpone(void) {
         Literal(xte);
         CompCall(Ctick("compile,"));
     }
+}
+
+SI localWID;                            // compilation wordlist for locals
+
+SV BeginLocals(void) {
+    localWID = AddWordlist("locals");
+    OrderPush(localWID);
+}
+
+SV EndLocals(void) { OrderPop();  wordlists--; }
+SV LocalExec(void) { ApiWordExec("(local)", my()); }
+SV LocalComp(void) { ApiWordComp("(local)", my()); }
+
+SV Local(void) {
+    int temp = CURRENT;  CURRENT = localWID;
+    parseword(' ');
+    if (AddHead(tok, "1.1430 -- a")) {
+        SetFns(Dpop() + BYTE_ADDR(2), LocalExec, LocalComp);
+    }
+    CURRENT = temp;
 }
 
 SV SkipToEOL(void) {                    // and look for x.xxxx format number
@@ -1871,12 +1921,41 @@ SV MakeHeaders(void) {
                 if (Header[p].smudge == 0) flags &= ~0x80;
                 if (Header[p].notail)      flags &= ~0x01;
                 flashC8(flags);
-                flashC8(0);             // applet ID
+                flashC8(Header[p].applet);
             }
             p = Header[p].link;
         }
         Data[wids + i - 1] = link;
     }
+}
+
+// Applets
+// begin-applet ( page -- ) starts a new applet.
+// end-applet ( -- ) ends the applet and restores the old CP and DP.
+
+/*
+To do:
+MakeBootList should use MakeAPIlist with 0 0 for the start addresses
+MakeAPIlist should have offsets for the start addresses of code and data
+EndApplet should write cache spaces to flash page isAPI
+Add begin and end applet to the lexicon
+Add locals, applets, and cache size stuff to the wiki pages
+*/
+
+SI appletCP, appletDP, appletFP;
+
+SV BeginApplet(void) {
+    appletCP = CP; CP = CodeSize - CodeCache;
+    appletDP = DP; DP = BYTE_ADDR(DataSize - DataCache);
+    isAPI = Dpop();
+}
+
+SV EndApplet(void) {
+    uint32_t fp = flashPtr;
+    CP = appletCP;
+    DP = appletDP;
+    flashPtr = fp;
+    isAPI = 0;
 }
 
 // Dump internal state in text format for file comparison tools like WinMerge.
@@ -1962,9 +2041,11 @@ SV LoadKeywords(void) {
     CURRENT = root_wid;
     AddEquate("root",         "1.0000 -- wid",        root_wid);
     AddEquate("forth-wordlist", "1.0010 -- wid",      forth_wid);
-    AddKeyword("save-dump", "1.0020 <filename> -- ", SaveChadState, noCompile);
-    AddEquate("cm-size",      "1.0030 -- n",          CodeSize);
-    AddEquate("dm-size",      "1.0040 -- n",          BYTE_ADDR(DataSize));
+    AddKeyword("save-dump",  "1.0020 <filename> -- ", SaveChadState, noCompile);
+    AddEquate("cm-size",      "1.0030 -- n",          CodeSize - CodeCache);
+    AddEquate("cm-cache",     "1.0030 -- n",          CodeCache);
+    AddEquate("dm-size",      "1.0040 -- n",          BYTE_ADDR(DataSize - DataCache));
+    AddEquate("dm-cache",     "1.0040 -- n",          BYTE_ADDR(DataCache));
     AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
     AddEquate("cell",         "1.0060 -- n",          CELLS);
     AddEquate("|tib|",        "1.0065 -- n",          MaxLineLength);
@@ -2023,6 +2104,7 @@ SV LoadKeywords(void) {
     AddKeyword("previous",    "1.0500 --",            Previous,      noCompile);
     AddKeyword("also",        "1.0510 --",            Also,          noCompile);
     AddKeyword("order",       "1.0520 --",            Order,         noCompile);
+    AddKeyword("Order",       "1.0520 --",            Order,         noCompile);
     AddKeyword("+order",      "1.0530 wid --",        PlusOrder,     noCompile);
     AddKeyword("lexicon",     "1.0540 <name> --",     Lexicon,       noCompile);
     AddKeyword("include",     "1.1000 <filename> --", Include,       noCompile);
@@ -2078,6 +2160,9 @@ SV LoadKeywords(void) {
     AddKeyword("irq!",        "1.1380 x --",          irqStore,      noCompile);
     AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
     AddKeyword("cotrig",      "1.1400 sel --",        CoprocInst,    noCompile);
+    AddKeyword("begin-locals","1.1410 --",            BeginLocals,   noCompile);
+    AddKeyword("end-locals",  "1.1420 --",            EndLocals,     noCompile);
+    AddKeyword("local",       "1.1430 -- a",          Local,         noCompile);
     // Primitives can compile and execute
     // They are basically 16-bit fixed codes
     AddALUinst("nop",     "1.2000 --",   0);
@@ -2246,7 +2331,7 @@ int chad(char * line, int maxlength) {
                 if (verbose & 2) {
                     printf("  %s", tok);
                 }
-                if (NotKeyword(tok)) {  // try to convert to number
+                if (EvalToken(tok)) {   // try to convert to number
                     LogColor(COLOR_NUM, 0, tok);
                     int i = 0;   int radix = BASE;   char c = 0;
                     if (radix == 0)

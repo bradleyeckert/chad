@@ -34,7 +34,7 @@ For reference, in 130nm memory density is about 400 Kb/mm<sup>2</sup>
 so designing for the 130nm node would give one `chad` core a die area of 0.4 mm<sup>2</sup>.
 The 130nm node is attractive for several reasons:
 
-- The masks are affordable: No need for multi-layer reticles.
+- The masks are more affordable: No need for multi-layer reticles.
 - It's supported by 12" fabs, which is not the case with 180nm.
 - 180nm is cheaper, but the capacity crunch is hitting 8" hard. 
 - Due to the above, 130nm is best for new designs.
@@ -47,6 +47,25 @@ Memories are usually supplied as GDSII and matching simulation code targeted to 
 These size estimates should be taken with a grain of salt since RAM architectures vary wildly
 depending on speed and power requirements and transistors per bit (there are 4T and 1T types).
 For example, MoSys 1T SRAM is half the area of 6T SRAM. 4T is about 30% smaller than 6T.
+
+## Lockstep operation
+
+Evolving standards such as ISO 26262 (ASIL D functional safety) for automotive applications
+and other standards such as those for household appliances and medical devices are moving
+toward enhanced fault detection. One of these methods is dual-core lockstep,
+which could be applied to `chad` without significant software changes. This doubles the die area.
+The cores should be able to run independently or in lockstep mode depending on safety requirements.
+Dual-core lockstep is all the rage among automotive MCU manufacturers these days.
+
+A mismatch in state is detected within nanoseconds, but then what? I would suggest:
+
+- Trigger an interrupt to request a graceful shutdown.
+- The ISR is expected to trigger a hard reset.
+- Hardware synchronizes the resets or does a reset-all if the reset triggers are not received.
+
+The application should be structured so as to return to it's last mode of operation after reset.
+It should take a few milliseconds to boot and run the application code, which could make the
+system restoration transparent as long as no user input is required.
 
 ## Memory DFT
 

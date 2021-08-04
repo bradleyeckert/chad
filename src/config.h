@@ -9,7 +9,9 @@
 #define CELLBITS        24      /* Width of a cell in bits, 16 to 32        */
 // Sizes of memories in cells, should be an exact power of 2
 #define CodeSize      4096      /* Code memory 16-bit words                 */
+#define CodeCache      512      /* Size of cache region                     */
 #define DataSize      2048      /* Data memory cells                        */
+#define DataCache      256      /* Size of cache region                     */
 #define StackAwidth      5      /* log2(Stack cells)                        */
 #define CodeAlignment    1      /* Alignment for new definitions            */
 

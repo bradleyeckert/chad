@@ -146,18 +146,25 @@ Data memory is an exact power of 2 in size.
 The number of cells is set in `config.h`.
 The corresponding number of bytes is the constant `dm-size`.
 
-| Field             | Name  | Size     | Address    |
-| ----------------- | ----- | --------:| ----------:|
-| Text input buffer | tib   | 80 bytes | Top of RAM |
-| Frame stack       | fpad  | 64 cells |            |
-| ...               | ...   |  ...     | ...        |
-| Bytes in `tib`    | tibs  |  1 cells | 4 cells    |
-| Index into `tib`  | >in   |  1 cells | 3 cells    |
-| Compile state     | state |  1 cells | 2 cells    |
-| Number radix      | base  |  1 cells | 1 cells    |
-| Data pointer      | dp    |  1 cells | 0 cells    |
+| Field                     | Name   | Size      | Cell Address         |
+| ------------------------- | ------ | ---------:| --------------------:|
+| Text input buffer         | tib    | 80 bytes  | Top of RAM           |
+| Frame stack               | frp0   | 128 cells | grows down from frp0 |
+| Numeric conversion region |        |           |                      |
+| ...                       | ...    |  ...      | ...                  |
+| Compile state             | state  |  1 cell   | 26                   |
+| WID of current definition | current|  1 cell   | 25                   |
+| Search order              | order  |  8 cells  | 17                   |
+| Depth of search order     | orders |  1 cell   | 16                   |
+| Wordlist table            | wids   |  8 cells  |  6                   |
+| Number radix              | base   |  1 cell   |  5                   |
+| Code pointer              | cp     |  1 cell   |  4                   |
+| Data pointer              | dp     |  1 cell   |  3                   |
+| Address of `tib`          | 'tib   |  1 cell   |  2                   |
+| Bytes in `tib`            | tibs   |  1 cell   |  1                   |
+| Index into `tib`          | >in    |  1 cell   |  0                   |
 
-The lowest 5 cells of memory are fixed because they are shared with the
+The lowest 26 cells of memory are fixed because they are shared with the
 host interpreter.
 
 The frame stack grows upward.
@@ -213,6 +220,62 @@ You can't `see` a compiled word unless it has been copied to flash memory
 for later loading into code RAM.
 The `forg` field points to the flash version.
 If `len` is 0, `forg` may be omitted.
+
+## Frame stack
+
+The frame stack is a fundamental feature of the system. It allows library code
+to avoid overflowing the stacks, which are limited by hardware.
+It is also used for other things, so it's roomy (128 cells or more).
+For example, ROLL can use the frame stack primitives.
+
+### Locals (to be implemented)
+
+An important use of the frame stack is local variables.
+Locals as defined by the ANS Forth standard are not really applicable to `chad`.
+Those kinds of locals are useful for Windows/Unix API calls, not embedded programming.
+Chuck Moore calls locals a crutch. Experienced Forth programmers who have implemented
+locals in their embedded Forths end up not using them.
+ANS Forth locals are nice, but their scope is limited to the current definition.
+They are practically syntactic sugar.
+
+How about a scope that encompasses several definitions?
+The scheme must be portable to ANS Forth.
+The proposed lexicon is:
+
+- `begin-locals` begins a locals scope and adds it to the search order
+- `end-locals` ends a locals scope and removes it from the search order
+- `local <name>` defines a word whose run-time action pushes an address onto the data stack
+- `n m frame` moves `n` cells onto the frame stack and reserves `m` cells of extra space
+- `[local]` returns the address of the extra space (if any)
+
+```
+begin-locals
+local foo
+local bar
+
+: first foo ? ;
+: second bar ? ;
+: third ( bar foo -- ) 2 0 frame foo bar unframe ;
+end-locals 
+```
+
+`foo` compiles as a literal (index into the frame stack) and a call to `(local)`
+which could be defined as `: (local) invert cells frp @ + ;`.
+A 3-cell frame could look like:
+
+```
+33 22 11 3
+  fp ------^
+```
+
+The order of locals is backwards, like ANS Forth, due to the way stacks work.
+Any extra allocated locals space is in low memory.
+The last cell on the frame stack is the size of the frame in cells.
+It is used by `unframe` to discard the frame.
+
+For testing, the names of the locals will be gone from the search order.
+You can still get the address with things like `1 (local)` for `foo` etc.
+The size of the current stack frame is `0 (local) @`.
 
 ## Applets (to be implemented)
 
