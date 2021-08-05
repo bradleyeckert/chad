@@ -31,17 +31,31 @@ include ../forth/interpret.f
 \ include ../forth/ctea.f
 
 \ Test some locals
- begin-locals
- 0 cells local fooTest
- 1 cells local barTest
- : first   ." the first local is " fooTest ? cr ;
- : second  ." the second local is " barTest ? cr ;
- : testlocals ( bar foo -- )
-     2 0 /locals
-     first second
-     locals/
- ;
- end-locals
+module \ private scope starts here
+0 cells local fooTest
+1 cells local barTest
+: first   ." the first local is " fooTest ? cr ;
+: second  ." the second local is " barTest ? cr ;
+exportable \ and ends here, but private section is findable
+: testlocals ( bar foo -- )
+    2 0 /locals
+    first second
+    locals/
+;
+end-module \ end the scope of the private section
+
+\ Place some applets
+$80 applet
+: 5*  dup 2* 2* + ;
+: sqr  dup * ;
+: fn5  5* sqr ;
+end-applet
+
+paged applet
+: 9*  dup 2* 2* 2* + ;
+: sqr  dup * ;
+: fn9  9* sqr ;
+end-applet
 
 
 \ Error handling

@@ -228,35 +228,40 @@ to avoid overflowing the stacks, which are limited by hardware.
 It is also used for other things, so it's roomy (128 cells or more).
 For example, ROLL can use the frame stack primitives.
 
-### Locals (to be implemented)
+### Locals
 
 An important use of the frame stack is local variables.
 Locals as defined by the ANS Forth standard are not really applicable to `chad`.
 Those kinds of locals are useful for Windows/Unix API calls, not embedded programming.
 Chuck Moore calls locals a crutch. Experienced Forth programmers who have implemented
-locals in their embedded Forths end up not using them.
+locals in their embedded Forths often end up not using them.
 ANS Forth locals are nice, but their scope is limited to the current definition.
 They are practically syntactic sugar.
 
 How about a scope that encompasses several definitions?
 The scheme must be portable to ANS Forth.
+This one is simple and encapsulates private words.
 The proposed lexicon is:
 
-- `begin-locals` begins a locals scope and adds it to the search order
-- `end-locals` ends a locals scope and removes it from the search order
+- `module` begins a locals scope and adds it to the search order
+- `exportable` puts definitions in the wordlist that was being used before `module`
+- `end-module` ends a locals scope and removes it from the search order
 - `local <name>` defines a word whose run-time action pushes an address onto the data stack
-- `n m frame` moves `n` cells onto the frame stack and reserves `m` cells of extra space
+- `n m /locals` moves `n` cells onto the frame stack and reserves `m` cells of extra space
 - `[local]` returns the address of the extra space (if any)
 
+Example:
+
 ```
-begin-locals
+module
 local foo
 local bar
-
-: first foo ? ;
+: first foo ? ;  / private words
 : second bar ? ;
-: third ( bar foo -- ) 2 0 frame foo bar unframe ;
-end-locals 
+exportable
+: test1 ( bar foo -- ) 2 0 /locals foo bar locals/ ;
+: test2 ( bar foo -- ) 2 0 /locals bar foo locals/ ;
+end-module 
 ```
 
 `foo` compiles as a literal (index into the frame stack) and a call to `(local)`
@@ -271,63 +276,49 @@ A 3-cell frame could look like:
 The order of locals is backwards, like ANS Forth, due to the way stacks work.
 Any extra allocated locals space is in low memory.
 The last cell on the frame stack is the size of the frame in cells.
-It is used by `unframe` to discard the frame.
+It is used by `locals/` to discard the frame.
 
 For testing, the names of the locals will be gone from the search order.
 You can still get the address with things like `1 (local)` for `foo` etc.
 The size of the current stack frame is `0 (local) @`.
 
-## Applets (to be implemented)
+## Applets
 
 The usual way to handle large programs is to provide a large memory from which
 to execute. Although execution from SPI flash is a possibility, it breaks the
 encryption scheme. Code would have to be plaintext.
 So, SPIF (the flash controller) doesn't support that.
 
-Instead, the application reserves sections of code and data RAM for applets.
+Instead, the application reserves a section of code RAM for applets.
 Conceptually, an applet is a chunk of code in manually managed cache.
-When applet functionality is needed, its code and data are loaded from flash
+When applet functionality is needed, its code is loaded from flash
 in a manner very similar to the boot load. SPIF does the transfer in hardware.
 Software can either spin until the load is finished or do something useful.
 After loading, the applet's API can be used to do whatever is needed.
 
-A global variable holds the previous and current applet IDs,
-which can be the applet's flash memory 4K sector number. 
-That as well as an API call ID can be packed into a literal,
-which is pushed onto the stack before calling
-`aplfn`. `aplfn` checks if the applet is in code memory.
-If a different applet is there, it saves the new applet's ID and loads it from flash.
-This conceptually similar to a "cache miss".
+This scheme works well for applet code. Applet data is another matter because
+it would need a write-back mechanism to work like a proper cache.
+The alternative is to keep long-lived data in normal variables and allow short-lived
+data to be cached without write-back.
+Local variables could be used for temporary state.
 
-While a normal Forth would put immediate data right after the call and manipulate the
-return stack to get it, code space is unreadable for security reasons.
-So, the data is just passed on the stack as a literal.
-Applets will be aligned on 4K boundaries to match the flash sector size.
-An 11-bit literal can pack a 6-bit sector number and a 5-bit call ID.
-That allows for a 256 KB of applet storage and 32 different API calls per applet.
-`aplfn` jumps to the location in applet code indexed by call ID.
-The code at that location is a jump instruction.
+The variable `apipage` holds the current applet IDs, which is its flash page number.
+A page in flash is 256 bytes.
+Calls to words in an applet are prepended by a page number literal and a call to (API)
+which 32 bits of extra overhead, but it guarantees that the code cache contains the
+correct code.
 
-If `aplfn` handles a cache miss (before jumping to the code), after that code returns
-control to `aplfn` the previous applet is restored so that the code after it is safe.
-So, applets can call other applets and still use normal jumps and calls internally.
-The data space of applets is a different story.
-Global variables used by applets can be trashed unless saved.
-The easiest solution to the problem is to not put long-term data in applets.
-Use handles for that.
+When an applet is defined, CP and DP are saved (so they aren't affected) and set to
+the static code and data cache areas in the RAMs.
+These are placed at the tops of the code and data RAMs respectively.
+`end-applet` saves the applet's code and data to flash at the specified page.
 
-An example of an applet is a file system.
-It may use 2KB of code space, which would load in 150 usec when decrypting
-using a 100 MHz clock.
-Compare to a sector read of a SD card in SPI mode: 25 MBPS x 4096 bits = 164 usec.
-The file system could be distributed among several applets to optimize the load time.
+- `applet` *( page -- )* starts a new applet.
+- `end-applet` *( -- )* ends the applet and restores the old CP and DP.
+- `paged` *( -- page )* returns the next applet page.
 
-A historical analog can be seen in the Europay Smart Card payment system.
-It operated over POTS phone lines and used MCUs from the 2000 time frame
-to implement a Forth token interpreter.
-Within that severely constrained environment, load-on-demand applets worked very well.
-Chad's load rate and execution speed are a couple of orders of magnitude faster
-than what Europay had to work with.
+For the first applet, manually choose a free page in flash.
+For subsequent applets, `paged` will return the next free page.
 
 ## Securing the terminal (to be implemented)
 

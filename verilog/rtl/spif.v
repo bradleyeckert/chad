@@ -70,7 +70,9 @@ module spif
 // Interrupt requests
   output reg                  cyclev,   // cycle count overflow strobe
   output wire                 urxirq,   // UART full strobe
-  output wire                 utxirq    // UART ready strobe
+  output wire                 utxirq,   // UART ready strobe
+// Other status
+  output reg                  badboot   // Boot code has bad signature
 );
 
 // Wishbone bus Alice (connects to Bob)
@@ -391,7 +393,8 @@ module spif
   wire b_txok = uo_ready & ~uo_wr;      // okay to send to UART
   wire f_ok = f_ready & ~f_wr & g_ready;
   reg init;                             // initialize memory at POR
-  reg [7:0] sig_ex;                    // signature byte to check
+  reg [7:0] sig_ex;                     // signature byte to check
+  reg cold;                             // cold boot
 
 // Strobes to trigger writes
 
@@ -410,7 +413,7 @@ module spif
       b_state <= 4'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    uo_wr <= 1'b0;     g_reset_n <= 1'b0;
       rd_format <= 3'b010;              // default is single-rate SPI
-      rd_addr <= 0;
+      rd_addr <= 0;       cold <= 1'b1;      badboot <= 1'b0;
       i_state <= ISP_PING;              // spit out a char on POR
       outword <= 91;                    // power-up output character
       init <= RAM_INIT;
@@ -467,7 +470,7 @@ module spif
                       end
                       if (ISPbyte[2]) begin
                         b_state <= 4'b0001; // reboot from flash
-                        rd_addr <= 0;
+                        rd_addr <= {i_count, 8'd0};
                         rd_format <= 3'b010;
                       end
                       g_reset_n <= ~ISPbyte[3];
@@ -671,8 +674,11 @@ module spif
       if (testsig) begin                // test the boot signature bytes
         if (fr_data[7:0] != sig_ex)
           sig_ok <= 1'b0;
-        if (sig_last)
-          p_reset <= ~sig_ok;
+        if (sig_last) begin
+          badboot <= ~sig_ok & cold;
+          p_reset <= ~sig_ok & cold;
+          cold <= 1'b0;
+        end
       end
     end
 
@@ -694,7 +700,7 @@ module spif
     4'hA:    spif_dout = fr_data[31:WIDTH]; // flash read word
 `endif
     4'hB:    spif_dout = fr_data[WIDTH-1:0];
-    4'hC:    spif_dout = ISPenable;     // other status bits
+    4'hC:    spif_dout = {sig_ok, ISPenable}; // other status bits
     4'hE:    spif_dout = PRODUCT_ID;    // basic versioning boilerplate
     4'hF:    spif_dout = {DATA_SIZE[3:0], CODE_SIZE[3:0], BASEBLOCK[7:0]};
     default: spif_dout = outword;

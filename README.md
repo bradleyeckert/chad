@@ -152,6 +152,34 @@ The interrupt system uses a style that's conducive to small stacks and Forth.
 It trades a little extra interrupt latency (which you can control) for simpler
 and less error-prone interrupt handling that's similar in concept to Forth's PAUSE.
 
+## Consequences of the architecture
+
+That arise from:
+
+- Stacks in hardware that have limited depths
+- Limited on-chip RAM
+- Unlimited off-chip Flash memory
+
+Means that it deviates from the ANS Forth model when necessary.
+But it's close enough to make ANS Forth usable as a testbench.
+Some of the RAM is used as a frame stack, which is used to:
+
+- Protect the hardware stacks from overflow
+- Provide local variables
+
+The "unlimited flash" means SPI flash is very cheap, so data is kept there
+whenever possible. That includes:
+
+- Headers
+- Text
+- Boot code
+- Paged application code (applets)
+
+Applets remove restrictions on application size, at least where code is concerned.
+Large apps may reside in flash yet still be supported by a small (and fast) code RAM
+and a CPU with a limited (8K) address range.
+Human-speed Forth tools are good candidates for applets so as to free up code RAM.
+
 ## Status
 
 The "myapp" demo boots and runs in both `chad` and a Verilog simulator.
@@ -190,7 +218,3 @@ A cooperative multitasker can likewise use `frame.f` words to move hardware
 stacks to and from task buffers. This makes a context switch more unwieldy, but still
 in the microsecond range.
 
-Put a larger data space in the hardware. The code space is 4K x 16.
-Data space should be 2K or 4K words.
-
-Support applets. See `forth.md`.

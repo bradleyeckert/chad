@@ -145,13 +145,13 @@ static void FlashInterpret(void) {      // see spif.v, line 288
     }
 }
 
-void FlashMemBoot(void) {
+void FlashMemBoot(int startaddr) {
     FlashMemSPIformat(0);
     FlashMemSPIformat(2);
     FlashSPI(0x0B);
-    FlashSPI(FlashBaseBlock()); // 3-byte address
-    FlashSPI(0);
-    FlashSPI(0);
+    FlashSPI((startaddr >> 16) + FlashBaseBlock()); // 3-byte address
+    FlashSPI(startaddr >> 8);
+    FlashSPI(startaddr);
     FlashSPI(0);                // dummy byte
     FlashInterpret();
 }
@@ -175,7 +175,7 @@ static int IOspiResult(void) {
 
 static void JamISP(uint8_t c) {
     static int state = 0;
-    static int n = 0;
+    static int n = 0; // 12-bit parameter
     int sel = c >> 6;
 #ifdef VERBOSE
     printf("j[%d,%02X] ", state, c);
@@ -184,12 +184,12 @@ static void JamISP(uint8_t c) {
     case 0: // command
         switch (sel) {
         case 0: // 00nnnnnn
-            n = (n << 6) + (c & 0x3F);
+            n = ((n << 6) + (c & 0x3F)) & 0xFFF;
             break;
         case 1: // 01
             // (c & 1) ignore reset
             if (c & 2) { printf("ISP: no ping\n"); }
-            if (c & 4) { FlashMemBoot(); }
+            if (c & 4) { FlashMemBoot(n << 8); }
             if (c & 8) {
 #ifdef VERBOSE
                 printf("Loading Key %X%08X\n", (uint32_t)(gkey >> 32), (uint32_t)gkey);

@@ -753,7 +753,7 @@ SI FindWord(char* key) {                // find in context
 SI Ctick(char* name) {
     if (FindWord(name) < 0) {
         error = UNRECOGNIZED;
-         printf("<%s> ", name);
+        // printf("<%s> ", name);
         return 0;
     }
     return Header[me].target;           // W field of found word
@@ -842,13 +842,17 @@ SV Def_Exec   (void) {
 // Execute or compile a number and its API handler
 
 SV ApiWordExec(char* name, cell value) {
+    int x = me;
     Dpush(value);
     Simulate(Ctick(name));
+    me = x;
 }
 
 SV ApiWordComp(char* name, cell value) {
+    int x = me;
     Literal(value);
     CompCall(Ctick(name));
+    me = x;
 }
 
 SI AddHead (char* name, char* anchor) { // add a header to the list
@@ -1224,12 +1228,13 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
 // Before the call, a synchronization token is compiled to force the
 // cache to match the expected code.
 // (API) ( n -- ) ensures that applet page n is in cache.
-// The allowed range of n is 1 to 2047. A page size of 512 bytes
-// (256 instructions) covers the lower 1MB of SPI flash.
+// The allowed range of n is 1 to 2047. A page size of 256 bytes
+// (256 instructions) covers the lower 512 KB of SPI flash.
 
 SI isAPI;
-SV DefA_Exec(void) { ApiWordExec("(API)", my()); }
-SV DefA_Comp(void) { ApiWordComp("(API)", my()); }
+SI AppletID(void)  { return Header[me].applet; }
+SV DefA_Exec(void) { ApiWordExec("(API)", AppletID()); Def_Exec(); }
+SV DefA_Comp(void) { ApiWordComp("(API)", AppletID()); Def_Comp(); }
 
 // Start a new definition at the code boundary specified by CodeAlignment.
 // Use CodeAlignment > 1 for Code memory (ROM) that's slow.
@@ -1243,9 +1248,11 @@ SV Colon(void) {
         LogColor(COLOR_DEF, 0, tok);
         if (isAPI) {
             Header[hp].applet = isAPI;
-            SetFns(isAPI, DefA_Exec, DefA_Comp);
+            SetFns(CP, DefA_Exec, DefA_Comp);
         }
-        SetFns(CP, Def_Exec, Def_Comp);
+        else {
+            SetFns(CP, Def_Exec, Def_Comp);
+        }
         Header[hp].target = CP;
         Header[hp].color = COLOR_WORD;
         Header[hp].smudge = 1;
@@ -1466,10 +1473,14 @@ SI localWID;                            // compilation wordlist for locals
 
 SV BeginLocals(void) {
     localWID = AddWordlist("locals");
-    OrderPush(localWID);
+    OrderPush(localWID);  Definitions();
 }
 
-SV EndLocals(void) { OrderPop();  wordlists--; }
+SV Exportable(void) {
+    CURRENT = ORDER(ORDERS - 2);
+}
+
+SV EndLocals(void) { OrderPop();  Definitions();  wordlists--; }
 SV LocalExec(void) { ApiWordExec("(local)", my()); }
 SV LocalComp(void) { ApiWordComp("(local)", my()); }
 
@@ -1735,7 +1746,11 @@ SV AddBootKey(void)     { ChadBootKey = (ChadBootKey << CELLBITS) + Dpop(); }
 SV forg(void)           { flashPtr = Dpop(); }
 SV fhere(void)          { Dpush(flashPtr); }
 SV flashC16(uint16_t w) { flashC8(w >> 8);  flashC8((uint8_t)w); }
-SV flashAN(uint16_t w)  { flashC16(0xC100); flashC16(0xC3); flashC16(w - 1); }
+
+SV flashAN(uint16_t addr, uint16_t len) { 
+    flashC8(0xC1); flashC16(addr);
+    flashC8(0xC3); flashC16(len - 1);
+}
 
 SV flashCC(uint32_t w) {                // append big endian cell with bytes
     if (CELLBITS == 16)                 // 2 bytes
@@ -1829,24 +1844,26 @@ SV CompTextKey(void) {
 }
 
 // Write boot data to flash memory image in `flash.c`
-SV MakeBootList(void) {
+SV MakeAPIlist(uint16_t cp0, uint16_t dp0) {
     GeckoLoad(ChadBootKey);
     signature = 0xFFFFFFFF;
     flashC8(0x80);                      // speed up SCLK
-    flashAN(CP);
+    flashAN(cp0, CP - cp0);
     flashC8(1);                         // 16-bit code write
-    for (uint16_t i = 0; i < CP; i++) {
+    for (uint16_t i = cp0; i < CP; i++) {
         flashC16(Code[i]);
     }
-    uint16_t count = DP;
-    uint8_t bytes = (CELLBITS + 7) >> 3;
-    flashAN(count);
-    flashC8(3 + bytes);                 // 16-bit data write
-    for (uint16_t i = 0; i < count; i++) {
-        cell x = Data[i];
-        uint8_t j = bytes;
-        while (j)
-            flashC8((uint8_t)(x >> (8 * --j)));
+    uint16_t count = DP - dp0;
+    if (count) {
+        uint8_t bytes = (CELLBITS + 7) >> 3;
+        flashAN(CELL_ADDR(dp0), count);
+        flashC8(3 + bytes);             // 16-bit data write
+        for (uint16_t i = 0; i < count; i++) {
+            cell x = Data[i];
+            uint8_t j = bytes;
+            while (j)
+                flashC8((uint8_t)(x >> (8 * --j)));
+        }
     }
     uint16_t sig_hi = signature >> 16;
     uint16_t sig_lo = signature & 0xFFFF;
@@ -1855,17 +1872,21 @@ SV MakeBootList(void) {
     flashC16(sig_lo);
 }
 
+SV MakeBootList(void) { 
+    MakeAPIlist(0, 0);
+}
+
 SV BootNrun(void) {
     Dpush(0);
     LoadFlash();                        // file --> "SPI flash"
-    FlashMemBoot();                     // boot from flash
+    FlashMemBoot(0);                    // boot from flash
     Cold();                             // run CPU
 }
 
 SV Boot(void) {
     Dpush(0);
     LoadFlash();                        // file --> "SPI flash"
-    FlashMemBoot();                     // boot from flash
+    FlashMemBoot(0);                    // boot from flash
     SkipToEOL();
 }
 
@@ -1873,6 +1894,8 @@ SV Boot(void) {
 static char* FnTargetName(void (*fn)()) { // target: ( w -- )
     if (fn == Def_Exec)  return "execute";
     if (fn == Def_Comp)  return "compile,";
+    if (fn == DefA_Exec) return "APIexecute";
+    if (fn == DefA_Comp) return "APIcompile,";
     if (fn == CompMacro) return "compile,"; // ignore macro
     if (fn == Equ_Exec)  return "noop";
     if (fn == Equ_Comp)  return "lit,";
@@ -1929,22 +1952,14 @@ SV MakeHeaders(void) {
     }
 }
 
-// Applets
-// begin-applet ( page -- ) starts a new applet.
-// end-applet ( -- ) ends the applet and restores the old CP and DP.
-
 /*
 To do:
-MakeBootList should use MakeAPIlist with 0 0 for the start addresses
-MakeAPIlist should have offsets for the start addresses of code and data
-EndApplet should write cache spaces to flash page isAPI
-Add begin and end applet to the lexicon
 Add locals, applets, and cache size stuff to the wiki pages
 */
 
-SI appletCP, appletDP, appletFP;
+SI appletCP, appletDP, appletPage;
 
-SV BeginApplet(void) {
+SV BeginApplet(void) {  // ( page -- )
     appletCP = CP; CP = CodeSize - CodeCache;
     appletDP = DP; DP = BYTE_ADDR(DataSize - DataCache);
     isAPI = Dpop();
@@ -1952,10 +1967,17 @@ SV BeginApplet(void) {
 
 SV EndApplet(void) {
     uint32_t fp = flashPtr;
+    flashPtr = isAPI << 8;              // 256-byte pages
+    MakeAPIlist(CodeSize - CodeCache, BYTE_ADDR(DataSize - DataCache));
     CP = appletCP;
     DP = appletDP;
+    appletPage = (flashPtr + 0xFF) >> 8;
     flashPtr = fp;
     isAPI = 0;
+}
+
+SV AppletPage(void) {  // ( -- page )
+    Dpush(appletPage);
 }
 
 // Dump internal state in text format for file comparison tools like WinMerge.
@@ -2072,6 +2094,9 @@ SV LoadKeywords(void) {
     AddKeyword("boot-test",   "1.0139 <filename> --", Boot,          noCompile);
     AddKeyword("make-heads",  "1.0140 --",            MakeHeaders,   noCompile);
     AddKeyword("make-boot",   "1.0145 --",            MakeBootList,  noCompile);
+    AddKeyword("applet",      "1.0146 page --",       BeginApplet,   noCompile);
+    AddKeyword("end-applet",  "1.0147 --",            EndApplet,     noCompile);
+    AddKeyword("paged",       "1.0148 -- page",       AppletPage,     noCompile);
     AddKeyword("equ",         "1.0150 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0160 n1 n2 --",      Assert,        noCompile);
     AddKeyword("hwoptions",   "1.0170 -- n",          HWoptions,     noCompile);
@@ -2160,9 +2185,10 @@ SV LoadKeywords(void) {
     AddKeyword("irq!",        "1.1380 x --",          irqStore,      noCompile);
     AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
     AddKeyword("cotrig",      "1.1400 sel --",        CoprocInst,    noCompile);
-    AddKeyword("begin-locals","1.1410 --",            BeginLocals,   noCompile);
-    AddKeyword("end-locals",  "1.1420 --",            EndLocals,     noCompile);
-    AddKeyword("local",       "1.1430 -- a",          Local,         noCompile);
+    AddKeyword("module",      "1.1410 --",            BeginLocals,   noCompile);
+    AddKeyword("end-module",  "1.1420 --",            EndLocals,     noCompile);
+    AddKeyword("exportable",  "1.1430 --",            Exportable,    noCompile);
+    AddKeyword("local",       "1.1440 -- a",          Local,         noCompile);
     // Primitives can compile and execute
     // They are basically 16-bit fixed codes
     AddALUinst("nop",     "1.2000 --",   0);

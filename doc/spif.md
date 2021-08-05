@@ -18,6 +18,7 @@ So, we encrypt the flash contents and decrypt it on the fly.
 
 ISP of SPI flash over USB is possible using a cheap ($0.30) USB UART chip,
 the CH330N, or any of a number of such parts.
+The UART doubles as the terminal interface for Forth.
 
 ## Parameters (aka generics)
 
@@ -142,7 +143,7 @@ ISP command bytes:
 - s = SPI cycle: write byte again, reading the result.
 - g = Load the cipher with the new key.
 - f = set flash bus rate from N. 0 is fastest.
-- b = Reboot from flash.
+- b = Reboot from flash at page address N.
 - p = Trigger a ping. It will send boilerplate out the UART.
 - r = Reset the processor.
 
@@ -263,6 +264,11 @@ The SCLK frequency starts out at sysclk / 16 to be conservative.
 At some point early on, you should include a command byte to raise the
 frequency to more closely match the capability of the flash chip.
 For example, `80` sets the maximum SCLK.
+
+A 32-bit CRC is expected after the E0h end-bootup command.
+The first bootup (starting at address 0) keeps the MCU in reset if the CRC is bad.
+It also asserts the `badboot` signal so that other hardware can perform a global
+reset to re-try in case a SPI glitch corrupts the boot stream.
 
 ## User output stream
 

@@ -19,7 +19,7 @@ The flash memory may be relocated by non-zero BASEBLOCK so that the
 beginning of physical memory is reserved for a FPGA bitstream.
 */
 
-//#define VERBOSE
+// #define VERBOSE
 
 static uint8_t mem[FlashMemorySize];
 static uint8_t boilerplate[16];

@@ -16,6 +16,9 @@ hex
 : ispcmd  ( c -- )              \ c --
    _isp ispwait                 \ write ISP command
 ;
+: ispnum  ( n -- )
+   3F and _isp                  \ 6-bit number command
+;
 
 \ The gecko key is loaded by writing to a register and then triggering a load.
 \ `fcmd24` is used for writing to flash, which isn't done currently
@@ -36,6 +39,18 @@ hex
 
 : )@f  ( -- )                   \ 2.4030 --
    80 _isp                      \ end read (raise CS#)
+;
+
+\ Arbitrary stream-from-flash starts the boot interpreter at a specified page.
+
+variable apipage
+
+: (API)  ( page -- )
+   dup apipage @ xor if
+      dup apipage !
+      dup 6 rshift ispnum ispnum \ set page number
+      44 ispcmd  exit
+   then  drop
 ;
 
 decimal
@@ -88,6 +103,14 @@ decimal
    2dup 1 0 d+  2swap c@f
 ;
 : 3*   ( n -- 3n ) dup 2* + ;   \ multiply by 3, goes with f@
+
+variable appletID
+: APIexecute  ( xt -- )
+   appletID @ (API) execute
+;
+: APIcompile, ( xt -- )
+   appletID @ lit,  ['] (API) compile,  compile,
+;
 
 \ `emit` may require reading font bitmaps from flash, so `f$type` reads the
 \ string into a RAM buffer because the bitmap read disrupts keystream sync.

@@ -55,21 +55,29 @@ variable frp                            \ frame stack pointer
 \ locals/  ( -- )  discards the frame
 
 \ example:
-\ begin-locals
+\ module
 \ 0 cells local foo
 \ 1 cells local bar
 \ : first foo ? ;
 \ : second bar ? ;
+\ exportable
 \ : third ( bar foo -- ) 2 0 /locals foo bar locals/ ;
-\ end-locals
+\ end-module
+
+\ This strategy works best when there is one publicly used word in the scope.
+\ The other words are left visible
 
 variable localwid
 
-: begin-locals  ( -- )
+: module  ( -- )
     get-order wordlist  dup localwid !  swap 1+  set-order
+    definitions
 ;
-: end-locals  ( -- )
-    get-order  nip 1-  set-order
+: exportable  ( -- )
+    get-order  2 pick set-current  set-order
+;
+: end-module  ( -- )
+    get-order  nip 1-  set-order  definitions
 ;
 : (local) ( offset -- a )
     frp @ swap -
@@ -92,19 +100,20 @@ fpclear
 
 \ example:
 test-ansify [if]
-begin-locals
+module
 0 cells local foo
 1 cells local bar
 cr .( foo is at ) foo .
 cr .( bar is at ) bar .
 : first  cr ." the first local is " foo ? ;
 : second cr ." the second local is " bar ? ;
+exportable
 : test ( bar foo -- )
     2 0 /locals
     first second
     locals/
 ;
-end-locals
+end-module
 1 2 test
 [then]
 
