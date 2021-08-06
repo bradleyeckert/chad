@@ -130,7 +130,9 @@ module chad
   assign io_rd =  !reboot & func_ior;
 
   assign rstkD = (insn[15]) ? {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0} : st0;
-  wire ack = irq & insn[8] & ((insn[15:12] == 4'b1111) | ~insn[15] & ~func_T_R);
+  wire return = insn[8] & ((insn[15:12] == 4'b1111) | ~insn[15] & ~func_T_R);
+  wire ack = irq & return & ~rst0[0];
+  wire exception = return & rst0[0];
   assign iack = ack & ~hold;
 
   always @*
@@ -142,25 +144,25 @@ module chad
     default: {dstkW, dspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({insn[15:12], insn[8], ack}) // adjust return stack pointer
+    casez ({insn[15:12], insn[8], ack | exception})
     6'b0???_?_0: {rstkW, rspI} = {func_T_R, insn[3:2]};
-    6'b0???_?_1: {rstkW, rspI} = {1'b0,     2'b00};
     6'b110?_?_?: {rstkW, rspI} = {1'b1,     2'b01};     // call
     6'b1111_1_0: {rstkW, rspI} = {1'b0,     2'b11};     // lit+ret
-    6'b1111_1_1: {rstkW, rspI} = {1'b0,     2'b00};
     default:     {rstkW, rspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({reboot, insn[15:12], insn[8], ack, |st0})
-    8'b1_????_?_?_?: pcN = 0;
-    8'b0_100?_?_?_?, // jump, call, if
-    8'b0_110?_?_?_?,
-    8'b0_101?_?_?_0: pcN = {2'd0, insn[12:0]};
-    8'b0_1111_1_0_?, // lit+ret
-    8'b0_0???_1_0_?: pcN = rst0[15:1];
-    8'b0_1111_1_1_?,
-    8'b0_0???_1_1_?: pcN = ivec;
-    default:         pcN = pc_plus_1;
+    casez ({reboot, insn[15:12], insn[8], ack, exception, |st0})
+    9'b1_????_?_?_?_?: pcN = 0;
+    9'b0_100?_?_?_?_?, // jump, call, if
+    9'b0_110?_?_?_?_?,
+    9'b0_101?_?_?_?_0: pcN = {2'd0, insn[12:0]};
+    9'b0_1111_1_0_?_?, // lit+ret
+    9'b0_0???_1_0_?_?: pcN = rst0[15:1];
+    9'b0_1111_1_1_0_?,
+    9'b0_0???_1_1_0_?: pcN = ivec;
+    9'b0_1111_1_?_1_?,
+    9'b0_0???_1_?_1_?: pcN = 15'd16;
+    default:           pcN = pc_plus_1;
     endcase
   end
 

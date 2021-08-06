@@ -115,7 +115,7 @@ H</ul>
  Saves a boot format file in hex format, without boilerplate, for HDL simulation.
 =1.0136: save-flash ( n <filename> -- )
  Saves a boot format file. It's a 16-byte boilerplate followed by flash data.
- pid = product id: 
+ pid = product id:
  bytes 0 to 3 are {bootsector, keyID, productID[15:8], productID[7:0]}.
  Bootsector = 0 if SPI flash doesn't hold the FPGA bitstream.
  keyID = 0 if the saved boot data is in plaintext format.
@@ -128,8 +128,18 @@ H</ul>
 =1.0140: make-heads ( -- )
  Create a header list data structure in flash memory at `fhere`.
  `forth-wordlist` must be in the search order.
-=1.0145: make-boot ( -- )
+=1.0141: make-boot ( -- )
  Create a boot data structure in flash memory at `fhere`.
+=1.0146: applet ( page -- )
+ Start a new applet that will load starting at flash address (`page` * 256).
+ Code and data pointers CP and DP point to memory regions used for cache.
+=1.0147: end-applet ( -- )
+ Compile a boot structure for the compiled applet code into flash.
+=1.0148: paged ( -- page )
+ Returns the next free flash page after the most recent `end-applet`.
+=1.0149: paged! ( page -- )
+ Set the start page of applets (initial value of `paged`).
+
 =1.0150: equ ( x <name> -- )
  A synonym of constant that's guaranteed to not use any target resources
  for its definition. It creates a word that pushes x onto the stack.
@@ -472,7 +482,14 @@ H</ul>
 =1.1400: coproc ( sel -- )
  Compile a coprocessor instruction with 11-bit `sel` field.
  Example: `... [ 5 coproc ] ...`.
-
+=1.1410: module ( -- )
+ Begin a private scope and add it to the search order.
+=1.1420: end-module ( -- )
+ End the private scope and remove it from the search order.
+=1.1430: exportable ( -- )
+ Put definitions in the wordlist that was being used before `module`.
+=1.1440: local ( <name> -- )
+ Define a word whose run-time action pushes an address onto the data stack.
 =1.2000: nop ( -- )
  Do nothing.
 #

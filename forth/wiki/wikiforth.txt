@@ -369,6 +369,11 @@ H</ul>
  Remove `u`. Rotate `u+1` items on the top of the stack.
  An ambiguous condition exists if there are less than u+2 items
  on the stack before `roll` is executed.
+=2.2990: /locals ( xn ... x0 n m -- )
+ Moves `n` cells onto the frame stack and reserve `m` cells of extra space
+ whose address is `[local]`.
+=2.2991: locals/ ( -- )
+ Drop the top frame from the frame stack.
 =2.4000: @f( ( df-addr -- )
  Start reading SPI flash using a `0B` "fast read" command at the double address
  `df-addr`. The constant `BASEBLOCK` is added to address[23:16] to allow the
@@ -388,6 +393,8 @@ H</ul>
  The data is expected to be synchronized with the keystream, if used.
 =2.4060: fcount ( df-addr -- df-addr+1 c )
  SPI flash version of `count`. Read the byte and bump the double address.
+=2.4065: fbuf ( df-addr c-addr u -- )
+ Read `u` bytes from 2-cell flash address `df-addr` onto RAM.
 =2.4070: ftype ( df-addr u -- )
  SPI flash version of `type`. Type the string at the double address.
 =2.4080: f$type ( f-addr -- )

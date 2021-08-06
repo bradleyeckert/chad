@@ -202,6 +202,9 @@ Here's what text rendering looks like on a TFT LCD module:
 
 ## To-do
 
+Applets need better cache handling. Use exceptions, which are supported in the
+simulator but not used by applets yet.
+
 The ISP utility should have the terminal code merged in.
 Although it's written in C, it should be translated to Forth and 8th.
 

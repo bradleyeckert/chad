@@ -50,4 +50,4 @@ variable hicycles
    until  2drop
 ;
 
-there swap - . .( instructions used by I/O redirect) cr
+there swap - .(  ) . .( instructions used by I/O redirect) cr

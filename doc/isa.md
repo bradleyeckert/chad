@@ -111,7 +111,24 @@ that aren't stack-friendly.
 You might think a carry-in add or subtract instructions would be nice to have.
 It's easy enough to gate a carry into the adder. The problem with this is that
 the instruction decoding that feeds in the carry adds significant delay,
-which slows down the processor. Oops.
+which slows down the processor.
+
+**Cache control for large apps**
+
+Any `RET` that occurs with the LSB of R (top of the return stack) set causes
+an exception (jump to 010h) instead of a return.
+
+Some of code space is reserved for instruction cache.
+This allows large applications to be paged into RAM as needed.
+The code sections are called applets. A call to a word in an applet is compiled as:
+
+- A literal containing a long address consisting as its code page in external memory
+(such as SPI flash) packed with its offset into cache
+- `call` to `(API)`, which loads the code into RAM and jumps to the word.
+
+`(API)` also sets the LSB of R and pushes the current code page onto the return stack.
+Return performs an exception if the LSB of the top of the return stack is set.
+The exception loads the previous code back into cache before returning to it.
 
 **Loops** adds a decrement to the R -> T path:
 
@@ -140,6 +157,11 @@ that have their `RET` bits set.
 
 Literal instructions have 11 data bits, or 69% of a 16-bit instruction.
 Tables of literals have an overhead of 31% to 50% depending on the data size.
+
+**Long calls/jumps**
+
+Software can access code past the 13-bit address range by putting a `litx`
+before the jump or call. `chad` does not currently use this feature.
 
 **Missing `T|N`**
 
@@ -170,21 +192,6 @@ I programmed my first computer using a pencil and paper for the assembler
 and a DIP switch and a pushbutton to program a UV EPROM.
 I could turn bad code into NOPs by overwriting it with zeros.
 The idea stuck, so 0 is a `nop` although these days it doesn't matter.
-
-### Memory Spaces
-
-The code space contains ROM to function as a library.
-ROM costs nearly nothing (in die area) compared to RAM.
-Proposed memory space is organized as:
-
-- Code ROM: 1024 x 16 (address 0x000 to 0x3FF)
-- Code RAM: 1024 x 16 (address 0x400 to 0x7FF)
-- Data RAM: 1024 x 18 (address 0x000 to 0x3FF)
-- I/O space: address 0x000 to 0xFFF
-
-The CPU boots from the ROM.
-ROM contains the Forth kernel.
-Code executing from ROM loads the application.
 
 ## Coprocessor Conventions
 

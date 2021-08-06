@@ -14,6 +14,7 @@
 #define DataCache      256      /* Size of cache region                     */
 #define StackAwidth      5      /* log2(Stack cells)                        */
 #define CodeAlignment    1      /* Alignment for new definitions            */
+#define ExceptionVector 16      /* Jump address for exceptions              */
 
 #define MoreInstrumentation     /* Simulator has more instrumentation       */
 //#define HASFLOATS             /* Dotted numbers are floating point        */

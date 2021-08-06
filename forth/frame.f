@@ -92,12 +92,12 @@ variable frp1                           \ temporary frame pointer
 
 \ Set up a stack frame with n cells (popped from the data stack) and m
 \ uninitialized cells.
-: /locals  ( ... n m -- )
+: /locals                               \ 2.2990 xn ... x0 n m --
     dup >r cells  frp +!         frp @
     ds>mem  mem> r> + swap >mem  frp !
 ;
 
-: locals/  ( -- )
+: locals/  ( -- )                       \ 2.2991 --
     frp @ mem> negate cells + frp !
 ;
 

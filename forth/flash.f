@@ -104,7 +104,14 @@ decimal
 ;
 : 3*   ( n -- 3n ) dup 2* + ;   \ multiply by 3, goes with f@
 
-variable appletID
+\ It would be better for APIexecute etc. to pack the appletID into xt.
+\ This would require a minimum cell size of 12+12=24 bits to handle
+\ a 4Kx16 code RAM and 12-bit applet page number.
+
+\ This would come into play if there are multiple instances of
+\ interpreters running, but since there isn't, appletID is global.
+
+variable appletID               \ only works from the interpreter
 : APIexecute  ( xt -- )
    appletID @ (API) execute
 ;
@@ -119,7 +126,7 @@ variable appletID
 \ `fbuf` moves a string from flash to RAM.
 \ The keystream is assumed to be in sync.
 
-: fbuf                         \ 2.4060 df-addr c-addr u --
+: fbuf                         \ 2.4065 df-addr c-addr u --
    >r >r  c@f(  r@ c!  r> r>   ( c-addr u ) \ 1st char
    begin  1 /string  dup while
       over @f> swap c!

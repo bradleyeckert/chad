@@ -20,8 +20,8 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 #elif (CELLBITS > 16)
 #define cell     uint32_t
 #define CELLSIZE 5  /* # of bits needed to address bits in a cell */
-#define CELL_ADDR(x) (x >> 1) 
-#define BYTE_ADDR(x) (x << 1)
+#define CELL_ADDR(x) ((x) >> 1) 
+#define BYTE_ADDR(x) ((x) << 1)
 #else
 #define cell     uint16_t
 #define CELLSIZE 4

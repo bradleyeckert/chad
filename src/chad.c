@@ -235,7 +235,8 @@ SI CPUsim(int single) {
         }
 #endif
         _pc = pc + 1;
-        uint8_t ivec = 0;
+        uint8_t interruptVector = 0;
+        uint8_t exception = 0;
         cell _lex = 0;
         cell s = Dstack[SP];
         cell temp;
@@ -260,10 +261,10 @@ SI CPUsim(int single) {
                 if (insn & 0x1000) {                                /*    imm */
                     Dpush((lex << 11) | ((insn & 0xe00) >> 1) | (insn & 0xff));
                     if (insn & 0x100) {                             /*  r->pc */
-                        ivec = Iack();
-                        if (ivec) {
-                            _pc = ivec;
-                        }
+                        interruptVector = Iack();
+                        exception = Rstack[RP & RPMASK] & 1;
+                        if (exception) _pc = ExceptionVector;
+                        else if (interruptVector) _pc = interruptVector;
                         else {
                             _pc = Rstack[RP] >> 1;
                             if (RDEPTH == mark) single = 2;
@@ -288,10 +289,10 @@ SI CPUsim(int single) {
         }
         else { // ALU
             if (insn & 0x100) {                                     /*  r->pc */
-                ivec = Iack();
-                if (ivec) {
-                    _pc = ivec;
-                }
+                interruptVector = Iack();
+                exception = Rstack[RP & RPMASK] & 1;
+                if (exception) _pc = ExceptionVector;
+                else if (interruptVector) _pc = interruptVector;
                 else {
                     _pc = Rstack[RP] >> 1;
                     if (RDEPTH == mark) single = 2;
@@ -344,7 +345,7 @@ SI CPUsim(int single) {
             default:   _t = t;  single = BAD_ALU_OP;
             }
             SP = SPMASK & (SP + sign2b[insn & 3]);                /* dstack+- */
-            if (ivec == 0)
+            if ((interruptVector == 0) && (exception == 0))
                 RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);     /* rstack+- */
             switch ((insn >> 4) & 7) {
             case  1: Dstack[SP] = t;                         break;   /* T->N */
@@ -830,7 +831,13 @@ SV Prim_Comp  (void) { toCode(my()); }
 SV Prim_Exec  (void) { CPUsim(0x10000 + my()); } // single step
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
 SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
-SV Def_Comp   (void) { CompCall(my()); notail = Header[me].notail; }
+SI lastAPI;
+
+SV Def_Comp   (void) {
+    CompCall(my()); notail = Header[me].notail;
+    int api = Header[me].applet;
+    if (api) lastAPI = api;
+}
 
 SV Def_Exec   (void) {
     if (verbose & VERBOSE_TOKEN) {
@@ -1234,7 +1241,14 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
 SI isAPI;
 SI AppletID(void)  { return Header[me].applet; }
 SV DefA_Exec(void) { ApiWordExec("(API)", AppletID()); Def_Exec(); }
-SV DefA_Comp(void) { ApiWordComp("(API)", AppletID()); Def_Comp(); }
+SV DefA_Comp(void) {
+    int id = AppletID();
+    if (lastAPI != id) {                // changed from last reference
+        lastAPI = id;   
+        ApiWordComp("(API)", id);
+    }
+    Def_Comp();
+}
 
 // Start a new definition at the code boundary specified by CodeAlignment.
 // Use CodeAlignment > 1 for Code memory (ROM) that's slow.
@@ -1252,7 +1266,8 @@ SV Colon(void) {
         }
         else {
             SetFns(CP, Def_Exec, Def_Comp);
-        }
+        } 
+        lastAPI = isAPI;                // starts in sync
         Header[hp].target = CP;
         Header[hp].color = COLOR_WORD;
         Header[hp].smudge = 1;
@@ -1940,11 +1955,11 @@ SV MakeHeaders(void) {
                 flashCC(Header[p].w);
                 flashCC(Ctick(exec));   // target versions of host fns
                 flashCC(Ctick(comp));
+                flashCC(Header[p].applet);
                 uint8_t flags = 0xFF;
                 if (Header[p].smudge == 0) flags &= ~0x80;
                 if (Header[p].notail)      flags &= ~0x01;
                 flashC8(flags);
-                flashC8(Header[p].applet);
             }
             p = Header[p].link;
         }
@@ -1976,9 +1991,8 @@ SV EndApplet(void) {
     isAPI = 0;
 }
 
-SV AppletPage(void) {  // ( -- page )
-    Dpush(appletPage);
-}
+SV AppletPage(void)   { Dpush(appletPage);   }
+SV ToAppletPage(void) { appletPage = Dpop() >> 8; }
 
 // Dump internal state in text format for file comparison tools like WinMerge.
 
@@ -2093,10 +2107,11 @@ SV LoadKeywords(void) {
     AddKeyword("boot",        "1.0138 <filename> --", BootNrun,      noCompile);
     AddKeyword("boot-test",   "1.0139 <filename> --", Boot,          noCompile);
     AddKeyword("make-heads",  "1.0140 --",            MakeHeaders,   noCompile);
-    AddKeyword("make-boot",   "1.0145 --",            MakeBootList,  noCompile);
+    AddKeyword("make-boot",   "1.0141 --",            MakeBootList,  noCompile);
     AddKeyword("applet",      "1.0146 page --",       BeginApplet,   noCompile);
     AddKeyword("end-applet",  "1.0147 --",            EndApplet,     noCompile);
-    AddKeyword("paged",       "1.0148 -- page",       AppletPage,     noCompile);
+    AddKeyword("paged",       "1.0148 -- page",       AppletPage,    noCompile);
+    AddKeyword("paged!",      "1.0149 page --",       ToAppletPage,  noCompile);
     AddKeyword("equ",         "1.0150 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0160 n1 n2 --",      Assert,        noCompile);
     AddKeyword("hwoptions",   "1.0170 -- n",          HWoptions,     noCompile);
