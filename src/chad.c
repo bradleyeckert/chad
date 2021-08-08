@@ -1239,15 +1239,22 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
 // (256 instructions) covers the lower 512 KB of SPI flash.
 
 SI isAPI;
-SI AppletID(void)  { return Header[me].applet; }
-SV DefA_Exec(void) { ApiWordExec("(API)", AppletID()); Def_Exec(); }
+SI xxt(void) {
+    int offset = my() - (CodeSize - CodeCache);
+    return (Header[me].applet << 10) + offset;
+}
+SV DefA_Exec(void) {
+    ApiWordExec("spifload", Header[me].applet);
+    Def_Exec();
+}
 SV DefA_Comp(void) {
-    int id = AppletID();
+    int id = Header[me].applet;
     if (lastAPI != id) {                // changed from last reference
         lastAPI = id;   
-        ApiWordComp("(API)", id);
+        ApiWordComp("xexec", xxt());
     }
-    Def_Comp();
+    else 
+        Def_Comp();
 }
 
 // Start a new definition at the code boundary specified by CodeAlignment.
@@ -1974,10 +1981,11 @@ Add locals, applets, and cache size stuff to the wiki pages
 
 SI appletCP, appletDP, appletPage;
 
-SV BeginApplet(void) {  // ( page -- )
+SV BeginApplet(void) {  // ( addr -- )
     appletCP = CP; CP = CodeSize - CodeCache;
     appletDP = DP; DP = BYTE_ADDR(DataSize - DataCache);
-    isAPI = Dpop();
+    isAPI = (Dpop() + 0xFF) >> 8;
+    appletPage = isAPI << 8;
 }
 
 SV EndApplet(void) {
@@ -1986,13 +1994,13 @@ SV EndApplet(void) {
     MakeAPIlist(CodeSize - CodeCache, BYTE_ADDR(DataSize - DataCache));
     CP = appletCP;
     DP = appletDP;
-    appletPage = (flashPtr + 0xFF) >> 8;
+    appletPage = flashPtr;
     flashPtr = fp;
     isAPI = 0;
 }
 
 SV AppletPage(void)   { Dpush(appletPage);   }
-SV ToAppletPage(void) { appletPage = Dpop() >> 8; }
+SV ToAppletPage(void) { appletPage = Dpop(); }
 
 // Dump internal state in text format for file comparison tools like WinMerge.
 
@@ -2110,8 +2118,8 @@ SV LoadKeywords(void) {
     AddKeyword("make-boot",   "1.0141 --",            MakeBootList,  noCompile);
     AddKeyword("applet",      "1.0146 page --",       BeginApplet,   noCompile);
     AddKeyword("end-applet",  "1.0147 --",            EndApplet,     noCompile);
-    AddKeyword("paged",       "1.0148 -- page",       AppletPage,    noCompile);
-    AddKeyword("paged!",      "1.0149 page --",       ToAppletPage,  noCompile);
+    AddKeyword("paged",       "1.0148 -- addr",       AppletPage,    noCompile);
+    AddKeyword("paged!",      "1.0149 addr --",       ToAppletPage,  noCompile);
     AddKeyword("equ",         "1.0150 x <name> --",   Constant,      noCompile);
     AddKeyword("assert",      "1.0160 n1 n2 --",      Assert,        noCompile);
     AddKeyword("hwoptions",   "1.0170 -- n",          HWoptions,     noCompile);

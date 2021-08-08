@@ -58,11 +58,11 @@ module gecko
   wire [7:0] inkey = (recycle) ? key : b[(16 - KEY_LENGTH)*8 : (16 - KEY_LENGTH)*8 - 7];
   reg keyed;                    // key detected
 
-  always @(posedge clk or negedge rst_n)
-    if (!rst_n) begin
+  always @(posedge clk)
+    if (!rst_n) begin           // synchronous reset
       state <= LOAD;  keyed <= 1'b0;
       ready <= 1'b0;  dout <= 8'd0;
-      count <= 5'd15;
+      count <= 5'd15;  // s <= 31'd0;  b <= 90'd0;
     end else if (clken) begin
       case (state)
       LOAD:                     // load the key into s and b

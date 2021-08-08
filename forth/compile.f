@@ -5,6 +5,7 @@ there
 \ {noop execute compile, lit, or doLitop noCompile}
 
 \ Compile to code RAM
+\ This might go away if compile to flash is possible.
 
 : !c     ( n addr -- )
    io'rxbusy io!              \ set address

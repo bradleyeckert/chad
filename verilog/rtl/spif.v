@@ -301,25 +301,23 @@ module spif
 
   reg [KEY_LENGTH*8-1:0] widekey;       // 0 = no cypher
   reg [3:0] key_index;
-  reg key_init;                         // initialize key at POR
+  reg g_init;                           // reset hard key
 
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
       key_index <= KEY_LENGTH - 1;
-      key_init <= 1'b1;
     end else begin
-      if (g_reset_n == 1'b0) begin
+      if (g_init)
+        widekey <= key;
+      else if (g_load)                  // shift in a key digit:
+        widekey <= {widekey[KEY_LENGTH*8 - (WIDTH+1) : 0], outword};
+      else if (key_index)               // shift out a byte
+        widekey <= {8'b0, widekey[KEY_LENGTH*8 - 1 : 8]};
+
+      if (g_reset_n == 1'b0)            // re-key strobe `)gkey`
         key_index <= KEY_LENGTH - 1;    // sync reset
-        if (key_init) begin
-          widekey <= key;
-          key_init <= 1'b0;
-        end
-      end else if (g_load)              // shift in a key digit:
-          widekey <= {widekey[KEY_LENGTH*8 - (WIDTH+1) : 0], outword};
-        else if (key_index) begin       // shift out a byte
-          key_index <= key_index - 1'b1;
-          widekey <= {8'b0, widekey[KEY_LENGTH*8 - 1 : 8]};
-        end
+      else if (key_index)
+        key_index <= key_index - 1'b1;
     end
 
   wire g_ready;                         // g_dout is ready
@@ -369,7 +367,9 @@ module spif
 // reads blank.
 //==============================================================================
 
-  localparam FAST_READ = 8'h0B;
+  localparam READ_CMD = 8'h0B;          // 0B=single, 3B=dual
+  localparam READ_RATE = 3'd2;          // 2=single, 5=dual
+
   reg [15:0] b_count;                   // length of byte run
   reg [15:0] b_dest;                    // address register for boot load destination
   reg [2:0]  rd_format;                 // boot load SPI mode
@@ -401,6 +401,7 @@ module spif
   wire codeAddrS = (mem_addr[3:0] == 4'h1) & io_wr & internal & ~p_hold;
   wire codeDataS = (mem_addr[3:0] == 4'h2) & io_wr & internal & ~p_hold;
 
+
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
@@ -412,8 +413,9 @@ module spif
       b_bcnt <= 2'd0;     codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 4'd1;    f_format <= 3'd0;  g_load <= 1'b0;
       p_reset <= 1'b1;    uo_wr <= 1'b0;     g_reset_n <= 1'b0;
-      rd_format <= 3'b010;              // default is single-rate SPI
+      rd_format <= READ_RATE;
       rd_addr <= 0;       cold <= 1'b1;      badboot <= 1'b0;
+      g_init <= 1'b1;
       i_state <= ISP_PING;              // spit out a char on POR
       outword <= 91;                    // power-up output character
       init <= RAM_INIT;
@@ -428,6 +430,7 @@ module spif
       g_next <= 1'b0;
       g_load <= 1'b0;
       g_reset_n <= 1'b1;
+      g_init <= 1'b0;
       testsig <= 1'b0;
       sig_last <= 1'b0;
       if (init) begin
@@ -440,7 +443,7 @@ module spif
         uo_wr <= 1'b0;
         case (b_state[2:0])
           3'b000:  f_dout <= ISPbyte;
-          3'b001:  f_dout <= FAST_READ;
+          3'b001:  f_dout <= READ_CMD;
           3'b010:  f_dout <= rd_addr[23:16] + BASEBLOCK[7:0];
           3'b011:  f_dout <= rd_addr[15:8];
           3'b100:  f_dout <= rd_addr[7:0];
@@ -471,9 +474,11 @@ module spif
                       if (ISPbyte[2]) begin
                         b_state <= 4'b0001; // reboot from flash
                         rd_addr <= {i_count, 8'd0};
-                        rd_format <= 3'b010;
+                        rd_format <= READ_RATE;
+                        g_reset_n <= 1'b0;
+                        g_init <= 1'b1;
                       end
-                      g_reset_n <= ~ISPbyte[3];
+                      else g_reset_n <= ~ISPbyte[3]; // load key
                       if (ISPbyte[4])   // change flash bus rate
                         f_rate <= i_count[3:0];
                       f_wr <= ISPbyte[5];
@@ -543,7 +548,6 @@ module spif
                 2'b11:               	// blank = "end"
                   begin
                     if (plain[5]) begin
-                      p_reset <= 1'b1;
                       if (plain[4]) begin
                         f_wr <= 1'b0;   // 1111xxxx = end interpret
                         f_format <= 3'd0; // raise CS#
@@ -617,9 +621,9 @@ module spif
               2'b00: begin
                   sig_ex <= crcIn[7:0];
                   if (signing) begin    // end of signature testing
+                    f_format <= 3'd0;   // raise CS# after signature
                     sig_last <= 1'b1;
                     signing <= 1'b0;
-                    f_format <= 3'd0;   // raise CS#
                   end
                 end
               endcase
@@ -676,7 +680,7 @@ module spif
           sig_ok <= 1'b0;
         if (sig_last) begin
           badboot <= ~sig_ok & cold;
-          p_reset <= ~sig_ok & cold;
+          p_reset <= 1'b0;              // first boot run deasserts reset
           cold <= 1'b0;
         end
       end
@@ -684,7 +688,7 @@ module spif
 
   wire booting = (b_state) ? 1'b1 : 1'b0;
   reg [WIDTH-1:0] spif_dout;
-  wire jammin = ISPfull | ~f_ok;
+  wire jammin = ISPfull | ~f_ok | booting;
 
   always @* begin                       // i/o read mux
     case (mem_addr[3:0])                // Verilog zero-extends smaller vectors
@@ -693,6 +697,7 @@ module spif
     4'h2:    spif_dout = txbusy;        // EMIT is busy?
     4'h3:    spif_dout = plain;         // flash SPI result
     4'h4:    spif_dout = jammin;        // jammed byte is still pending
+    // change 5 to reserved, address 4 means flash is busy
     4'h5:    spif_dout = booting;       // still reading flash?
     4'h6:    spif_dout = cycles;        // free-running counter
 `ifndef IS32BIT
@@ -712,12 +717,13 @@ module spif
 // The Data and Code RAMs are accessed via DMA by the boot process.
 // The bootloader writes to either code or data RAM.
 // p_hold inhibits reads to keep the read streams in sync with their addresses.
+// It's stretched when writing to code RAM to re-sync the instruction stream.
 
   assign p_hold = codeWr | dataWr | iobusy | wbbusy;
-  assign code_rd = ~p_hold;
+  assign code_rd = ~codeWr;
   assign code_wr = codeWr;
   assign code_a = (codeWr) ? b_dest[CODE_SIZE-1:0] : code_addr[CODE_SIZE-1:0];
-  assign data_rd = mem_rd & ~p_hold;
+  assign data_rd = mem_rd & ~dataWr;
   assign data_wr = mem_wr | dataWr;
   assign data_a = (dataWr) ? b_dest[DATA_SIZE-1:0] : mem_addr[DATA_SIZE-1:0];
   assign data_din = (dataWr) ? b_data : din;

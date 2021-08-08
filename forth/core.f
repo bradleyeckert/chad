@@ -9,7 +9,11 @@
 0 cp _! drop
 later coldboot                          \ 2.0010 -- \ boots here
 later irqtick
+\ space for 14 more interrupt vectors
 :noname exit exit exit exit exit ; drop \ inactive interrupt vectors
+:noname exit exit exit exit exit exit exit ; drop
+later api_recover                       \ RET has its address's LSB set
+
 later throw                             \ 2.0020 n --
 
 : noop  nop ;                           \ 2.0100 --

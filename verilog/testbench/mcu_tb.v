@@ -101,7 +101,7 @@ module mcu_tb();
       @(posedge cs_n);
       $display("Finished booting at %0t", $time);
       $display("Time is in units of ns/10 or us/10000");
-      repeat (20000) @(posedge clk);
+      repeat (40000) @(posedge clk);
       $display("Sending line of text to UART RXD");
       UART_TX(8'h35); // 5 .s
       UART_TX(8'h20);

@@ -13,6 +13,7 @@
 \ boot code and headers. Should be a multiple of 4096.
 
 $6000 forg                              \ strings in flash start here
+$8000 paged!                            \ applets start here
 
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
@@ -24,9 +25,11 @@ include ../forth/io_equs.f
 include ../forth/redirect.f
 include ../forth/frame.f
 include ../forth/numout.f
-include ../forth/compile.f
 include ../forth/flash.f
+include ../forth/compile.f
+include ../forth/api.f
 include ../forth/interpret.f
+include ../forth/tools.f
 \ include ../forth/bignum.f
 \ include ../forth/ctea.f
 
@@ -45,18 +48,19 @@ exportable \ and ends here, but private section is findable
 end-module \ end the scope of the private section
 
 \ Place some applets
-$80 applet
+paged applet
 : 5*  dup 2* 2* + ;
-: sqr  dup * ;
+: sqr  dup * dup drop ;
 : fn5  5* sqr ;
 end-applet
 
 paged applet
 : 9*  dup 2* 2* 2* + ;
 : sqr  dup * ;
-: fn9  9* sqr ;
+: fn9  9* sqr  1 fn5 +  ;
 end-applet
 
+: test9  1 fn9 . 2 fn5 . ;
 
 \ Error handling
 
@@ -76,6 +80,7 @@ end-applet
 : myapp  ( -- )
 \   [ $14 cells ] literal dup io@        \ read gp_i
 \   swap io!                             \ write top gp_o
+   test9
    ." May the Forth be with you."
    0 quit
 ;

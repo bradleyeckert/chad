@@ -41,19 +41,51 @@ hex
    80 _isp                      \ end read (raise CS#)
 ;
 
-\ Arbitrary stream-from-flash starts the boot interpreter at a specified page.
+\ Load a boot stream from flash starting at a specified page
 
-variable apipage
+variable spifpage
 
-: (API)  ( page -- )
-   dup apipage @ xor if
-      dup apipage !
-      dup 6 rshift ispnum ispnum \ set page number
-      44 ispcmd  exit
-   then  drop
+: spifload  ( page -- )
+   dup spifpage !
+   dup 6 rshift ispnum ispnum   \ set page number
+   44 ispcmd
+;
+
+\ Large applications are supported by caching, which is enabled by an exception.
+\ The `api_recover` exception is triggered when RET executes with the LSB of the
+\ address set. Instead of popping PC from the return stack, execution jumps to a
+\ fixed address (such as 010h).
+
+\ `xexec` executes a word at a specified xxt (extended execution token)
+\ consisting of the flash page number packed with an offset into cache memory
+\ in the format 12.10 where the upper 12 bits are the flash page number
+\ (a page is 256 bytes) and the lower 10 bits are a word offset into the cache
+\ region of code RAM.
+
+: xexec  ( xxt -- ) ( R: addr -- page addr+1 )
+   r> spifpage @ >r 1 + >r
+   dup 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ spifload  ( depth = 3, 2 )
+   3FF and cm-size +  2* >r             \ execute the xxt
+; no-tail-recursion
+
+:noname  ( R: page addr+1 -- addr )
+   r> 0 invert +                        \ clear LSB
+   r> ?dup if  spifload  then           \ restore cache
+   >r
+; resolves api_recover
+
+\ It would be better for APIexecute etc. to pack the appletID into xt.
+\ This would come into play if there are multiple instances of
+\ interpreters running, but since there isn't, appletID is global.
+
+variable appletID               \ only works from the interpreter
+: APIexecute  ( xt -- )
+   appletID @ spifload
+   execute
 ;
 
 decimal
+
 
 \ Flash reads using hardware instead of discrete SPI transfers.
 \ Double cell addresses are used but not implemented. If they are needed,
@@ -104,21 +136,6 @@ decimal
 ;
 : 3*   ( n -- 3n ) dup 2* + ;   \ multiply by 3, goes with f@
 
-\ It would be better for APIexecute etc. to pack the appletID into xt.
-\ This would require a minimum cell size of 12+12=24 bits to handle
-\ a 4Kx16 code RAM and 12-bit applet page number.
-
-\ This would come into play if there are multiple instances of
-\ interpreters running, but since there isn't, appletID is global.
-
-variable appletID               \ only works from the interpreter
-: APIexecute  ( xt -- )
-   appletID @ (API) execute
-;
-: APIcompile, ( xt -- )
-   appletID @ lit,  ['] (API) compile,  compile,
-;
-
 \ `emit` may require reading font bitmaps from flash, so `f$type` reads the
 \ string into a RAM buffer because the bitmap read disrupts keystream sync.
 \ This is a good place for `pad`. Make it big enough for app usage.
@@ -153,35 +170,12 @@ tkey or [if]
 : f$type                        \ 2.4080 f-addr --
    /text  fcount  ftype         \ emit the "flash string"
 ;
-: fdump  ( f-addr len -- )      \ only useful if tkey is 0
-   over 5 h.x  0 swap
-   for
-      over 15 and 0= if cr over 5 h.x then
-      fcount h.2
-   next 2drop
-;
 
-\ Header structures are in flash. Up to 8 wordlists may be in the
-\ search order. WIDs are indices into `wids`, an array in data space.
-\ The name of the wordlist is just before the first link.
-\ The count is after the name instead of before it so it's stored as plaintext.
-
-: (.wid)  \ f-addr --                   \ f-addr points to the link that's 0
-   1-  dup /text c@f  tuck -  swap      \ f-addr len
-   31 > if drop [char] ? emit exit then \ no name
-   1-  f$type
-;
 : [wid]   ( wid -- addr )               \ wid is indexed from 1
    cells [ wids cell - ] literal +
 ;
 : wid    [wid] @ ;                      \ wid -- f-addr
 
-: .wid   \ wid --                       \ display WID identifier (for order)
-   wid    dup                           \ get the pointer
-   begin  nip dup /text @f              \ skip to beginning
-   dup 0= until  drop
-   (.wid) space
-;
 
 \ | Length  | Name  | Usage                |
 \ | ------- |:-----:| --------------------:|
