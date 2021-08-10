@@ -43,12 +43,10 @@ hex
 
 \ Load a boot stream from flash starting at a specified page
 
-variable spifpage
-
 : spifload  ( page -- )
-   dup spifpage !
-   dup 6 rshift ispnum ispnum   \ set page number
-   44 ispcmd
+   dup api !
+   dup 6 rshift ispnum ispnum           \ set page number
+   44 ispcmd                            \ interpret the flash stream
 ;
 
 \ Large applications are supported by caching, which is enabled by an exception.
@@ -62,27 +60,21 @@ variable spifpage
 \ (a page is 256 bytes) and the lower 10 bits are a word offset into the cache
 \ region of code RAM.
 
-: xexec  ( xxt -- ) ( R: addr -- page addr+1 )
-   r> spifpage @ >r 1 + >r
-   dup 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ spifload  ( depth = 3, 2 )
+16 cells buffer: apistack
+variable apisp   apistack apisp !
+
+: xexec  ( xxt -- ) ( R: addr -- addr+1 )
+   r> 1 + >r
+   api @  apisp @ >mem apisp !
+   dup 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ spifload
    3FF and cm-size +  2* >r             \ execute the xxt
 ; no-tail-recursion
 
-:noname  ( R: page addr+1 -- addr )
-   r> 0 invert +                        \ clear LSB
-   r> ?dup if  spifload  then           \ restore cache
-   >r
+:noname  ( R: addr+1 -- addr )
+   r> 0 invert + >r                     \ clear LSB
+   apisp @ mem> swap apisp !
+   ?dup if  spifload  then              \ restore cache
 ; resolves api_recover
-
-\ It would be better for APIexecute etc. to pack the appletID into xt.
-\ This would come into play if there are multiple instances of
-\ interpreters running, but since there isn't, appletID is global.
-
-variable appletID               \ only works from the interpreter
-: APIexecute  ( xt -- )
-   appletID @ spifload
-   execute
-;
 
 decimal
 
@@ -328,6 +320,9 @@ fhere equ errorMsgs \ starting at -2 and going negative
    ( -80 ) ," Dictionary full"
    ( -81 ) ," Writing to invalid flash sector"
    ( -82 ) ," Flash string space overflow"
+   ( -83 ) ," Invalid SPI flash address"
+   ( -84 ) ," Invalid coprocessor field"
+   ( -85 ) ," Can't postpone an applet word"
    ," " \ empty string = end of list
 
 there swap - . .( instructions used by flash) cr

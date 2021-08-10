@@ -47,21 +47,6 @@ exportable \ and ends here, but private section is findable
 ;
 end-module \ end the scope of the private section
 
-\ Place some applets
-paged applet
-: 5*  dup 2* 2* + ;
-: sqr  dup * dup drop ;
-: fn5  5* sqr ;
-end-applet
-
-paged applet
-: 9*  dup 2* 2* 2* + ;
-: sqr  dup * ;
-: fn9  9* sqr  1 fn5 +  ;
-end-applet
-
-: test9  1 fn9 . 2 fn5 . ;
-
 \ Error handling
 
 [defined] quit [if]
@@ -80,12 +65,12 @@ end-applet
 : myapp  ( -- )
 \   [ $14 cells ] literal dup io@        \ read gp_i
 \   swap io!                             \ write top gp_o
-   test9
    ." May the Forth be with you."
    0 quit
 ;
 
 ' myapp resolves coldboot
+.( Application instructions: ) there . cr
 
 \ You can now run the app with "cold"
 
@@ -124,4 +109,5 @@ asm +order
 gendoc ../forth/wiki/wikiasm.txt html/asm.html
 only forth
 
+\ 8 verbosity cold \ track stack max
 \ 0 there dasm \ dumps all code

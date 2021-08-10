@@ -54,8 +54,9 @@ SI error;                               // simulator and interpreter error code
 #define orders  (wids + 9)              // # of wids in the search order
 #define order   (orders + 1)            // search order stack[8]
 #define current (order + 9)             // wid of the current definition
-#define state   (current + 1)           // this the shared last variable
-#define here    (state + 1)             // first free cell
+#define state   (current + 1)           // compile if set else interpret
+#define api     (state + 1)             // current API page
+#define here    (api + 1)               // first free variable
 
 #define TOIN    Data[toin]
 #define TIBS    Data[tibs]
@@ -67,7 +68,8 @@ SI error;                               // simulator and interpreter error code
 #define ORDER(x) Data[order + (x)]
 #define CURRENT Data[current]
 #define CONTEXT ORDER(ORDERS - 1)
-#define STATE Data[state]
+#define STATE   Data[state]
+#define API     Data[api]
 
 SV Hex(void) { BASE = 16; }
 SV Decimal(void) { BASE = 10; }
@@ -131,6 +133,14 @@ SV TraceLine(cell pc, uint16_t insn) {
         printf(")");
     }
     printf(" \\ w=%Xh, cy=%X\n", w & CELLMASK, cy);
+}
+
+SV NewMaxStack(uint8_t s, uint8_t r, int pc) {
+    if (verbose & VERBOSE_STKMAX) {
+        printf("SP=%d, RP=%d, PC=%Xh, R: ", s, r, pc);
+        PrintReturnStack();
+        printf("\n");
+    }
 }
 
 //##############################################################################
@@ -290,7 +300,7 @@ SI CPUsim(int single) {
         else { // ALU
             if (insn & 0x100) {                                     /*  r->pc */
                 interruptVector = Iack();
-                exception = Rstack[RP & RPMASK] & 1;
+                exception = Rstack[RP] & 1;
                 if (exception) _pc = ExceptionVector;
                 else if (interruptVector) _pc = interruptVector;
                 else {
@@ -365,15 +375,26 @@ SI CPUsim(int single) {
             }
             t = _t & CELLMASK;
         }
+#ifdef MoreInstrumentation
+        if (verbose & VERBOSE_TRACE) {
+            if (exception)
+                printf("Exception at %Xh, R/2=%Xh, page=%Xh\n",
+                    pc, Rstack[RP]/2, Rstack[(RP-1) & RPMASK]);
+        }
+        if (sp > spMax) {
+            spMax = sp;
+            NewMaxStack(sp, rpMax, _pc);
+        }
+        if (rp > rpMax) {
+            rpMax = rp; 
+            NewMaxStack(spMax, rp, _pc);
+        }
+#endif
         pc = _pc;  lex = _lex;
         cycles++;
         if ((cycles & CELLMASK) == 0) {  // raw counter overflow
             irq |= (1 << 1);            // lowest priority interrupt
         }
-#ifdef MoreInstrumentation
-        if (sp > spMax) spMax = sp;
-        if (rp > rpMax) rpMax = rp;
-#endif
         if (pc & ~(CodeSize-1)) single = BAD_PC;
     } while (single == 0);
     return single;
@@ -529,6 +550,7 @@ SV TableEntry(void) {
 
 CELL CtrlStack[256];                    // control stack
 uint8_t ConSP = 0;
+SI lastAPI;
 
 SV ControlSwap(void) {
     cell x = CtrlStack[ConSP];
@@ -542,9 +564,9 @@ SV sane(void) {
 
 // Addressing beyond 1FFFh is not supported yet.
 
-SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= CP;  latest = CP; }
-SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = CP; }
-SV MarkFwd(void) { CtrlStack[++ConSP] = CP; }
+SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= CP;  latest = CP;  lastAPI = 0; }
+SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = CP;  lastAPI = 0; }
+SV MarkFwd(void) { CtrlStack[++ConSP] = CP;  lastAPI = 0; }
 SV doBegin(void) { MarkFwd(); }
 SV doAgain(void) { ResolveRev(jump); }
 SV doUntil(void) { ResolveRev(zjump); }
@@ -831,12 +853,12 @@ SV Prim_Comp  (void) { toCode(my()); }
 SV Prim_Exec  (void) { CPUsim(0x10000 + my()); } // single step
 SV doInstMod  (void) { int x = Dpop(); Dpush(my() | x); }
 SV doLitOp    (void) { toCode(Dpop() | my());  Dpush(0); }
-SI lastAPI;
+
+// Referencing a word outside of an API
 
 SV Def_Comp   (void) {
-    CompCall(my()); notail = Header[me].notail;
-    int api = Header[me].applet;
-    if (api) lastAPI = api;
+    notail = Header[me].notail;
+    CompCall(my()); 
 }
 
 SV Def_Exec   (void) {
@@ -846,20 +868,28 @@ SV Def_Exec   (void) {
     Simulate(my());
 }
 
-// Execute or compile a number and its API handler
+// Literal and word: push and execute or literal and [compile]
 
-SV ApiWordExec(char* name, cell value) {
-    int x = me;
+SV LitnExec(char* name, cell value) {
     Dpush(value);
+    int x = me;
     Simulate(Ctick(name));
     me = x;
 }
 
-SV ApiWordComp(char* name, cell value) {
+SV LitnComp(char* name, cell value) {
     int x = me;
+    int xt = Ctick(name);
+    notail = Header[me].notail;
     Literal(value);
-    CompCall(Ctick(name));
+    CompCall(xt);
     me = x;
+}
+SI AppletSync(void) {
+    int page = Header[me].applet;
+    if (page)
+        LitnExec("spifload", page);
+    return page;
 }
 
 SI AddHead (char* name, char* anchor) { // add a header to the list
@@ -1230,28 +1260,22 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
     error = SaveFlashMem(tok, (uint32_t)d, format);
 }
 
-// The isAPI flag is set when applet code is being compiled.
-// When an applet word is compiled, CP is somewhere in cache space.
-// Before the call, a synchronization token is compiled to force the
-// cache to match the expected code.
-// (API) ( n -- ) ensures that applet page n is in cache.
-// The allowed range of n is 1 to 2047. A page size of 256 bytes
-// (256 instructions) covers the lower 512 KB of SPI flash.
+// API calls are compiled as a literal xxt and a call to xexec
 
-SI isAPI;
-SI xxt(void) {
+SI isAPI;                               // compiler is in API mode
+
+SI xxt(void) {                          // convert xt to xxt
     int offset = my() - (CodeSize - CodeCache);
     return (Header[me].applet << 10) + offset;
 }
 SV DefA_Exec(void) {
-    ApiWordExec("spifload", Header[me].applet);
-    Def_Exec();
+    LitnExec("xexec", xxt());
 }
 SV DefA_Comp(void) {
     int id = Header[me].applet;
     if (lastAPI != id) {                // changed from last reference
         lastAPI = id;   
-        ApiWordComp("xexec", xxt());
+        LitnComp("xexec", xxt());
     }
     else 
         Def_Comp();
@@ -1274,7 +1298,7 @@ SV Colon(void) {
         else {
             SetFns(CP, Def_Exec, Def_Comp);
         } 
-        lastAPI = isAPI;                // starts in sync
+        lastAPI = isAPI;
         Header[hp].target = CP;
         Header[hp].color = COLOR_WORD;
         Header[hp].smudge = 1;
@@ -1408,6 +1432,9 @@ SI isImmediate(void) {                  // ticked word is immediate?
 SV See (void) {                         // ( <name> -- )
     int addr;
     if ((addr = tick())) {
+        int page = AppletSync();
+        if (page)
+            printf("API:%Xh ", page);
         if (isImmediate()) printf("immediate ");
         Dpush(addr);  Dpush(Header[me].length);  Dasm();
     }
@@ -1481,7 +1508,7 @@ SV BrackUndefined(void) { BrackDefined();  Dpush(~Dpop()); }
 SV SetFPexpbits(void) { FPexpbits = Dpop(); }
 #endif
 
-SV Postpone(void) {
+SV Postpone(void) {                     // postpone of applet words not supported
     cell xte = tick();
     if (isImmediate())
         CompCall(xte);
@@ -1489,6 +1516,8 @@ SV Postpone(void) {
         Literal(xte);
         CompCall(Ctick("compile,"));
     }
+    if (Header[me].applet)
+        error = BAD_POSTPONE;
 }
 
 SI localWID;                            // compilation wordlist for locals
@@ -1503,8 +1532,8 @@ SV Exportable(void) {
 }
 
 SV EndLocals(void) { OrderPop();  Definitions();  wordlists--; }
-SV LocalExec(void) { ApiWordExec("(local)", my()); }
-SV LocalComp(void) { ApiWordComp("(local)", my()); }
+SV LocalExec(void) { LitnExec("(local)", my()); }
+SV LocalComp(void) { LitnComp("(local)", my()); }
 
 SV Local(void) {
     int temp = CURRENT;  CURRENT = localWID;
@@ -1995,8 +2024,12 @@ SV EndApplet(void) {
     CP = appletCP;
     DP = appletDP;
     appletPage = flashPtr;
-    flashPtr = fp;
+    flashPtr = fp;                      // restore fp tp point to text region
     isAPI = 0;
+    // wipe cache so you can't execute it without loading from flash image
+    for (int i = 0; i < CodeCache; i++) {
+        chadToCode(i + CodeSize - CodeCache, 0);
+    }
 }
 
 SV AppletPage(void)   { Dpush(appletPage);   }
@@ -2104,6 +2137,7 @@ SV LoadKeywords(void) {
     AddEquate("orders",       "1.0078 -- addr",       BYTE_ADDR(order));
     AddEquate("current",      "1.0079 -- addr",       BYTE_ADDR(current));
     AddEquate("state",        "1.0080 -- addr",       BYTE_ADDR(state));
+    AddEquate("api",          "1.0081 -- addr",       BYTE_ADDR(api));
     AddKeyword("stats",       "1.0090 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0091 <name> --",     Locate,        noCompile);
     AddKeyword("verbosity",   "1.0092 flags --",      Verbosity,     noCompile);
@@ -2116,7 +2150,7 @@ SV LoadKeywords(void) {
     AddKeyword("boot-test",   "1.0139 <filename> --", Boot,          noCompile);
     AddKeyword("make-heads",  "1.0140 --",            MakeHeaders,   noCompile);
     AddKeyword("make-boot",   "1.0141 --",            MakeBootList,  noCompile);
-    AddKeyword("applet",      "1.0146 page --",       BeginApplet,   noCompile);
+    AddKeyword("applet",      "1.0146 addr --",       BeginApplet,   noCompile);
     AddKeyword("end-applet",  "1.0147 --",            EndApplet,     noCompile);
     AddKeyword("paged",       "1.0148 -- addr",       AppletPage,    noCompile);
     AddKeyword("paged!",      "1.0149 addr --",       ToAppletPage,  noCompile);

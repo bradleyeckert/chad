@@ -7,8 +7,18 @@ there
 
 variable dpl
 variable echoing                        \ 2.6130 -- a-addr
+-1 constant applets
+later interpret
 
-\ paged applet  paged
+\ Since these are postponed, don't define in an applet
+
+: [        0 state ! ;  immediate       \ 2.6300 --
+: ]        1 state ! ;                  \ 2.6310 --
+
+\ Text input parsing uses an applet that fits in 512 bytes of flash.
+
+applets [if] .(     Applet bytes: { )   \ }
+paged applet  paged [then]
 
 \ Input parsing
 
@@ -28,7 +38,7 @@ variable echoing                        \ 2.6130 -- a-addr
          >r >r 2swap r@ um* rot r> um* d+
          r> 0 d+  2swap
       else
-         2drop exit
+         2drop  exit
       then
       1 /string
    repeat
@@ -92,7 +102,9 @@ variable echoing                        \ 2.6130 -- a-addr
     [char] - has? >r  >number
     [char] . has? r> 2>r                \ 0 is single, -1 is double
     dup if  dup dpl !  >number  then    \ digits after the decimal
-    nip if  2drop  -13 throw  then      \ any chars remain: error
+    nip if  2drop                       \ any chars remain: error
+       -13 throw exit
+    then
     r> if dnegate then                  \ is negative
     r> ?dup and                         \ if single, remove high cell
 ;
@@ -107,10 +119,14 @@ variable echoing                        \ 2.6130 -- a-addr
     [char] # has? if  10 base(number) exit  then
     [char] % has? if   2 base(number) exit  then
     2dup 3 = over is'  swap 2 + is'  if
-       drop 1+ c@ false exit
+       drop 1+ c@ false  exit
     then  (number)
 ;
+applets [if] end-applet  paged swap - . [then]
 
+\ Search order words use an applet that fits in 512 bytes of flash.
+
+applets [if] paged applet  paged [then]
 
 \ The search order is implemented as a stack that grows upward, with #order the
 \ offset into the orders array as well as the number of WIDs in the list.
@@ -153,48 +169,6 @@ variable echoing                        \ 2.6130 -- a-addr
                forth-wordlist swap set-order
 ;
 
-\ `words` overrides the host version, which is in `root`.
-
-: _words  ( wordlist -- )
-   begin dup while
-      dup /text @f  swap                ( link ht )
-      [ cellbits 8 / ] literal +
-      0 fcount ftype space
-   repeat drop
-;
-: words                                 \ 2.6280 --
-   context _words                       \ list words in the top wordlist
-;
-
-: .error  ( error -- )
-   dup if
-      cr dup ." Error " .
-      dup -82 -2 within if
-         dup invert 1- errorMsgs msg space
-      then
-      cr source type
-      cr >in @ $7F and spaces ." ^-- >in"
-   then  drop
-;
-
-: _.s  \ ? -- ?
-   depth  begin dup while               \ if negative depth,
-      dup pick .  1-                    \ depth rolls back around to 0
-   repeat drop
-;
-
-: .s                                    \ 2.6290 ? -- ?
-   _.s  ." <-Top " cr
-;
-
-: prompt  ( ? -- ? )                    \ "ok>" includes stack dump
-   depth if ." \ " _.s then
-   ." ok>"
-;
-
-: [        0 state ! ;  immediate       \ 2.6300 --
-: ]        1 state ! ;                  \ 2.6310 --
-
 \ Header structures are in flash. Up to 8 wordlists may be in the
 \ search order. WIDs are indices into `wids`, an array in data space.
 \ The name of the wordlist is just before the first link.
@@ -221,25 +195,53 @@ variable echoing                        \ 2.6130 -- a-addr
    cr ."  Current: " current @ .wid  cr
 ;
 
-\ end-applet  paged swap - . .( applet bytes, )
 
-\ `interpret` wants to be outside the applet.
+\ `words` overrides the host version, which is in `root`.
 
-: interpret  ( -- ? )
-   begin  parse-name  dup while
-      hfind over if                     \ not found
-         (xnumber) if
-            state @ if swap lit, lit, then
-         else
-            state @ if lit, then
-         then
-      else
-         2drop  @f> @f> @f>
-         @f> appletID !  )@f            ( w xte xtc )
-         state @ if swap then drop execute
-      then
-   repeat 2drop
+: _words  ( wordlist -- )
+   begin dup while
+      dup /text @f  swap                ( link ht )
+      [ cellbits 8 / ] literal +
+      0 fcount ftype space
+   repeat drop
 ;
+: words                                 \ 2.6280 --
+   context _words                       \ list words in the top wordlist
+;
+
+: .error  ( error -- )
+   dup if
+      cr ." Error "  dup .
+      invert 1-  dup 1 84 within if
+         errorMsgs msg space
+      else
+         drop
+      then
+      cr source type
+      cr >in @ $7F and spaces ." ^-- >in"
+      exit
+   then  drop
+;
+
+: _.s  \ ? -- ?
+   depth  begin dup while               \ if negative depth,
+      dup pick .  1-                    \ depth rolls back around to 0
+   repeat drop
+;
+
+: prompt  ( ? -- ? )                    \ "ok>" includes stack dump
+   depth if ." \ " _.s then
+   ." ok>"
+;
+
+: .s                                    \ 2.6290 ? -- ?
+   _.s  ." <-Top " cr
+;
+
+
+
+
+
 
 \ The QUIT loop avoids CATCH and THROW for stack depth reasons.
 \ If an error occurs, `throw` restarts `quit`.
@@ -251,7 +253,7 @@ variable echoing                        \ 2.6130 -- a-addr
    \ If stacks are more than 8 deep, limit them to 8
    begin spstat $18 and while drop repeat
    begin spstat 8 rshift $18 and while rdrop repeat
-   state @ postpone [  .error cr
+   state @  postpone [  .error cr
    depth if  ." Data stack -> "
       begin spstat 7 and while . repeat  cr
    then
@@ -259,15 +261,40 @@ variable echoing                        \ 2.6130 -- a-addr
    dup 1 > if  ." Return stack -> "         hex
       begin 1- dup while  r> .  repeat  cr  decimal
    then drop
+   apistack apisp !                     \ clear API stack
+   0 api !
+   fpclear
    [ dm-size |tib| - ] literal 'tib !
    begin
-      prompt  refill drop  interpret
+      prompt  refill drop
+      interpret
    again
 ;
 
+applets [if] end-applet  paged swap - . [then]
 
-\ Can't be in the applet because set-current can't execute until
-\ end-applet writes the applet to the flash memory image.
+\ `interpret` wants to be outside the applet.
+
+:noname  ( -- ? )
+   begin  parse-name  dup while
+      hfind over if                     \ not found
+         2 stack(  (xnumber)  )stack
+         if
+            state @ if swap lit, lit, then
+         else
+            state @ if lit, then
+         then
+      else
+         2drop
+         @f> @f> @f>
+         @f> api !  )@f                 ( w xte xtc )
+         state @ if swap then drop execute
+      then
+   repeat 2drop
+; resolves interpret
+
+\ `only` can't be in the applet because set-current can't execute
+\ until end-applet writes the applet to the flash memory image.
 
 root set-current                        \ escape hatch from root
 : only         -1 set-order ;           \ 2.6220 --
@@ -282,4 +309,4 @@ forth-wordlist set-current
 
 [then]
 
-there swap - . .( instructions used by interpret) cr
+.( }; ) there swap - . .( instructions used by interpret) cr

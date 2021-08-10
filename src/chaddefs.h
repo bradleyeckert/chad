@@ -210,6 +210,7 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BAD_NOCOMPILE   -79 // Compiling an execute-only word
 #define BAD_FSOVERFLOW  -82 // Flash string overflow
 #define BAD_COPROCESSOR -84 // Invalid coprocessor field
+#define BAD_POSTPONE    -85 // Unsupported postpone
 #define BAD_CREATEFILE -198
 #define BAD_OPENFILE   -199 // Can't open file
 #define BYE            -299
@@ -218,4 +219,5 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define VERBOSE_SOURCE  1
 #define VERBOSE_TOKEN   2
 #define VERBOSE_TRACE   4
-#define VERBOSE_SRC     8
+#define VERBOSE_STKMAX  8
+#define VERBOSE_SRC     32
