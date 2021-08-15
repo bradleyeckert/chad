@@ -4,7 +4,7 @@
 module chad
 #(
   parameter WIDTH = 18,                 // cell size, can be 16 to 32
-  parameter DEPTH = 16                  // depth of both stacks
+  parameter DEPTH = 20                  // depth of both stacks
 )(
   input  wire clk,
   input  wire resetq,                   // Processor reset, async active low

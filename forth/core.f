@@ -12,6 +12,8 @@ later irqtick
 \ space for 14 more interrupt vectors
 :noname exit exit exit exit exit ; drop \ inactive interrupt vectors
 :noname exit exit exit exit exit exit exit ; drop
+later trap0
+later api_trap
 later api_recover                       \ RET has its address's LSB set
 
 later throw                             \ 2.0020 n --

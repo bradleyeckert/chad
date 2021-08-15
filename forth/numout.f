@@ -25,7 +25,7 @@ frp0 equ numbuf                         \ buffer for numeric conversion
           + [char] 7 + ;
 : <#      numbuf  hld ! ;               \ 2.3190 ud1 -- ud1
 : hold    hld dup >r @ 1- dup r> ! c! ; \ 2.3200 char --
-: _#_     um/mod swap digit hold ;
+: _#_     um/mod swap digit hold ;      \ ud base -- u/base
 : #       dup  base @ >r  if            \ 2.3210 ud1 -- ud2
               0 r@ um/mod r> swap
               >r _#_ r> exit

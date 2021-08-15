@@ -155,12 +155,13 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 
 // Other instruction types
 
-#define jump   (4 << 13)
-#define zjump  (5 << 13)
-#define call   (6 << 13)
-#define litx   (28 << 11)
-#define copop  (29 << 11)
-#define lit    (15 << 12)
+#define lit    (2 << 13)
+#define trap   (3 << 13)
+#define zjump  (4 << 13)
+#define litx   (5 << 13)
+#define copop  (11 << 12)
+#define jump   (6 << 13)
+#define call   (7 << 13)
 
 #endif
 

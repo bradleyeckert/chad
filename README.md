@@ -182,9 +182,13 @@ Human-speed Forth tools are good candidates for applets so as to free up code RA
 
 ## Status
 
-The "myapp" demo boots and runs in both `chad` and a Verilog simulator.
+NOTE: The Verilog model is broken, but it is in the middle of being reworked.
+`spif` DMA was hammering the data, but I figured out how to fix `hold`.
+The ISA needs to be changed to match the simulator, which I changed to add
+more compact API calls.
+
+The "myapp" demo boots and runs in `chad`.
 An ISP utility loads the boot file into an FPGA with SPI flash chip attached.
-The FPGA boots and runs. You might call that "silicon proven".
 
 `chad` boots and runs an app from simulated flash memory. 
 A minimal SoC (MCU) in Verilog demonstrates synthesis results and
@@ -195,7 +199,7 @@ performs the following:
 - `chad` starts running the "myapp" demo after bootup
 - The demo runs a Forth interpreter (ok> prompt) via the UART.
 
-It's silicon-proven on Digilent's Arty A7-35T board: 100 MHz, 10% of the chip.
+Before I broke the Verilog, it ran on Digilent's Arty A7-35T board: 100 MHz, 10% of the chip.
 Here's what text rendering looks like on a TFT LCD module:
 
 ![ArtyA7 Image](doc/artyLCD.jpg)

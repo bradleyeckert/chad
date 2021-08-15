@@ -13,8 +13,12 @@
 #define DataSize      2048      /* Data memory cells                        */
 #define DataCache      256      /* Size of cache region                     */
 #define StackAwidth      5      /* log2(Stack cells)                        */
+#define MAXSP           15      /* Maximum allowed SP                       */
+#define MAXRP           15      /* Maximum allowed RP                       */
+#define IRQheadspace     4      /* Headspace reserved for interrupts        */
 #define CodeAlignment    1      /* Alignment for new definitions            */
-#define ExceptionVector 16      /* Jump address for exceptions              */
+#define TrapVector      16      /* Jump address for the two traps           */
+#define ExceptionVector 18      /* Jump address for exceptions              */
 
 #define MoreInstrumentation     /* Simulator has more instrumentation       */
 //#define HASFLOATS             /* Dotted numbers are floating point        */

@@ -35,7 +35,7 @@ static uint64_t GetMicroseconds() {
 #include "gecko.h"
 
 SI verbose = 0;
-uint8_t sp, rp;                         // stack pointers
+static uint8_t sp, rp;                  // stack pointers
 CELL t, pc, cy, lex, w;                 // registers
 CELL Data[DataSize];                    // data memory
 CELL Dstack[StackSize];                 // data stack
@@ -200,8 +200,11 @@ SV Rpush(cell v)                        // push to the return stack
 static uint8_t Iack(void) {             // priority encoder
     uint8_t r = 0;
     uint32_t x = irq;
-    while (x >>= 1) ++r;                // position of highest bit
-    irq &= ~(1 << r);                   // clear the request bit
+    if ((sp <= (MAXSP - IRQheadspace))  // only acknowledge if sufficient stack
+        && (rp <= (MAXRP - IRQheadspace))) {
+        while (x >>= 1) ++r;            // position of highest bit
+        irq &= ~(1 << r);               // clear the request bit
+    }
     return r;
 }
 
@@ -250,54 +253,11 @@ SI CPUsim(int single) {
         cell _lex = 0;
         cell s = Dstack[SP];
         cell temp;
-        if (insn & 0x8000) {
-            int target = (lex << 13) | (insn & 0x1fff);
-            switch (insn >> 13) { // 4 to 7
-            case 4:                                                 /*   jump */
-                _pc = target;  break;
-            case 5:                                                 /*  zjump */
-                if (!Dpop()) { _pc = target; }  break;
-            case 6:                                                 /*   call */
-                RP = RPMASK & (RP + 1);
-                Rstack[RP & RPMASK] = _pc << 1;
-                _pc = target;
-#ifdef MoreInstrumentation
-                if (verbose & VERBOSE_TRACE) {
-                    printf("Call to %Xh\n", target);
-                }
-#endif
-                break;
-            default:
-                if (insn & 0x1000) {                                /*    imm */
-                    Dpush((lex << 11) | ((insn & 0xe00) >> 1) | (insn & 0xff));
-                    if (insn & 0x100) {                             /*  r->pc */
-                        interruptVector = Iack();
-                        exception = Rstack[RP & RPMASK] & 1;
-                        if (exception) _pc = ExceptionVector;
-                        else if (interruptVector) _pc = interruptVector;
-                        else {
-                            _pc = Rstack[RP] >> 1;
-                            if (RDEPTH == mark) single = 2;
-                            RP = RPMASK & (RP - 1);
-                        }
-#ifdef MoreInstrumentation
-                        uint16_t time = (uint16_t)cycles - retMark;
-                        retMark = (uint16_t)cycles;
-                        if (time > latency)
-                            latency = time;
-#endif
-                    }
-                }
-                else {
-                    if (insn & 0x800)                               /* coproc */
-                        coprocGo(insn & 0x7FF,
-                            t & CELLMASK, s & CELLMASK, w & CELLMASK);
-                    else
-                        _lex = (lex << 11) | (insn & 0x7FF);        /*   litx */
-                }
-            }
-        }
-        else { // ALU
+        cell target;
+        switch (insn >> 13) { // 4 to 7
+        case 0:
+        case 1:
+            target = (lex << 13) | (insn & 0x1fff);
             if (insn & 0x100) {                                     /*  r->pc */
                 interruptVector = Iack();
                 exception = Rstack[RP] & 1;
@@ -325,11 +285,11 @@ SI CPUsim(int single) {
             case 0x02: temp = (t & MSB);
                 _t = (t >> 1) | temp;                        break; /*    T2/ */
             case 0x12:
-                _t = (t >> 1) | (cy << (CELLBITS-1));        break; /*   cT2/ */
-            case 0x03: _c = t >> (CELLBITS-1);
-                       _t = t << 1;                          break; /*    T2* */
-            case 0x13: _c = t >> (CELLBITS-1);
-                       _t = (t << 1) | cy;                   break; /*   T2*c */
+                _t = (t >> 1) | (cy << (CELLBITS - 1));      break; /*   cT2/ */
+            case 0x03: _c = t >> (CELLBITS - 1);
+                _t = t << 1;                                 break; /*    T2* */
+            case 0x13: _c = t >> (CELLBITS - 1);
+                _t = (t << 1) | cy;                          break; /*   T2*c */
             case 0x04: _t = s;                               break; /*      N */
             case 0x14: _t = w;                               break; /*      W */
             case 0x05: _t = s ^ t;                           break; /*    T^N */
@@ -374,13 +334,67 @@ SI CPUsim(int single) {
             default: break;
             }
             t = _t & CELLMASK;
+            break;
+        case 2:                                                /* literal */
+            Dpush((lex << 12) | ((insn & 0x1e00) >> 1) | (insn & 0xff));
+            if (insn & 0x100) {                                 /*  r->pc */
+                interruptVector = Iack();
+                exception = Rstack[RP & RPMASK] & 1;
+                if (exception) _pc = ExceptionVector;
+                else if (interruptVector) _pc = interruptVector;
+                else {
+                    _pc = Rstack[RP] >> 1;
+                    if (RDEPTH == mark) single = 2;
+                    RP = RPMASK & (RP - 1);
+                }
+#ifdef MoreInstrumentation
+                uint16_t time = (uint16_t)cycles - retMark;
+                retMark = (uint16_t)cycles;
+                if (time > latency)
+                    latency = time;
+#endif
+            } 
+            break;
+        case 3:                                                 /*   trap */
+            Dpush((lex << 12) | ((insn & 0x1e00) >> 1) | (insn & 0xff));
+            temp = ((insn >> 8) & 1);
+            RP = RPMASK & (RP + 1);
+            Rstack[RP & RPMASK] = _pc << 1;
+            _pc = TrapVector + temp;
+#ifdef MoreInstrumentation
+            if (verbose & VERBOSE_TRACE) {
+                printf("Trap to %Xh\n", _pc);
+            }
+#endif
+            break;
+        case 4:                                                 /*  zjump */
+            if (!Dpop()) { 
+                _pc = insn & 0x1fff; 
+            }
+            break;
+        case 5:
+            if (insn & 0x1000)                                  /* coproc */
+                coprocGo(insn & 0x7FF,
+                    t & CELLMASK, s & CELLMASK, w & CELLMASK);
+            else {
+                _lex = (lex << 12) | (insn & 0xFFF);            /*   litx */
+            }
+            break;
+        case 6:                                                 /*   jump */
+            _pc = insn & 0x1fff;  
+            break;
+        case 7:                                                 /*   call */
+            RP = RPMASK & (RP + 1);
+            Rstack[RP & RPMASK] = _pc << 1;
+            _pc = insn & 0x1fff;
+#ifdef MoreInstrumentation
+                if (verbose & VERBOSE_TRACE) {
+                    printf("Call to %Xh\n", _pc);
+                }
+#endif
+            break;
         }
 #ifdef MoreInstrumentation
-        if (verbose & VERBOSE_TRACE) {
-            if (exception)
-                printf("Exception at %Xh, R/2=%Xh, page=%Xh\n",
-                    pc, Rstack[RP]/2, Rstack[(RP-1) & RPMASK]);
-        }
         if (sp > spMax) {
             spMax = sp;
             NewMaxStack(sp, rpMax, _pc);
@@ -388,6 +402,13 @@ SI CPUsim(int single) {
         if (rp > rpMax) {
             rpMax = rp; 
             NewMaxStack(spMax, rp, _pc);
+        }
+        if (verbose & VERBOSE_TRACE) {
+            if (exception)
+                printf("Exception at %Xh, R/2=%Xh, page=%Xh\n",
+                    pc, Rstack[RP] / 2, Rstack[(RP - 1) & RPMASK]);
+            if (interruptVector)
+                printf("Interrupt Level %d\n", _pc);
         }
 #endif
         pc = _pc;  lex = _lex;
@@ -422,9 +443,9 @@ SV CompExit (void) {                    // compile an exit
     }
     int a = (CP-1) & (CodeSize-1);
     int old = Code[a];                  // previous instruction
-    if (((old & 0x8000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
+    if (((old & 0xC000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
         Code[a] = rdn | old | ret;      // make the ALU instruction return
-    } else if ((old & lit) == lit) {    // literal?
+    } else if ((old & 0xF000) == lit) { // literal?
         Code[a] = old | ret;            // make the literal return
     } else if ((!notail) && ((old & 0xE000) == call)) {
         Code[a] = (old & 0x1FFF) | jump; // tail recursion (call -> jump)
@@ -434,28 +455,31 @@ plain:  toCode(alu | ret | rdn);         // compile a stand-alone return
 }
 
 // The LEX register is cleared whenever the instruction is not LITX.
-// LITX shifts 11-bit data into LEX from the right.
+// LITX shifts 12-bit data into LEX from the right.
 // Full 16-bit and 32-bit data are supported with 2 or 3 inst.
 
 SV extended_lit (int k) {
-    toCode(litx | (k & 0x7FF));
+    toCode(litx | (k & 0xFFF));
+}
+SI lit_field(int x) {
+    x &= 0xFFF;
+    return (x & 0xff) | (x & 0xF00) << 1;
 }
 SV Literal (cell x) {
-#if (CELLBITS > 22)
-    if (x & 0xFFC00000) {
-        extended_lit(x >> 22);
-        extended_lit(x >> 11);
+#if (CELLBITS > 24)
+    if (x & 0xFF000000) {
+        extended_lit(x >> 24);
+        extended_lit(x >> 12);
     }
     else {
-        if (x & 0x003FF800)
-            extended_lit(x >> 11);
+        if (x & 0x0FFF000)
+            extended_lit(x >> 12);
     }
 #else
-    if (x & 0x003FF800)
-        extended_lit(x >> 11);
+    if (x & 0x0FFF000)
+        extended_lit(x >> 12);
 #endif
-    x &= 0x7FF;
-    toCode (lit | (x & 0xff) | (x & 0x700) << 1);
+    toCode (lit | lit_field(x));
 }
 
 #ifdef HASFLOATS
@@ -549,7 +573,7 @@ SV TableEntry(void) {
 // Compile Control Structures
 
 CELL CtrlStack[256];                    // control stack
-uint8_t ConSP = 0;
+static uint8_t ConSP = 0;
 SI lastAPI;
 
 SV ControlSwap(void) {
@@ -971,11 +995,12 @@ SV AddLitOp (char *name, char* help, cell value) {
 
 // Disassembler
 
-static char* TargetName (cell addr) {
+static char* TargetName (cell addr, int page) {
     if (!addr) return NULL;
     int i = hp + 1;
     while (--i) {
         if (Header[i].target == addr) {
+            if ((!page) | (page == Header[i].applet))
             return Header[i].name;
         }
     }
@@ -1021,31 +1046,10 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
     cell _lex = 0;
     char* name;
     DAbuf[0] = '\0';
-    if (IR & 0x8000) {
-        int target = IR & 0x1FFF;
-        switch ((IR>>12) & 7) {
-        case 6:
-            target = IR & 0x7FF;  HexToDA(target);
-            if (IR & 0x800) {
-                appendDA("cop");
-            }
-            else {
-                _lex = (lex << 11) + target;
-                appendDA("litx");
-            }
-            break;
-        case 7:
-            target = (IR & 0xFF) | (IR & 0xE00) >> 1;
-            appendDA(itos((lex << 11) + target, BASE, 0, 0));
-            appendDA("imm");
-            if (IR & ret) { appendDA("exit"); }  break;
-        default:
-            name = TargetName(target);
-            if (name == NULL) HexToDA(target);
-            diss((IR>>13)&3,"jump\0zjump\0call");
-            if (name != NULL) appendDA(name);
-        }
-    } else { // ALU
+    int target;
+    switch ((IR>>13) & 7) {
+    case 0:
+    case 1:
         if (ALUlabel(IR)) {
             if (IR & ret) appendDA("exit");
         }
@@ -1063,6 +1067,46 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
             if (IR & ret) appendDA("RET");
             appendDA("alu");
         }
+        break;
+    case 2:
+        target = (IR & 0xFF) | (IR & 0x1E00) >> 1;
+        appendDA(itos((lex << 12) + target, BASE, 0, 0));
+        appendDA("imm");
+        if (IR & ret) { appendDA("exit"); }
+        break;
+    case 3:
+        target = (lex << 12) | (IR & 0xFF) | (IR & 0x1E00) >> 1;
+        int trapnum = (IR & ret) ? 1 : 0;
+        if (trapnum) {
+            name = TargetName((target & 0x3FF) + (CodeSize - CodeCache), target >> 10);
+            if (name == NULL) HexToDA(target);
+            appendDA("xcall");
+            if (name != NULL) appendDA(name);
+        }
+        else {
+            appendDA(itos(target, BASE, 0, 0));
+            appendDA(itos(trapnum, BASE, 0, 0));
+            appendDA("trap");
+        }
+        break;
+    case 5:
+        target = IR & 0xFFF;  HexToDA(target);
+        if (IR & 0x1000) {
+            appendDA("cop");
+        }
+        else {
+            _lex = (lex << 12) + target;
+            appendDA("litx");
+        }
+        break;
+    case 4:
+    case 6:
+    case 7:
+        target = IR & 0x1FFF;
+        name = TargetName(target, 0);
+        if (name == NULL) HexToDA(target);
+        diss((IR>>13)&3,"zjump\0?\0jump\0call");
+        if (name != NULL) appendDA(name);
     }
     lex = _lex;
     printf("%16s", DAbuf);
@@ -1076,7 +1120,7 @@ SV Dasm (void) { // ( addr len -- )
     for (int i=0; i<length; i++) {
         int a = addr++ & (CodeSize-1);
         int x = Code[a];
-        name = TargetName(a);
+        name = TargetName(a, 0);
         if (name != NULL) printf("%s\n", name);
         printf("%03x %04x  ", a, x);
         DisassembleInsn(x);
@@ -1274,8 +1318,10 @@ SV DefA_Exec(void) {
 SV DefA_Comp(void) {
     int id = Header[me].applet;
     if (lastAPI != id) {                // changed from last reference
-        lastAPI = id;   
-        LitnComp("xexec", xxt());
+        lastAPI = id;
+        int ext = xxt();
+        extended_lit(ext >> 12);
+        toCode(trap | ret | lit_field(ext));
     }
     else 
         Def_Comp();

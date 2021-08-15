@@ -14,26 +14,38 @@ clock cycle.
 Returns often cost nothing since a "return" bit can trigger a return in parallel
 with an ALU operation.
 
+Hardware stacks are very fast in modern chips because wire delays trump logic delays.
+In a hardware stack, there are few long wires because the bits are adjacent.
+A stack is a bidirectional shift register.
+GreenArrays has demonstrated that stacks can be very low power.
+The stack implementation can adjust the amount of data shifting by depth
+to reduce the power consumption of the stack.
+For example, here is a 17-deep stack:
+
+![Stack](stack.png)
+
+The depth counter should be protected from overflow (don't count past `1111`).
+
 ## Chad ISA summary
 
 ```
-0xpppppR xwwwrrss = ALU instruction
+00pppppR xwwwrrss = ALU instruction
     x = unused
     p = 5-bit ALU operation select
     R = return
     w = strobe select
     r = return stack displacement
     s = data stack displacement
-100nnnnn nnnnnnnn = jump
-    PC = (lex<<13) | n
-101nnnnn nnnnnnnn = conditional jump
-110nnnnn nnnnnnnn = call, same as jump but pushes PC.
-11100nnn nnnnnnnn = literal extension
-    lex = (lex<<11) | n;  Any other instruction clears lex.
-11101nnn nnnnnnnn = reserved for user's coprocessor
-1111nnnR nnnnnnnn = unsigned literal (imm)
-    T = (lex<<11) | n
+010nnnnR nnnnnnnn = unsigned literal (imm)
+    T = (lex<<12) | n
     R = return
+011nnnnH nnnnnnnn = trap: literal with call to handler H
+100nnnnn nnnnnnnn = conditional jump
+1010nnnn nnnnnnnn = literal extension
+    lex = (lex<<12) | n;  Any other instruction clears lex.
+1011xnnn nnnnnnnn = reserved for user's coprocessor
+110nnnnn nnnnnnnn = jump, PC = (lex<<13) | n
+111nnnnn nnnnnnnn = call, same as jump but pushes PC.
 ```
 
 ### ALU detail
@@ -73,7 +85,7 @@ The `insn[6:4]` field of the ALU instruction is:
 - 000:
 - 001: `T->N` Write T to N
 - 010: `T->R` Write T to R
-- 011: `N->[T]` Write T to mem\[A]
+- 011: `N->[T]` Write N to mem\[T]
 - 100: `N->io[T]` Write N to io\[T], waiting for its ACK signal
 - 101: `_MEMRD_` Trigger read from data memory
 - 110: `_IORD_` Trigger read from the I/O port

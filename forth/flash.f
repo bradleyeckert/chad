@@ -69,6 +69,7 @@ variable apisp   apistack apisp !
    dup 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ spifload
    3FF and cm-size +  2* >r             \ execute the xxt
 ; no-tail-recursion
+' xexec resolves api_trap
 
 :noname  ( R: addr+1 -- addr )
    r> 0 invert + >r                     \ clear LSB
