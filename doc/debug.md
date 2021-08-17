@@ -4,6 +4,7 @@
 - `see` *( <name> -- )* Disassemble a word
 - `dasm` *( addr len -- )* Disassembles a section of code
 - `sstep` *( addr steps -- )* Single step starting at *addr*.
+- `logsteps` *( steps -- )* Number of steps to log to "output.txt"
 
 ## verbosity
 
@@ -13,7 +14,8 @@ interpreter prints out.
 - `1` enables line printing. Each line of input text is echoed.
 - `2` enables printing of each blank delimited token and its stack effects.
 - `4` enables machine level instruction trace in the simulator.
-- `8` prints out the source remaining after >IN.
+- `8` tracks the maximum stack depth
+- `16` prints out the source remaining after >IN.
 
 Options `1` and `2` (or both, 1|2 = `3`) show you what's going on in the
 chad interpreter (known in Forth as the QUIT loop).
@@ -54,3 +56,12 @@ It does this by setting bit 2 in the verbosity setting during stepping.
 In that mode, invoking the simulator produces a log output listing. 
 Make sure you use `0 verbosity` after getting the log because it's easy
 to trigger a lot more data than you want.
+
+## logsteps
+
+`10000 logsteps cold` dumps the first 10000 simulation steps to "output.txt".
+The Verilog model, `chad.v`, has a LOGGING option that saves the same thing
+to "simlog.txt". Use a file comparison tool like WinMerge to see
+differences in simulation. It's best to test code before doing I/O because
+I/O is where the simulations start to differ. Real world peripherals
+create delays. For example, `emit` spins while waiting for the UART.

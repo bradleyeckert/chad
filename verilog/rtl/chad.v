@@ -1,10 +1,10 @@
-// Chad processor                                               11/11/2020 BNE
+// Chad processor                                               8/16/2021 BNE
 // License: This code is a gift to the divine.
 
 module chad
 #(
   parameter WIDTH = 18,                 // cell size, can be 16 to 32
-  parameter DEPTH = 20                  // depth of both stacks
+  parameter DEPTH = 20                  // depth of both stacks (16 should be enough)
 )(
   input  wire clk,
   input  wire resetq,                   // Processor reset, async active low
@@ -28,6 +28,8 @@ module chad
   output wire [WIDTH-1:0] copb,         // Coprocessor B input
   output wire [WIDTH-1:0] copc          // Coprocessor C input
 );
+
+// `define LOGGING
 
   reg  [4:0] dsp, rsp;                  // Stack depth tracking
   reg  [WIDTH-1:0] st0;                 // Top of data stack
@@ -54,13 +56,13 @@ module chad
     .rd(rst0), .we(rstkW), .wd(rstkD), .delta(rspI));
 
   // Coprocessor
-  assign copgo = (insn[15:11] == 5'b11101);
+  assign copgo = (insn[15:11] == 5'b10110);
   assign copa = st0;
   assign copb = st1;
   assign copc = wreg;
 
-  reg [WIDTH-12:0] lex;
-  wire [WIDTH-1:0] longlex = {lex, insn[10:0]};
+  reg [WIDTH-13:0] lex;
+  wire [WIDTH-1:0] longlex = {lex, insn[11:0]};
 
   wire [WIDTH:0] sum  = st1 + st0;	// N + T
   wire [WIDTH:0] diff = st1 - st0;	// N - T
@@ -84,15 +86,8 @@ module chad
 
   always @*
   begin // Compute the new value of st0
-    if (insn[15])
-      casez (insn[14:12])
-      3'b00?:  st0N = st0;          			// jump
-      3'b01?:  st0N = st1;          			// conditional jump
-      3'b10?:  st0N = st0;          			// call
-      3'b110:  st0N = st0;          			// litx
-      default: st0N = {lex, insn[11:9], insn[7:0]};	// literal
-      endcase
-    else // ALU operations, insn[14] not currently used
+    case (insn[15:13])
+    3'b000, 3'b001: begin
       case (insn[12:9])
       4'b0000: st0N = (insn[13]) ? cop : st0;           // T, COP
       4'b0001: st0N = (insn[13]) ? carry : {WIDTH{st0[WIDTH-1]}}; // 0<, C
@@ -112,16 +107,22 @@ module chad
       4'b1111: st0N = {{(WIDTH - 13){1'b0}}, rsp, 3'b000, dsp};
       default: st0N = {WIDTH{1'bx}};                    // abnormal
       endcase
+    end
+    3'b010:  st0N = {lex, insn[12:9], insn[7:0]};	// literal
+    3'b100:  st0N = st1;          			// conditional jump
+    default: st0N = st0;                                // other
+    endcase
   end
 
+  wire isALU =      (insn[15:14] == 2'b00);
   wire func_T_N =   (insn[6:4] == 1);                   // T->N
   wire func_T_R =   (insn[6:4] == 2);                   // T->R
-  wire func_write = (insn[6:4] == 3) & ~insn[15];       // N->[T]
-  wire func_read =  (insn[6:4] == 4) & ~insn[15];       // _MEMRD_
-  wire func_iow =   (insn[6:4] == 5) & ~insn[15];       // N->io[T]
-  wire func_ior =   (insn[6:4] == 6) & ~insn[15];       // _IORD_
-  wire func_co =    (insn[6:4] == 7) & ~insn[15];       // co
-  wire islex =      (insn[15:12] == 4'b1110);
+  wire func_write = (insn[6:4] == 3) & isALU;           // N->[T]
+  wire func_read =  (insn[6:4] == 4) & isALU;           // _MEMRD_
+  wire func_iow =   (insn[6:4] == 5) & isALU;           // N->io[T]
+  wire func_ior =   (insn[6:4] == 6) & isALU;           // _IORD_
+  wire func_co =    (insn[6:4] == 7) & isALU;           // co
+  wire islex =      (insn[15:12] == 4'b1010);
 
   assign mem_rd = !reboot & func_read;
   assign mem_wr = !reboot & func_write;
@@ -129,42 +130,48 @@ module chad
   assign io_wr =  !reboot & func_iow;
   assign io_rd =  !reboot & func_ior;
 
-  assign rstkD = (insn[15]) ? {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0} : st0;
-  wire return = insn[8] & ((insn[15:12] == 4'b1111) | ~insn[15] & ~func_T_R);
-  wire ack = irq & return & ~rst0[0];
+  assign rstkD = isALU ? st0 : {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0};
+  wire return = insn[8] & ((insn[15:13] == 3'b010) | isALU & ~func_T_R);
+  //            R bit       imm                      ALU & not pushing T to R
+  wire ack = 1'b0; // irq & return & ~rst0[0]; // disable interrupts ***
   wire exception = return & rst0[0];
   assign iack = ack & ~hold;
 
   always @*
   begin
-    casez ({insn[15:12]})               // adjust data stack pointer
-    4'b0???: {dstkW, dspI} = {func_T_N, insn[1:0]};
-    4'b101?: {dstkW, dspI} = {1'b0,     2'b11};         // if
-    4'b1111: {dstkW, dspI} = {1'b1,     2'b01};         // imm
+    casez ({insn[15:13]})               // adjust data stack pointer
+    3'b00?:  {dstkW, dspI} = {func_T_N, insn[1:0]};     // ALU
+    3'b100:  {dstkW, dspI} = {1'b0,     2'b11};         // if
+    3'b01?:  {dstkW, dspI} = {1'b1,     2'b01};         // imm, trap
     default: {dstkW, dspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({insn[15:12], insn[8], ack | exception})
-    6'b0???_?_0: {rstkW, rspI} = {func_T_R, insn[3:2]};
-    6'b110?_?_?: {rstkW, rspI} = {1'b1,     2'b01};     // call
-    6'b1111_1_0: {rstkW, rspI} = {1'b0,     2'b11};     // lit+ret
-    default:     {rstkW, rspI} = {1'b0,     2'b00};
+    casez ({insn[15:13], insn[8], ack | exception})
+    6'b00?_?_0: {rstkW, rspI} = {func_T_R, insn[3:2]};  // ALU
+    6'b?11_?_?: {rstkW, rspI} = {1'b1,     2'b01};      // trap, call
+    6'b010_1_0: {rstkW, rspI} = {1'b0,     2'b11};      // lit+ret
+    default:    {rstkW, rspI} = {1'b0,     2'b00};
     endcase
 
-    casez ({reboot, insn[15:12], insn[8], ack, exception, |st0})
-    9'b1_????_?_?_?_?: pcN = 0;
-    9'b0_100?_?_?_?_?, // jump, call, if
-    9'b0_110?_?_?_?_?,
-    9'b0_101?_?_?_?_0: pcN = {2'd0, insn[12:0]};
-    9'b0_1111_1_0_0_?, // lit+ret
-    9'b0_0???_1_0_0_?: pcN = rst0[15:1];
-    9'b0_1111_1_1_0_?,
-    9'b0_0???_1_1_0_?: pcN = ivec;
-    9'b0_1111_1_?_1_?,
-    9'b0_0???_1_?_1_?: pcN = 15'd16;
-    default:           pcN = pc_plus_1;
+    casez ({reboot, insn[15:13], insn[8], ack, exception, |st0})
+    9'b1_???_?_?_?_?: pcN = 0;
+    9'b0_100_?_?_?_0, // if, jump|call
+    9'b0_11?_?_?_?_?: pcN = {2'd0, insn[12:0]};
+    9'b0_011_?_?_?_?: pcN = {14'd8, insn[8]}; // trap
+    9'b0_010_1_0_0_?, // lit+ret
+    9'b0_00?_1_0_0_?: pcN = rst0[15:1]; // ret
+    9'b0_010_1_1_0_?, // interrupt (lit-ret or alu-ret)
+    9'b0_00?_1_1_0_?: pcN = ivec;
+    9'b0_010_1_?_1_?, // exception
+    9'b0_00?_1_?_1_?: pcN = 15'd18;
+    default:          pcN = pc_plus_1;
     endcase
   end
+
+`ifdef LOGGING
+  reg [WIDTH-1:0] nos;
+  integer f, i, j;
+`endif
 
   always @(negedge resetq or posedge clk)
   begin
@@ -175,6 +182,19 @@ module chad
       { carry, wreg } <= 0;
       lex <= 0;
     end else begin
+`ifdef LOGGING
+      if (reboot) begin
+        f = $fopen("simlog.txt","w");
+        i = 10000;
+      end else
+      if ((i) && (!hold)) begin
+        for (j = 0; j < WIDTH; j = j + 1)
+          nos[j] = (st1[j] === 1'b1) ? 1'b1 : 1'b0; // alias x to 0
+        $fwrite(f,"PC=%h,insn=%h,T=%h,N=%h,R=%h,sp=%x,rp=%x\n", pc, insn, st0, nos, rst0, dsp, rsp);
+        if (i == 1) $fclose(f);
+        i = i - 1;
+      end
+`endif
       reboot <= 0;
       if (!hold) begin
         { pc, st0 } <= { pcN, st0N };
@@ -184,7 +204,7 @@ module chad
           carry <= co;
           if (insn[11]) wreg <= st0;
         end
-        if (islex) lex <= longlex[WIDTH-12:0];
+        if (islex) lex <= longlex[WIDTH-13:0];
         else lex <= 0;
       end
     end

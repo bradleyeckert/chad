@@ -50,7 +50,7 @@ module mcu
   wire [WIDTH-1:0]     io_dout;         // I/O data out                   o
   wire [14:0]          code_addr;       // Code memory address            i
   wire [15:0]          insn;            // Code memory data               o
-  wire                 p_hold;          // Processor hold                 o
+  wire                 hold;            // Processor hold request         o
   wire                 p_reset;         // Processor reset                o
 // UART interface
   wire                 u_ready;         // Ready for next byte to send    i
@@ -77,6 +77,13 @@ module mcu
   wire [WIDTH-1:0]     copa;            // Coprocessor A input            i
   wire [WIDTH-1:0]     copb;            // Coprocessor B input            i
   wire [WIDTH-1:0]     copc;            // Coprocessor C input            i
+
+// The memories need their addresses synchronized after a hold
+
+  reg hold_d;                           // delayed hold
+  reg [CODE_SIZE-1:0] code_a_d;         // address delay registers
+  reg [DATA_SIZE-1:0] data_a_d;
+  wire p_hold = hold | hold_d;          // stretch the processor hold
 
 // Coprocessor is instantiated outside of the processor
 
@@ -117,33 +124,46 @@ module mcu
 
 // Memory: In this case, a couple of single-port RAMs.
 
-  wire [DATA_SIZE-1:0] data_a;          // Data RAM read/write address
-  wire [WIDTH-1:0]     data_din;        // Data RAM write data
   wire                 data_wr;         // Data RAM write enable
   wire                 data_rd;         // Data RAM read enable
+  wire [DATA_SIZE-1:0] data_a;          // Data RAM read/write address
+  wire [DATA_SIZE-1:0] data_ax = (hold_d & data_rd) ? data_a_d : data_a;
+  wire [WIDTH-1:0]     data_din;        // Data RAM write data
 
   spram #(DATA_SIZE, WIDTH) data_ram (
     .clk      (clk      ),
-    .addr     (data_a   ),
+    .addr     (data_ax  ),
     .din      (data_din ),
     .dout     (mem_dout ),
     .we       (data_wr  ),
     .re       (data_rd  )
   );
 
-  wire [CODE_SIZE-1:0] code_a;          // Code RAM read/write address
-  wire [15:0]          code_din;        // Code RAM write data
   wire                 code_wr;         // Code RAM write enable
   wire                 code_rd;         // Code RAM read enable
+  wire [CODE_SIZE-1:0] code_a;          // Code RAM read/write address
+  wire [CODE_SIZE-1:0] code_ax = (hold_d & code_rd) ? code_a_d : code_a;
+  wire [15:0]          code_din;        // Code RAM write data
 
   spram #(CODE_SIZE, 16) code_ram (
     .clk      (clk      ),
-    .addr     (code_a   ),
+    .addr     (code_ax  ),
     .din      (code_din ),
     .dout     (insn     ),
     .we       (code_wr  ),
     .re       (code_rd  )
   );
+
+// Handle hold synchronization
+
+  always @(posedge clk)
+  begin
+    hold_d <= hold;
+    if (!hold) begin
+      code_a_d <= code_a;
+      data_a_d <= data_a;
+    end
+  end
 
 // Interrupts
 
@@ -170,6 +190,8 @@ module mcu
     end
   end
 
+  wire badboot;                         // boot code is corrupted
+
 // spif is the SPI flash controller and ISP hub
   spif #(CODE_SIZE, WIDTH, DATA_SIZE, BASEBLOCK, PID, KEY_LENGTH) bridge (
     .clk      (clk      ),
@@ -182,7 +204,7 @@ module mcu
     .din      (din      ),
     .io_dout  (io_dout  ),
     .code_addr(code_addr),
-    .p_hold   (p_hold   ),
+    .p_hold   (hold     ),
     .p_reset  (p_reset  ),
     .data_a   (data_a   ),
     .data_din (data_din ),
@@ -195,6 +217,7 @@ module mcu
     .key      (key      ),
     .sernum   (sernum   ),
     .ISPenable (1'b1    ),
+    .badboot  (badboot  ),
     .u_ready  (u_ready  ),
     .u_wr     (u_wr     ),
     .u_dout   (u_dout   ),

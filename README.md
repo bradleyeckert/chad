@@ -182,11 +182,6 @@ Human-speed Forth tools are good candidates for applets so as to free up code RA
 
 ## Status
 
-NOTE: The Verilog model is broken, but it is in the middle of being reworked.
-`spif` DMA was hammering the data, but I figured out how to fix `hold`.
-The ISA needs to be changed to match the simulator, which I changed to add
-more compact API calls.
-
 The "myapp" demo boots and runs in `chad`.
 An ISP utility loads the boot file into an FPGA with SPI flash chip attached.
 
@@ -199,24 +194,15 @@ performs the following:
 - `chad` starts running the "myapp" demo after bootup
 - The demo runs a Forth interpreter (ok> prompt) via the UART.
 
-Before I broke the Verilog, it ran on Digilent's Arty A7-35T board: 100 MHz, 10% of the chip.
+I ran it on Digilent's Arty A7-35T board: 100 MHz, 10% of the chip.
 Here's what text rendering looks like on a TFT LCD module:
 
 ![ArtyA7 Image](doc/artyLCD.jpg)
 
 ## To-do
 
-Applets work sometimes, but sometimes not. So far, they work in the Verilog simulation.
-Need to find out what is breaking so I can put a lot more code in applets.
-
 The ISP utility should have the terminal code merged in.
 Although it's written in C, it should be translated to Forth and 8th.
-
-SPI should default to dual data rate mode. 
-Dual rate takes 5 SPI clocks or 10 system clocks per byte.
-This matches the 9 cycles per byte overhead of decryption.
-QSPI doesn't add anything.
-You lose the WP pin and it costs you 2 extra I/O pins.
 
 Catch and Throw should use the features of `frame.f` to set up `catch` frames.
 Maybe leave more stack space for the frame stack in data RAM.

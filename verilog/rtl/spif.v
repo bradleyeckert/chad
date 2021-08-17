@@ -367,8 +367,11 @@ module spif
 // reads blank.
 //==============================================================================
 
-  localparam READ_CMD = 8'h0B;          // 0B=single, 3B=dual
-  localparam READ_RATE = 3'd2;          // 2=single, 5=dual
+  localparam SNGLREAD_CMD = 8'h0B;      // SPI commands
+  localparam DUALREAD_CMD = 8'h3B;
+  localparam SINGLE_RATE = 3'd2;        // SPI rate for commands and address
+  localparam DUAL_RATE = 3'd5;          // format for dual-rate SPI read
+  localparam BOOT_RATE = DUAL_RATE;     // either SINGLE_RATE or DUAL_RATE
 
   reg [15:0] b_count;                   // length of byte run
   reg [15:0] b_dest;                    // address register for boot load destination
@@ -401,7 +404,6 @@ module spif
   wire codeAddrS = (mem_addr[3:0] == 4'h1) & io_wr & internal & ~p_hold;
   wire codeDataS = (mem_addr[3:0] == 4'h2) & io_wr & internal & ~p_hold;
 
-
 // Boot mode FSM
   always @(posedge clk or negedge arstn)
     if (!arstn) begin                   // async reset
@@ -411,11 +413,11 @@ module spif
       b_mode <= 4'd0;     bumpDest <= 1'b0;  signing <= 1'b0;
       b_bytes  <= 2'd0;   dataWr <= 1'b0;    i_usel <= 3'd7;
       b_bcnt <= 2'd0;     codeWr <= 1'b0;    g_next <= 1'b0;
-      b_state <= 4'd1;    f_format <= 3'd0;  g_load <= 1'b0;
+      b_state <= 4'd1;    g_init <= 1'b1;    g_load <= 1'b0;
       p_reset <= 1'b1;    uo_wr <= 1'b0;     g_reset_n <= 1'b0;
-      rd_format <= READ_RATE;
+      rd_format <= BOOT_RATE;
+      f_format <= 3'd0;
       rd_addr <= 0;       cold <= 1'b1;      badboot <= 1'b0;
-      g_init <= 1'b1;
       i_state <= ISP_PING;              // spit out a char on POR
       outword <= 91;                    // power-up output character
       init <= RAM_INIT;
@@ -443,7 +445,7 @@ module spif
         uo_wr <= 1'b0;
         case (b_state[2:0])
           3'b000:  f_dout <= ISPbyte;
-          3'b001:  f_dout <= READ_CMD;
+          3'b001:  f_dout <= rd_format[2] ? DUALREAD_CMD : SNGLREAD_CMD ;
           3'b010:  f_dout <= rd_addr[23:16] + BASEBLOCK[7:0];
           3'b011:  f_dout <= rd_addr[15:8];
           3'b100:  f_dout <= rd_addr[7:0];
@@ -453,8 +455,8 @@ module spif
         f_wr <= 1'b0;
         if (f_ok) begin
           f_wr <= 1'b1;
-          case (b_state)
-          4'b0000:
+          case (b_state)                // read sequencing FSM
+          4'h0:                         // is idle:
             begin
               f_wr <= 1'b0;             // ========== Interpret ISP bytes
               case (i_state)
@@ -472,9 +474,10 @@ module spif
                         i_count <= 12'd6;
                       end
                       if (ISPbyte[2]) begin
-                        b_state <= 4'b0001; // reboot from flash
+                        b_state <= 4'h1; // reboot from flash
+                        f_format <= SINGLE_RATE;
+                        rd_format <= BOOT_RATE;
                         rd_addr <= {i_count, 8'd0};
-                        rd_format <= READ_RATE;
                         g_reset_n <= 1'b0;
                         g_init <= 1'b1;
                       end
@@ -533,12 +536,17 @@ module spif
                 bumpDest <= 1'b1;
               end
             end
-          4'b0001, 4'b1001:             // begin fast read
+          4'h1, 4'h9:                   // begin fast read, boot or flash-read
+            begin
+              f_format <= SINGLE_RATE;
+              b_state <= b_state + 1'b1;
+            end
+          4'h6:
             begin
               f_format <= rd_format;
               b_state <= b_state + 1'b1;
             end
-          4'b0111:                      // ========== Interpret flash bytes
+          4'h7:                         // ========== Interpret flash bytes
             begin
               g_next <= 1'b1;
               case (b_mode[3:1])        // what kind of byte is it?
@@ -551,6 +559,7 @@ module spif
                       if (plain[4]) begin
                         f_wr <= 1'b0;   // 1111xxxx = end interpret
                         f_format <= 3'd0; // raise CS#
+                        rd_format <= SINGLE_RATE; // ???
                         b_state  <= 4'd0;
                       end else begin    // 1110xxxx = finish booting
                         b_count <= 16'd4;
@@ -604,14 +613,15 @@ module spif
                 end
               endcase
             end
-          4'b1110:                      // clear fr_data before shifting in bytes
+          4'hE:                         // clear fr_data before shifting in bytes
             begin
               fr_data <= 0;
+              f_format <= rd_format;
               b_state <= b_state + 1'b1;
               g_next <= 1'b1;           // get keystream before the read
               rd_bcnt <= rd_bytes;
             end
-          4'b1111:                      // ========== Read a word
+          4'hF:                         // ========== Read a word
             begin
               testsig <= signing;
               case (rd_bcnt)
@@ -622,6 +632,7 @@ module spif
                   sig_ex <= crcIn[7:0];
                   if (signing) begin    // end of signature testing
                     f_format <= 3'd0;   // raise CS# after signature
+                    rd_format <= SINGLE_RATE;  // ???
                     sig_last <= 1'b1;
                     signing <= 1'b0;
                   end
@@ -653,7 +664,9 @@ module spif
             outword <= din;
           end
         4'h3: begin
-            b_state <= 4'd1;            // interpret flash byte stream
+            b_state <= 4'h1;            // interpret flash byte stream
+            f_format <= SINGLE_RATE;
+            rd_format <= BOOT_RATE;
             rd_addr <= din;
           end
         4'h5: begin
@@ -672,6 +685,7 @@ module spif
           end
         4'hB: begin
             b_state <= 4'h9;            // read a word from flash to b_data
+            f_format <= SINGLE_RATE;
             rd_addr <= din;
           end
         endcase

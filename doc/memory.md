@@ -31,6 +31,7 @@ This brings the code space requirement to 4K. So, more sensible memory sizes are
 - 2K x 24 data memory
 
 For reference, in 130nm memory density is about 400 Kb/mm<sup>2</sup>
+(according to ChipEstimate)
 so designing for the 130nm node would give one `chad` core a die area of 0.4 mm<sup>2</sup>.
 The 130nm node is attractive for several reasons:
 
@@ -47,6 +48,28 @@ Memories are usually supplied as GDSII and matching simulation code targeted to 
 These size estimates should be taken with a grain of salt since RAM architectures vary wildly
 depending on speed and power requirements and transistors per bit (there are 4T and 1T types).
 For example, MoSys 1T SRAM is half the area of 6T SRAM. 4T is about 30% smaller than 6T.
+
+Free tools from eFabless work with the Sky130 process. There are RAM generators for
+OpenRAM and DFFRAM, whose densities are roughly 75 and 25 Kb/mm<sup>2</sup> respectively.
+20% the density of commercial memory IP is still usable for Forth chips.
+The above mentioned 80 Kb (4Kx16 + 2Kx24) would be a little over 1 mm<sup>2</sup>
+of OpenRAM. A [test RAM](https://github.com/ShonTaware/SRAM_SKY130) had
+an access time of less than 2.5ns using Google SkyWater SKY130 PDKs and
+OpenRAM memory complier.
+
+Since OpenRAM is a little less mature, DFFRAM is a more reliable option.
+The same RAM would be 3 mm<sup>2</sup>.
+
+Google and eFabless are working with more chip fabs besides Skywater to set up open-source
+PDKs. Now that a suitable way of protecting fab IP has been proven, the years of 2022 onward
+should yield more free tools and more open-source IP as more fabs seek to have such IP target
+their processes.
+
+## ECC
+
+Hamming(26,31) can correct single-bit errors on data words as wide as 26-bit.
+Code memory can use 32-bit words with 6 parity bits to ECC code RAM.
+A 2:1 multiplexer would split the corrected data into 16-bit halves.
 
 ## Lockstep operation
 

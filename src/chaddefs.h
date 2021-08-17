@@ -217,8 +217,8 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define BYE            -299
 
 // verbose flags
-#define VERBOSE_SOURCE  1
-#define VERBOSE_TOKEN   2
-#define VERBOSE_TRACE   4
-#define VERBOSE_STKMAX  8
-#define VERBOSE_SRC     32
+#define VERBOSE_SOURCE  1   // show the source file line
+#define VERBOSE_TOKEN   2   // show the source token (blank-delimited string)
+#define VERBOSE_TRACE   4   // simulation trace in human readable form
+#define VERBOSE_STKMAX  8   // track and show the maximum stack depth
+#define VERBOSE_SRC     16  // display the remaining source in the TIB

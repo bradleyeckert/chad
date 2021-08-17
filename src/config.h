@@ -6,6 +6,8 @@
 #define __CONFIG_H__
 #include <stdint.h>
 
+#define SIM_FILENAME "output.txt"
+
 #define CELLBITS        24      /* Width of a cell in bits, 16 to 32        */
 // Sizes of memories in cells, should be an exact power of 2
 #define CodeSize      4096      /* Code memory 16-bit words                 */

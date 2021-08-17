@@ -34,6 +34,16 @@ static uint64_t GetMicroseconds() {
 #include "flash.h"
 #include "gecko.h"
 
+static FILE* fopenx(char* filename, char* fmt) {
+#ifdef MORESAFE
+    FILE* fp;
+    errno_t err = fopen_s(&fp, filename, fmt);
+    return fp;
+#else
+    return fopen(filename, fmt);
+#endif
+}
+
 SI verbose = 0;
 static uint8_t sp, rp;                  // stack pointers
 CELL t, pc, cy, lex, w;                 // registers
@@ -223,11 +233,17 @@ static uint8_t Iack(void) {             // priority encoder
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
 
+SI logging = 0;                         // enable simulation logging
+
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
     cell _pc;
     uint16_t insn;
 #ifdef MoreInstrumentation
+    FILE* fp = NULL;
+    if (logging) {
+        fp = fopenx(SIM_FILENAME, "w");
+    }
     uint16_t retMark = (uint16_t)cycles;
 #endif
     uint8_t mark = RDEPTH;
@@ -245,6 +261,13 @@ SI CPUsim(int single) {
 #ifdef MoreInstrumentation
         if (verbose & VERBOSE_TRACE) {
             TraceLine(pc, insn);
+        }
+        if (logging) {
+            fprintf(fp, "PC=%04x,insn=%04x,T=%06x,N=%06x,R=%06x,sp=%02x,rp=%02x\n",
+                pc, insn, t, Dstack[SP], Rstack[RP], sp, rp);
+            logging--;
+            if (!logging)
+                fclose(fp);
         }
 #endif
         _pc = pc + 1;
@@ -394,29 +417,30 @@ SI CPUsim(int single) {
 #endif
             break;
         }
+        pc = _pc;  lex = _lex;
+        cycles++;
+        if ((cycles & CELLMASK) == 0) { // raw counter overflow
+            irq |= (1 << 1);            // lowest priority interrupt
+        }
+        if (pc & ~(CodeSize-1))         // PC must remain within code memory
+            single = BAD_PC;
 #ifdef MoreInstrumentation
         if (sp > spMax) {
             spMax = sp;
-            NewMaxStack(sp, rpMax, _pc);
+            NewMaxStack(sp, rpMax, pc);
         }
         if (rp > rpMax) {
-            rpMax = rp; 
-            NewMaxStack(spMax, rp, _pc);
+            rpMax = rp;
+            NewMaxStack(spMax, rp, pc);
         }
         if (verbose & VERBOSE_TRACE) {
             if (exception)
                 printf("Exception at %Xh, R/2=%Xh, page=%Xh\n",
                     pc, Rstack[RP] / 2, Rstack[(RP - 1) & RPMASK]);
             if (interruptVector)
-                printf("Interrupt Level %d\n", _pc);
+                printf("Interrupt Level %d\n", pc);
         }
 #endif
-        pc = _pc;  lex = _lex;
-        cycles++;
-        if ((cycles & CELLMASK) == 0) {  // raw counter overflow
-            irq |= (1 << 1);            // lowest priority interrupt
-        }
-        if (pc & ~(CodeSize-1)) single = BAD_PC;
     } while (single == 0);
     return single;
 }
@@ -452,6 +476,10 @@ SV CompExit (void) {                    // compile an exit
     } else {
 plain:  toCode(alu | ret | rdn);         // compile a stand-alone return
     }
+}
+
+SV Calign(void) {
+    CP = (CP + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
 }
 
 // The LEX register is cleared whenever the instruction is not LITX.
@@ -590,7 +618,7 @@ SV sane(void) {
 
 SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= CP;  latest = CP;  lastAPI = 0; }
 SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = CP;  lastAPI = 0; }
-SV MarkFwd(void) { CtrlStack[++ConSP] = CP;  lastAPI = 0; }
+SV MarkFwd(void) { Calign();  CtrlStack[++ConSP] = CP;  lastAPI = 0; }
 SV doBegin(void) { MarkFwd(); }
 SV doAgain(void) { ResolveRev(jump); }
 SV doUntil(void) { ResolveRev(zjump); }
@@ -1218,16 +1246,6 @@ SV SwallowBOM(FILE *fp) {               // swallow leading UTF8 BOM marker
     }
 }
 
-static FILE* fopenx(char* filename, char* fmt) {
-#ifdef MORESAFE
-    FILE* fp;
-    errno_t err = fopen_s(&fp, filename, fmt);
-    return fp;
-#else
-    return fopen(filename, fmt);
-#endif
-}
-
 SI OpenNewFile(char *name) {            // Push a new file onto the file stack
     filedepth++;  fileID++;
     File.fp = fopenx(name, "r");
@@ -1335,7 +1353,7 @@ SV DefA_Comp(void) {
 SV Colon(void) {
     parseword(' ');
     if (AddHead(tok, "")) {             // start a definition
-        CP = (CP + (CodeAlignment - 1)) & (cell)(-CodeAlignment);
+        Calign();
         LogColor(COLOR_DEF, 0, tok);
         if (isAPI) {
             Header[hp].applet = isAPI;
@@ -2139,6 +2157,7 @@ SV Variable   (void) { Align();  buffer(CELLS); }
 SV Twovariable(void) { Variable();  allot(CELLS); }
 SV Char       (void) { parseword(' ');  Dpush(getUTF8()); }
 SV BrackChar  (void) { parseword(' ');  Literal(getUTF8()); }
+SV LogSteps   (void) { logging = Dpop(); }
 
 SV HWoptions(void) {
     int n = COP_OPTIONS;
@@ -2207,6 +2226,7 @@ SV LoadKeywords(void) {
     AddKeyword("see",         "1.0210 <name> --",     See,           noCompile);
     AddKeyword("dasm",        "1.0220 xt len --",     Dasm,          noCompile);
     AddKeyword("sstep",       "1.0230 xt len --",     Steps,         noCompile);
+    AddKeyword("logsteps",    "1.0234 --",            LogSteps,      noCompile);
     AddKeyword("cold",        "1.0235 --",            Cold,          noCompile);
     AddKeyword("words",       "1.0240 --",            Words,         noCompile);
     AddKeyword("Words",       "1.0241 --",            Words,         noCompile);
