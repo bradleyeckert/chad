@@ -119,7 +119,7 @@ cell 4 = [if]
 : or    invert swap invert and invert ; \ 2.0300 n m -- n|m
 : rot   >r swap r> swap ;               \ 2.0310 x1 x2 x3 -- x2 x3 x1
 
-: execute  2* >r ; no-tail-recursion    \ 2.0320 i*x xt -- j*x
+: execute  >r ; no-tail-recursion       \ 2.0320 i*x xt -- j*x
 : ?dup   dup if dup then ;              \ 2.0325 x -- 0 | x x
 : 2dup   over over ; ( macro )          \ 2.0330 d -- d d
 : 2drop  drop drop ;                    \ 2.0340 d --
@@ -286,7 +286,6 @@ CODE depth                              \ 2.0730 -- +n
 ;CODE
 
 : exec2: 2* [ ;             \ 2.0740 n -- \ for list of 2-inst literals
-: exec1: 2* r> + >r ;       \ 2.0750 n -- \ for list of 1-inst literals
-: exec0: r> + >r ;          \ 2.0760 n -- \ for list with raw index
+: exec1: r> + >r ;          \ 2.0750 n -- \ for list of 1-inst literals
 
 there . .( instructions used by core) cr

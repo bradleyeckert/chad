@@ -4,16 +4,15 @@ there
 
 \ It would be better for APIexecute etc. to pack the `api` into xt.
 \ This would come into play if there are multiple instances of
-\ interpreters running, but since there isn't, appletID is global.
+\ interpreters running, but since there isn't, `api` is global.
 
 : xt>API  ( xt -- xxt )
-   cm-size -  api @ 10 lshift +
-;
-: APIexecute  ( xt -- )
-\  api @ spifload  execute \ <-- version that assumes caller is not in API
-   xt>API xexec
+   api @ 13 lshift +
 ;
 
+: APIexecute  ( xt -- )
+   xt>API xexec
+;
 
 \ not used until the compiler is figured out, but...
 

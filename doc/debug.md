@@ -65,3 +65,22 @@ to "simlog.txt". Use a file comparison tool like WinMerge to see
 differences in simulation. It's best to test code before doing I/O because
 I/O is where the simulations start to differ. Real world peripherals
 create delays. For example, `emit` spins while waiting for the UART.
+
+# Machine level tracing
+
+There are various triggers you can use to instrument the code without being
+overwhelmed by data.
+These triggers are custom user instructions that only execute in the simulator.
+The instructions are:
+
+- `debug+` *( -- )* Turns on instruction level tracing.
+- `debug-` *( -- )* Turns off instruction level tracing.
+- `regs?` *( -- )* Triggers a register dump.
+- `/data` *( -- )* Clears data changes.
+- `data?` *( -- )* Displays all data changes since the last `/data` or `data?`.
+- `stacks?` *( -- )* Triggers a stack dump.
+
+`/data` and `data?` are used to find where data is being clobbered.
+Before the first use of `data?`, use `/data` to initialize it.
+Every time `data?` executes, it will display a list of changes to data space
+between address 0 and DP.

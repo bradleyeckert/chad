@@ -66,7 +66,7 @@ variable frp1                           \ temporary frame pointer
     else
         -4 throw                        \ not enough data on the stack
     then
-;
+; no-tail-recursion
 
 : )stack                                \ 2.2960 ? -- ?
     depth  fpad ds>mem  frp1 !          \ save whatever is on the stack

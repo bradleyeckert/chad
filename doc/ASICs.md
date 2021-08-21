@@ -1,69 +1,72 @@
-# Memory Sizes
+# ASIC considerations
 
-Each `chad` core uses two memories: code and data.
-The memories should be small enough to encourage multi-core usage but
-big enough to be useful.
-
-As a rough rule of thumb, suppose a 6T RAM bit and a 4T NAND gate.
-Since the packing of transistors in a memory is much more efficient than in logic,
-each gate is roughly the size of two (single-port) RAM bits.
-
-Stacks are bidirectional shift registers where each bit consists of a D-FF and four pass transistors.
-A D-FF is 12T in CMOS, so let each stack bit be worth 4 gates of die area.
-16x16 and 24x16 stacks total 2.5K gates.
-
-The ARM 1 RISC processor (1985) was 25K transistors.
-Assuming half of that was logic, that would be 3K gates. 
-The original 8086 (1978) was 29K transistors, about the same complexity.
-Suppose `chad` logic will cost 3K gates.
-Allow 1.5K gates for user logic and 2.5K gates for stacks.
-Let the memory have twice the die area of logic.
-That would make the ideal total memory size in the 28Kb range:
-
-- 1K x 16 code memory
-- 512 x 24 data memory
-
-To support a Forth interpreter, `chad` needs about 1.7K of code space.
-It would be nice to support 1K of applet space and 1.3K of user code.
-This brings the code space requirement to 4K. So, more sensible memory sizes are:
-
-- 4K x 16 code memory
-- 2K x 24 data memory
-
-For reference, in 130nm memory density is about 400 Kb/mm<sup>2</sup>
-(according to ChipEstimate)
-so designing for the 130nm node would give one `chad` core a die area of 0.4 mm<sup>2</sup>.
 The 130nm node is attractive for several reasons:
 
 - The masks are more affordable: No need for multi-layer reticles.
 - It's supported by 12" fabs, which is not the case with 180nm.
 - 180nm is cheaper, but the capacity crunch is hitting 8" hard. 
 - Due to the above, 130nm is best for new designs.
+- eFabless has FOSS chip design tools for 130 nm.
 - 130nm handles analog and mixed signal well too. 
 
-It's easy to forget the early days of computing, when RAM was separate from the CPU.
-On-chip RAM is taken for granted these days.
-Memory generators and their simulation toolchains are modern marvels that make such things possible.
-Memories are usually supplied as GDSII and matching simulation code targeted to the particular fab and process node.
-These size estimates should be taken with a grain of salt since RAM architectures vary wildly
-depending on speed and power requirements and transistors per bit (there are 4T and 1T types).
-For example, MoSys 1T SRAM is half the area of 6T SRAM. 4T is about 30% smaller than 6T.
+Forth computers are tiny, even when used on a 130nm process like Sky130.
+It's likely your chip will be pad-limited.
+I/O pads are big. I couldn't find size information on Sky130 I/O pads, but
+a MOSIS 0.35um Hi-ESD I/O pad has an outline of 0.3 x 0.09 mm.
+44 of these (11 per side) would give a 1.6mm x 1.6mm chip with a 1mm x 1mm
+user area. The four corners can be used for power pins, so a 48-pin package
+could house the chip. Can a Chad-based ASIC fit in 1 mm<sup>2</sup>?
+Let's see.
+
+## Memory Sizes
+
+Stacks are bidirectional shift registers where each bit consists of a D-FF
+and four pass transistors.
+A D-FF is 12T in CMOS, so let each stack bit be worth 4 gates of die area.
+16x16 and 24x16 stacks total 2.5K gates.
+Figure another 3K gates for the CPU etc. but it's a lousy estimate because
+logic area depends on speed and power requirements.
+It doesn't matter, SRAM is the biggest user of die area.
+
+To support a Forth interpreter, `chad` needs about 1.2K of code space.
+It would be nice to support 0.4K of applet space and 0.4K of user code.
+This brings the minimum code space requirement to 2K (32 Kb).
+Adding 1K of 24-bit data RAM adds 24 Kb for a total of 56 Kb of SRAM.
+Twice that would be nice if you can get it: 112 Kb.
 
 Free tools from eFabless work with the Sky130 process. There are RAM generators for
 OpenRAM and DFFRAM, whose densities are roughly 75 and 25 Kb/mm<sup>2</sup> respectively.
-20% the density of commercial memory IP is still usable for Forth chips.
-The above mentioned 80 Kb (4Kx16 + 2Kx24) would be a little over 1 mm<sup>2</sup>
+The seemingly low density could have something to do with Sky130 having only 5 metal layers.
+More metal layers would put the wiring for the RAM cells under or over the cells.
+The above mentioned 56 Kb would be 0.75 mm<sup>2</sup>
 of OpenRAM. A [test RAM](https://github.com/ShonTaware/SRAM_SKY130) had
 an access time of less than 2.5ns using Google SkyWater SKY130 PDKs and
 OpenRAM memory complier.
 
-Since OpenRAM is a little less mature, DFFRAM is a more reliable option.
-The same RAM would be 3 mm<sup>2</sup>.
+SRAM dominates the design, so 0.75 mm<sup>2</sup> of RAM should allow an ASIC in
+a 48-pin package.
 
-Google and eFabless are working with more chip fabs besides Skywater to set up open-source
-PDKs. Now that a suitable way of protecting fab IP has been proven, the years of 2022 onward
-should yield more free tools and more open-source IP as more fabs seek to have such IP target
-their processes.
+The preferred 112 Kb of SRAM would need more area, and let's add some margin
+and say the design needs 2.5 mm<sup>2</sup>. A pad ring with 60 I/Os (15 on a side)
+and 4 power pads would fit in a 64-pin package, have an active area of 2.8 mm<sup>2</sup>,
+and have dicing lanes on a 2.37mm pitch.
+About 5K dice at $3K per 8" wafer is a die cost of $0.60.
+
+## Packages
+
+A rule of thumb for IC packaging is a penny a pin, which means packaging dominates
+chip cost up to about 64 pins.
+
+A 64-pin package such as 64-LFQFP (10x10) or 64-QFN (9x9) seems like a good
+target package for an ASIC. 
+
+A staggered pad ring would make sense with higher pin counts than 100.
+Such a dual pad ring would add 1.2mm to a core width of 1.8mm for a $1.00 die
+that doesn't get pad-limited until 160 pads. 
+The same sized die with a single pad ring would support 100 pads.
+
+Higher pin counts like these usually use Flip Chip, which uses a grid of solder bumps
+to mount the die to a substrate that breaks out into a FCBGA.
 
 ## ECC
 

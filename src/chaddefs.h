@@ -159,9 +159,19 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define trap   (3 << 13)
 #define zjump  (4 << 13)
 #define litx   (5 << 13)
-#define copop  (11 << 12)
+#define copop  (0x16 << 11)
+#define userop (0x17 << 11)
 #define jump   (6 << 13)
 #define call   (7 << 13)
+
+// userop operation types
+
+#define trcreg  0
+#define trcon   1
+#define trcoff  2
+#define trcclrd 3
+#define trcdata 4
+#define trcstax 5
 
 #endif
 

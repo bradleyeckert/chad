@@ -79,7 +79,7 @@ hwoptions 8 and [if]                    \ TFT support?
 ;
 
 16 |bits|
-: bitcmd_table  exec0: [  \ index is a multiple of 4
+: bitcmd_table  exec1: [  \ index is a multiple of 2
     ' _nopix  | ' _nopix  | ' _mono9  | ' _mono9  |
     ' _run01  | ' _nopix  | ' _gray0  | ' _gray1  |
     ' _mono15 | ' _mono15 | ' _mono15 | ' _mono15 |
@@ -87,7 +87,7 @@ hwoptions 8 and [if]                    \ TFT support?
 ] literal ;
 
 : g_bitcmd  ( n16 -- )
-   dup  swapb 2/ 2/ $3C and bitcmd_table execute
+   dup  swapb 2/ 2/ 2/ $1E and bitcmd_table execute
 ;
 
 : LCDrowcol  ( z0 z1 cmd -- )           \ set row or column entry limits

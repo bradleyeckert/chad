@@ -714,3 +714,23 @@ _
 H<h2>Flow Control</h2>
 _
 =
+
+=1.2780: debug+ ( -- )
+ Turns on instruction level tracing.
+=1.2781: debug- ( -- )
+ Turns off instruction level tracing.
+=1.2782: regs? ( -- )
+ Triggers a register dump.
+=1.2783: /data ( -- )
+ Clears data changes.
+=1.2784: data? ( -- )
+ Displays all data changes since the last `/data` or `data?`.
+=1.2785: stacks? ( -- )
+ Triggers a stack dump.
+
+#
+_
+H<h2>Debugging</h2>
+_
+=
+

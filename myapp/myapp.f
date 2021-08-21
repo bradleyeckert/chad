@@ -18,6 +18,7 @@ $8000 paged!                            \ applets start here
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
 0 equ BASEBLOCK
+1 constant applets                     \ use applets to reduce code RAM usage
 
 include ../forth/core.f
 include ../forth/coreext.f
@@ -30,7 +31,7 @@ include ../forth/compile.f
 include ../forth/api.f
 include ../forth/interpret.f
 include ../forth/tools.f
-\ include ../forth/bignum.f
+include ../forth/bignum.f
 \ include ../forth/ctea.f
 
 \ Test some locals
@@ -88,6 +89,8 @@ end-module \ end the scope of the private section
 
 \ Try 25 fib, then stats
 .( Total instructions: ) there . cr
+
+0 api !                                 \ should be 0 at boot time
 
 \ Save to a flash memory image
 [defined] lit, [if]                     \ if there's code for it...

@@ -134,7 +134,7 @@ module chad
   wire return = insn[8] & ((insn[15:13] == 3'b010) | isALU & ~func_T_R);
   //            R bit       imm                      ALU & not pushing T to R
   wire ack = 1'b0; // irq & return & ~rst0[0]; // disable interrupts ***
-  wire exception = return & rst0[0];
+  wire exception = return & (|rst0[WIDTH-1:13]);
   assign iack = ack & ~hold;
 
   always @*

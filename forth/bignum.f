@@ -11,9 +11,9 @@
 \ for two-cell dividend and two-cell divisor.
 
 there
-: d+c  ( d1 d2 -- d3 carry )            \ double add with carry out
-   >r swap >r +c  carry r> +  r> +c carry
-;
+applets [if] .(     Applet bytes: { )   \ }
+paged applet  paged [then]
+
 : +carry  ( a b -- a+b carry )  +c carry ;          \ 0 tuck d+
 : -borrow ( a b -- a-b borrow ) -c carry negate ;   \ 0 tuck d-
 
@@ -113,6 +113,15 @@ variable maxden                         \ maximum allowed denominator
 \ 100000000005500. 1048575 ratio swap . .  \ dfrac = 194159 / 546509
 \
 \ `ud*` supports scaling of d_frac at this precision.
+
+applets [if] end-applet  paged swap - . .( }; ) [then]
+
+\ Probably want this in the kernel to keep it fast.
+\ A short applet would save 40 instructions.
+
+: d+c  ( d1 d2 -- d3 carry )            \ double add with carry out
+   >r swap >r +c  carry r> +  r> +c carry
+;
 
 \ Unsigned double * double -> quad product
 : ud*  ( ud1 ud2 -- uq )

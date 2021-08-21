@@ -50,31 +50,38 @@ hex
 ;
 
 \ Large applications are supported by caching, which is enabled by an exception.
-\ The `api_recover` exception is triggered when RET executes with the LSB of the
-\ address set. Instead of popping PC from the return stack, execution jumps to a
-\ fixed address (such as 010h).
+\ The `api_recover` exception is triggered when R>1FFFh.
+\ Instead of popping PC from the return stack, execution jumps to a fixed addr.
+\ `api_recover` gets the required page from R and masks off the page number.
 
 \ `xexec` executes a word at a specified xxt (extended execution token)
-\ consisting of the flash page number packed with an offset into cache memory
-\ in the format 12.10 where the upper 12 bits are the flash page number
-\ (a page is 256 bytes) and the lower 10 bits are a word offset into the cache
-\ region of code RAM.
+\ consisting of the flash page number packed with a 13-bit address.
+\ in the format 11.13 where the upper 11 bits are the flash page number
+\ (a page is 256 bytes) and the lower 13 bits are the xt.
 
-16 cells buffer: apistack
-variable apisp   apistack apisp !
-
-: xexec  ( xxt -- ) ( R: addr -- addr+1 )
-   r> 1 + >r
-   api @  apisp @ >mem apisp !
-   dup 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ 2/ spifload
-   3FF and cm-size +  2* >r             \ execute the xxt
+: xexec  ( xxt -- ) ( R: addr -- page|addr )
+   api @ 0d lshift r> + >r              \ add page to return address
+   1fff invert overand                  ( xxt new_page )
+   0d rshift spifload
+   1fff and  >r                         \ execute
 ; no-tail-recursion
 ' xexec resolves api_trap
 
-:noname  ( R: addr+1 -- addr )
-   r> 0 invert + >r                     \ clear LSB
-   apisp @ mem> swap apisp !
-   ?dup if  spifload  then              \ restore cache
+\ still has an occasional problem with return stack underflow
+\ `xcall` saves the return address into old code, which `api_trap` appends a
+\ current page number to. The new page is loaded and execution starts at the
+\ new page's code. Upon execute, the return stack has the old page number.
+
+\ When a return address with page<>0 is encountered, the pc jumps to api_recover
+\ while the questionable return address is on the return stack.
+\ The old page is reloaded before execution returns.
+
+:noname  ( R: page|addr -- addr )       \ returning to an api word (page <> 0)
+   r> 1fff overand >r
+   0d rshift  spifload                          ( needed_page )
+\   dup api @ xor if                     \ returning to a corrupted page
+\      spifload exit
+\   then drop
 ; resolves api_recover
 
 decimal
@@ -221,109 +228,5 @@ tkey or [if]
       then
    r> repeat  drop
 ;
-
-\ Given a message table, look up the message number and print it.
-\ `msg_seek` looks up the message in the list and returns 0 if not found.
-\ `msg` prints the message. If not found, it defaults to message 0.
-\ The list of standard FORTH errors is ~2KB, which is nothing for flash.
-
-: msg_seek  ( idx f-addr -- f-addr' | 0 )
-   begin  over  while  swap 1- swap
-      /text fcount nip tuck 0= if       \ idx offset f-addr
-         2drop dup xor exit
-      then  +
-   repeat  nip
-;
-: msg  \ 2.4120 idx f-addr --
-   dup>r msg_seek
-   ?dup if rdrop else r> then  f$type
-;
-
-fhere equ errorMsgs \ starting at -2 and going negative
-           ,"  "
-   (  -3 ) ," Stack overflow"
-   (  -4 ) ," Stack underflow"
-   (  -5 ) ," Return stack overflow"
-   (  -6 ) ," Return stack underflow"
-   (  -7 ) ," Do-loops nested too deeply during execution"
-   (  -8 ) ," Dictionary overflow"
-   (  -9 ) ," Invalid memory address"
-   ( -10 ) ," Division by zero"
-   ( -11 ) ," Result out of range"
-   ( -12 ) ," Argument type mismatch"
-   ( -13 ) ," Word not found"
-   ( -14 ) ," Interpreting a compile-only word"
-   ( -15 ) ," Invalid FORGET"
-   ( -16 ) ," Attempt to use zero-length string as a name"
-   ( -17 ) ," Pictured numeric output string overflow"
-   ( -18 ) ," Parsed string overflow"
-   ( -19 ) ," Definition name too long"
-   ( -20 ) ," Write to a read-only location"
-   ( -21 ) ," Unsupported operation"
-   ( -22 ) ," Control structure mismatch"
-   ( -23 ) ," Address alignment exception"
-   ( -24 ) ," Invalid numeric argument"
-   ( -25 ) ," Return stack imbalance"
-   ( -26 ) ," Loop parameters unavailable"
-   ( -27 ) ," Invalid recursion"
-   ( -28 ) ," User interrupt"
-   ( -29 ) ," Compiler nesting"
-   ( -30 ) ," Obsolescent feature"
-   ( -31 ) ," >BODY used on non-CREATEd definition"
-   ( -32 ) ," Invalid name argument (e.g., TO xxx)"
-   ( -33 ) ," Block read exception"
-   ( -34 ) ," Block write exception"
-   ( -35 ) ," Invalid block number"
-   ( -36 ) ," Invalid file position"
-   ( -37 ) ," File I/O exception"
-   ( -38 ) ," File not found"
-   ( -39 ) ," Unexpected end of file"
-   ( -40 ) ," Invalid BASE for floating point conversion"
-   ( -41 ) ," Loss of precision"
-   ( -42 ) ," Floating-point divide by zero"
-   ( -43 ) ," Floating-point result out of range"
-   ( -44 ) ," Floating-point stack overflow"
-   ( -45 ) ," Floating-point stack underflow"
-   ( -46 ) ," Floating-point invalid argument"
-   ( -47 ) ," Compilation wordlist deleted"
-   ( -48 ) ," Invalid POSTPONE"
-   ( -49 ) ," Search-order overflow"
-   ( -50 ) ," Search-order underflow"
-   ( -51 ) ," Compilation wordlist changed"
-   ( -52 ) ," Control-flow stack overflow"
-   ( -53 ) ," Exception stack overflow"
-   ( -54 ) ," Floating-point underflow"
-   ( -55 ) ," Floating-point unidentified fault"
-   ( -56 ) ," QUIT"
-   ( -57 ) ," Exception in sending or receiving a character"
-   ( -58 ) ," [IF], [ELSE], or [THEN] exception"
-   ( -59 ) ," Missing literal before opcode"
-   ( -60 ) ," Attempt to write to non-blank flash memory"
-   ( -61 ) ," Macro expansion failure"
-   ( -62 ) ," Input buffer overflow, line too long"
-   ( -63 ) ," Bad arguments to RESTORE-INPUT"
-   ( -64 ) ," Write to non-existent data memory"
-   ( -65 ) ," Read from non-existent data memory"
-   ( -66 ) ," PC is in non-existent code memory"
-   ( -67 ) ," Write to non-existent code memory"
-   ( -68 ) ," Test failure"
-   ( -69 ) ," Page fault writing flash memory"
-   ( -70 ) ," Bad I/O address"
-   ( -71 ) ," Writing to flash without issuing WREN first"
-   ( -72 ) ," Invalid ALU opcode"
-   ( -73 ) ," Bitfield is 0 or too wide for a cell"
-   ( -74 ) ," Resolving a word that's not a DEFER"
-   ( -75 ) ," Too many WORDLISTs used"
-   ( -76 ) ," Internal API calls are blocked"
-   ( -77 ) ," Invalid CREATE DOES> usage"
-   ( -78 ) ," Nesting overflow during include"
-   ( -79 ) ," Compiling an execute-only word"
-   ( -80 ) ," Dictionary full"
-   ( -81 ) ," Writing to invalid flash sector"
-   ( -82 ) ," Flash string space overflow"
-   ( -83 ) ," Invalid SPI flash address"
-   ( -84 ) ," Invalid coprocessor field"
-   ( -85 ) ," Can't postpone an applet word"
-   ," " \ empty string = end of list
 
 there swap - . .( instructions used by flash) cr

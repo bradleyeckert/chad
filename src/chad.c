@@ -48,6 +48,7 @@ SI verbose = 0;
 static uint8_t sp, rp;                  // stack pointers
 CELL t, pc, cy, lex, w;                 // registers
 CELL Data[DataSize];                    // data memory
+CELL DataTrc[DataSize];                 // data memory for trace comparison
 CELL Dstack[StackSize];                 // data stack
 CELL Rstack[StackSize];                 // return stack
 CELL Raddr;                             // data memory read address
@@ -85,7 +86,7 @@ SV Hex(void) { BASE = 16; }
 SV Decimal(void) { BASE = 10; }
 SV toImmediate(void) { STATE = 0; }
 SV toCompile(void) { STATE = 1; }
-CELL DisassembleInsn(cell IR);
+CELL DisassembleInsn(uint16_t IR, uint16_t page);
 
 static char* itos(uint32_t x, uint8_t radix, int8_t digits, int isUnsigned) {
     static char buf[32];                // itoa replacement
@@ -133,9 +134,7 @@ SV PrintReturnStack(void) {
     }
 }
 
-SV TraceLine(cell pc, uint16_t insn) {
-    DisassembleInsn(insn);
-    printf("%03Xh: %04Xh ( ", pc, insn);
+SV TraceStacks(void) {
     PrintDataStack();
     printf(")");
     if (RDEPTH) {
@@ -143,6 +142,12 @@ SV TraceLine(cell pc, uint16_t insn) {
         printf(")");
     }
     printf(" \\ w=%Xh, cy=%X\n", w & CELLMASK, cy);
+}
+
+SV TraceLine(cell pc, uint16_t insn) {
+    DisassembleInsn(insn, 0);
+    printf("%03Xh: %04Xh ( ", pc, insn);
+    TraceStacks();
 }
 
 SV NewMaxStack(uint8_t s, uint8_t r, int pc) {
@@ -153,6 +158,36 @@ SV NewMaxStack(uint8_t s, uint8_t r, int pc) {
     }
 }
 
+SV ShowTraceStacks(void) {
+    printf("%03Xh: ( ", pc);
+    TraceStacks();
+}
+
+SV ClearTraceData(void) {
+    memcpy(DataTrc, Data, DataSize*sizeof(cell));
+}
+
+SV ShowRegs(FILE* fp, uint16_t insn) {
+    fprintf(fp, "PC=%04x,insn=%04x,T=%06x,N=%06x,R=%06x,sp=%02x,rp=%02x\n",
+        pc, insn, t, Dstack[SP], Rstack[RP], sp, rp);
+}
+
+SV ShowTraceData(void) {
+    int printed = 0;
+    int length = CELL_ADDR(DP);
+    for (int i = 0; i < length; i++) {
+        cell a = Data[i];
+        cell b = DataTrc[i];
+        if (a != b) {
+            printf("Data[%Xh]: %d -> %d\n", BYTE_ADDR(i), b, a);
+            printed++;
+        }
+    }
+    if (printed)
+        printf("\n");
+    ClearTraceData();
+}
+
 //##############################################################################
 // CPU simulator
 
@@ -161,6 +196,7 @@ static uint8_t spMax, rpMax;            // stack depth tracking
 static uint64_t cycles = 0;             // cycle counter
 static uint32_t latency = 0;            // maximum cycles between return
 static uint32_t irq = 0;                // interrupt requests
+static uint32_t logging = 0;            // enable simulation logging
 
 // The C host uses this (externally) to write to code and data spaces.
 // Addr is a cell address in each case.
@@ -233,8 +269,6 @@ static uint8_t Iack(void) {             // priority encoder
 
 SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
 
-SI logging = 0;                         // enable simulation logging
-
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
     cell _pc;
@@ -245,6 +279,7 @@ SI CPUsim(int single) {
         fp = fopenx(SIM_FILENAME, "w");
     }
     uint16_t retMark = (uint16_t)cycles;
+    uint8_t trigregs = 0;               // trigger register dump
 #endif
     uint8_t mark = RDEPTH;
     if (single == -1) {                 // run until error
@@ -263,31 +298,32 @@ SI CPUsim(int single) {
             TraceLine(pc, insn);
         }
         if (logging) {
-            fprintf(fp, "PC=%04x,insn=%04x,T=%06x,N=%06x,R=%06x,sp=%02x,rp=%02x\n",
-                pc, insn, t, Dstack[SP], Rstack[RP], sp, rp);
+            ShowRegs(fp, insn);
             logging--;
-            if (!logging)
+            if (logging == 0)
                 fclose(fp);
+        }
+        if (trigregs) {
+            ShowRegs(stdout, insn);
+            trigregs = 0;
         }
 #endif
         _pc = pc + 1;
         uint8_t interruptVector = 0;
-        uint8_t exception = 0;
+        uint32_t exception = 0;
         cell _lex = 0;
         cell s = Dstack[SP];
         cell temp;
-        cell target;
         switch (insn >> 13) { // 4 to 7
         case 0:
         case 1:
-            target = (lex << 13) | (insn & 0x1fff);
             if (insn & 0x100) {                                     /*  r->pc */
                 interruptVector = Iack();
-                exception = Rstack[RP] & 1;
+                exception = Rstack[RP] & (~0x1FFF);
                 if (exception) _pc = ExceptionVector;
                 else if (interruptVector) _pc = interruptVector;
                 else {
-                    _pc = Rstack[RP] >> 1;
+                    _pc = Rstack[RP];
                     if (RDEPTH == mark) single = 2;
                 }
 #ifdef MoreInstrumentation
@@ -340,7 +376,7 @@ SI CPUsim(int single) {
             SP = SPMASK & (SP + sign2b[insn & 3]);                /* dstack+- */
             if ((interruptVector == 0) && (exception == 0))
                 RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);     /* rstack+- */
-            switch ((insn >> 4) & 7) {
+            switch ((insn >> 4) & 15) {
             case  1: Dstack[SP] = t;                         break;   /* T->N */
             case  2: Rstack[RP] = t;                         break;   /* T->R */
             case  3: temp = CELL_ADDR(t);
@@ -362,11 +398,11 @@ SI CPUsim(int single) {
             Dpush((lex << 12) | ((insn & 0x1e00) >> 1) | (insn & 0xff));
             if (insn & 0x100) {                                 /*  r->pc */
                 interruptVector = Iack();
-                exception = Rstack[RP & RPMASK] & 1;
+                exception = Rstack[RP] & (~0x1FFF);
                 if (exception) _pc = ExceptionVector;
                 else if (interruptVector) _pc = interruptVector;
                 else {
-                    _pc = Rstack[RP] >> 1;
+                    _pc = Rstack[RP];
                     if (RDEPTH == mark) single = 2;
                     RP = RPMASK & (RP - 1);
                 }
@@ -382,7 +418,7 @@ SI CPUsim(int single) {
             Dpush((lex << 12) | ((insn & 0x1e00) >> 1) | (insn & 0xff));
             temp = ((insn >> 8) & 1);
             RP = RPMASK & (RP + 1);
-            Rstack[RP & RPMASK] = _pc << 1;
+            Rstack[RP] = _pc;
             _pc = TrapVector + temp;
 #ifdef MoreInstrumentation
             if (verbose & VERBOSE_TRACE) {
@@ -396,9 +432,20 @@ SI CPUsim(int single) {
             }
             break;
         case 5:
-            if (insn & 0x1000)                                  /* coproc */
-                coprocGo(insn & 0x7FF,
-                    t & CELLMASK, s & CELLMASK, w & CELLMASK);
+            if (insn & 0x1000) {
+                if (insn & 0x800)
+                    switch (insn & 0x7FF) {
+                    case trcreg: trigregs = 1;  break;
+                    case trcon: verbose |= 12;  break;
+                    case trcoff: verbose &= ~12;  break;
+                    case trcclrd: ClearTraceData();  break;
+                    case trcdata: ShowTraceData();  break;
+                    case trcstax: ShowTraceStacks();  break;
+                    }
+                else                                            /* coproc */
+                    coprocGo(insn & 0x7FF,
+                        t& CELLMASK, s& CELLMASK, w& CELLMASK);
+            }
             else {
                 _lex = (lex << 12) | (insn & 0xFFF);            /*   litx */
             }
@@ -408,7 +455,7 @@ SI CPUsim(int single) {
             break;
         case 7:                                                 /*   call */
             RP = RPMASK & (RP + 1);
-            Rstack[RP & RPMASK] = _pc << 1;
+            Rstack[RP] = _pc;
             _pc = insn & 0x1fff;
 #ifdef MoreInstrumentation
                 if (verbose & VERBOSE_TRACE) {
@@ -424,6 +471,10 @@ SI CPUsim(int single) {
         }
         if (pc & ~(CodeSize-1))         // PC must remain within code memory
             single = BAD_PC;
+        if (rp == RPMASK) single = BAD_RSTACKUNDER;
+        if (sp == SPMASK) single = BAD_STACKUNDER;
+        if (rp == RPMASK - 1) single = BAD_RSTACKOVER;
+        if (sp == SPMASK - 1) single = BAD_STACKOVER;
 #ifdef MoreInstrumentation
         if (sp > spMax) {
             spMax = sp;
@@ -435,8 +486,8 @@ SI CPUsim(int single) {
         }
         if (verbose & VERBOSE_TRACE) {
             if (exception)
-                printf("Exception at %Xh, R/2=%Xh, page=%Xh\n",
-                    pc, Rstack[RP] / 2, Rstack[(RP - 1) & RPMASK]);
+                printf("Exception at %Xh, R=%Xh, page=%Xh\n",
+                    pc, Rstack[RP], Rstack[(RP - 1) & RPMASK]);
             if (interruptVector)
                 printf("Interrupt Level %d\n", pc);
         }
@@ -462,9 +513,8 @@ SV toCode (cell x) {                    // compile to code space
     chadToCode(CP++, x);
 }
 SV CompExit (void) {                    // compile an exit
-    if (latest == CP) {                 // code run is empty
+    if (latest == CP)                   // code run is empty
         goto plain;                     // nothing to optimize
-    }
     int a = (CP-1) & (CodeSize-1);
     int old = Code[a];                  // previous instruction
     if (((old & 0xC000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
@@ -602,7 +652,6 @@ SV TableEntry(void) {
 
 CELL CtrlStack[256];                    // control stack
 static uint8_t ConSP = 0;
-SI lastAPI;
 
 SV ControlSwap(void) {
     cell x = CtrlStack[ConSP];
@@ -616,9 +665,9 @@ SV sane(void) {
 
 // Addressing beyond 1FFFh is not supported yet.
 
-SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= CP;  latest = CP;  lastAPI = 0; }
-SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = CP;  lastAPI = 0; }
-SV MarkFwd(void) { Calign();  CtrlStack[++ConSP] = CP;  lastAPI = 0; }
+SV ResolveFwd(void) { Code[CtrlStack[ConSP--]] |= CP;  latest = CP; }
+SV ResolveRev(int inst) { toCode(CtrlStack[ConSP--] | inst);  latest = CP; }
+SV MarkFwd(void) { Calign();  CtrlStack[++ConSP] = CP; }
 SV doBegin(void) { MarkFwd(); }
 SV doAgain(void) { ResolveRev(jump); }
 SV doUntil(void) { ResolveRev(zjump); }
@@ -1027,10 +1076,9 @@ static char* TargetName (cell addr, int page) {
     if (!addr) return NULL;
     int i = hp + 1;
     while (--i) {
-        if (Header[i].target == addr) {
-            if ((!page) | (page == Header[i].applet))
+        if ((Header[i].target == addr) &&
+            (Header[i].applet == page))
             return Header[i].name;
-        }
     }
     return NULL;
 }
@@ -1069,7 +1117,7 @@ SI ALUlabel(uint16_t insn) {            // try to match to a predefined ALUinst
     return 0;
 }
 
-CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summary
+CELL DisassembleInsn(uint16_t IR, uint16_t page) {
     static cell lex;
     cell _lex = 0;
     char* name;
@@ -1106,7 +1154,7 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
         target = (lex << 12) | (IR & 0xFF) | (IR & 0x1E00) >> 1;
         int trapnum = (IR & ret) ? 1 : 0;
         if (trapnum) {
-            name = TargetName((target & 0x3FF) + (CodeSize - CodeCache), target >> 10);
+            name = TargetName((target & 0x1FFF), target >> 13);
             if (name == NULL) HexToDA(target);
             appendDA("xcall");
             if (name != NULL) appendDA(name);
@@ -1118,11 +1166,20 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
         }
         break;
     case 5:
-        target = IR & 0xFFF;  HexToDA(target);
         if (IR & 0x1000) {
-            appendDA("cop");
+            target = IR & 0x7FF;
+            if (IR & 0x800) {
+                HexToDA(target);
+                appendDA("user");
+            }
+            else {
+                HexToDA(target);
+                appendDA("cop");
+            }
         }
         else {
+            target = IR & 0xFFF;
+            HexToDA(target);
             _lex = (lex << 12) + target;
             appendDA("litx");
         }
@@ -1131,7 +1188,9 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
     case 6:
     case 7:
         target = IR & 0x1FFF;
-        name = TargetName(target, 0);
+        name = TargetName(target, page);    // look for name in the definition's page
+        if ((name == NULL) && (page))
+            name = TargetName(target, 0);   // look for name in kernel
         if (name == NULL) HexToDA(target);
         diss((IR>>13)&3,"zjump\0?\0jump\0call");
         if (name != NULL) appendDA(name);
@@ -1141,17 +1200,17 @@ CELL DisassembleInsn(cell IR) {         // see chad.h for instruction set summar
     return 0;
 }
 
-SV Dasm (void) { // ( addr len -- )
+SV DasmPaged (int page) { // ( addr len -- )
     int length = Dpop() & 0x0FFF;
     int addr = Dpop();
     char* name;
     for (int i=0; i<length; i++) {
         int a = addr++ & (CodeSize-1);
         int x = Code[a];
-        name = TargetName(a, 0);
+        name = TargetName(a, page);
         if (name != NULL) printf("%s\n", name);
         printf("%03x %04x  ", a, x);
-        DisassembleInsn(x);
+        DisassembleInsn(x, page);
         printf("\n");
     }
 }
@@ -1327,16 +1386,14 @@ SV SaveFlash(void) {                    // ( format d_pid baseblock -- )
 SI isAPI;                               // compiler is in API mode
 
 SI xxt(void) {                          // convert xt to xxt
-    int offset = my() - (CodeSize - CodeCache);
-    return (Header[me].applet << 10) + offset;
+    return (Header[me].applet << 13) + my();
 }
 SV DefA_Exec(void) {
     LitnExec("xexec", xxt());
 }
 SV DefA_Comp(void) {
     int id = Header[me].applet;
-    if (lastAPI != id) {                // changed from last reference
-        lastAPI = id;
+    if ((id) && (isAPI != id)) {        // not in this API
         int ext = xxt();
         extended_lit(ext >> 12);
         toCode(trap | ret | lit_field(ext));
@@ -1362,7 +1419,6 @@ SV Colon(void) {
         else {
             SetFns(CP, Def_Exec, Def_Comp);
         } 
-        lastAPI = isAPI;
         Header[hp].target = CP;
         Header[hp].color = COLOR_WORD;
         Header[hp].smudge = 1;
@@ -1493,14 +1549,18 @@ SI isImmediate(void) {                  // ticked word is immediate?
     return (Header[me].CompFn == Header[me].ExecFn);
 }
 
+SV Dasm(void) {
+    DasmPaged(0);
+}
+
 SV See (void) {                         // ( <name> -- )
     int addr;
     if ((addr = tick())) {
         int page = AppletSync();
         if (page)
-            printf("API:%Xh ", page);
+            printf("flash[%X00h]: ", page);
         if (isImmediate()) printf("immediate ");
-        Dpush(addr);  Dpush(Header[me].length);  Dasm();
+        Dpush(addr);  Dpush(Header[me].length);  DasmPaged(page);
     }
 }
 
@@ -2364,6 +2424,13 @@ SV LoadKeywords(void) {
     AddALUinst("(R-1)@",  "1.2750 -- x-1 | x -- x",  RM1toT | TtoN | sup);
     AddALUinst("_next_",  "1.2760 n -- flag | x -- n", zeq  | TtoR);
     AddALUinst("costat",  "1.2770 -- n",              cop   | TtoN | sup);
+    AddALUinst("debug+",  "1.2780 --",               userop | trcon);
+    AddALUinst("debug-",  "1.2781 --",               userop | trcoff);
+    AddALUinst("regs?",   "1.2782 --",               userop | trcreg);
+    AddALUinst("/data",   "1.2783 --",               userop | trcclrd);
+    AddALUinst("data?",   "1.2784 --",               userop | trcdata);
+    AddALUinst("stacks?", "1.2785 --",               userop | trcstax);
+
     // compile-only control words, can't be postponed
     AddKeyword("begin",   "1.2900 --",  noExecute, doBegin);
     AddKeyword("again",   "1.2910 --",  noExecute, doAgain);
