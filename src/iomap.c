@@ -282,6 +282,7 @@ uint32_t readIOmap (uint32_t addr) {
     case 6: return (uint32_t)chadCycles();
     case 7: return WishboneUpperRx;
     case 11: return FlashReadResult;
+    case 12: return 2;                  // bootokay=1
     case 0x14: return 0;                // GP input
     default: chadError(BAD_IOADDR);
     }

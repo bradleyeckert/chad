@@ -11,6 +11,16 @@ The 130nm node is attractive for several reasons:
 
 Forth computers are tiny, even when used on a 130nm process like Sky130.
 It's likely your chip will be pad-limited.
+
+## I/O pads
+
+I/O pads are blocks of hard IP with ESD diodes, drivers and receivers.
+They offer slew rate control, pullup/pulldown, and various other features.
+You can hard-wire them or control them through registers with sensible
+default settings.
+
+Sky130 pads have a specified maximum frequency of 30 MHz.
+
 I/O pads are big. I couldn't find size information on Sky130 I/O pads, but
 a MOSIS 0.35um Hi-ESD I/O pad has an outline of 0.3 x 0.09 mm.
 44 of these (11 per side) would give a 1.6mm x 1.6mm chip with a 1mm x 1mm
@@ -37,8 +47,8 @@ Twice that would be nice if you can get it: 112 Kb.
 Free tools from eFabless work with the Sky130 process. There are RAM generators for
 OpenRAM and DFFRAM, whose densities are roughly 75 and 25 Kb/mm<sup>2</sup> respectively.
 The seemingly low density could have something to do with Sky130 having only 5 metal layers.
-More metal layers would put the wiring for the RAM cells under or over the cells.
-The above mentioned 56 Kb would be 0.75 mm<sup>2</sup>
+More metal layers would put the wiring for the RAM cells on top of the cells.
+Said 56 Kb would be 0.75 mm<sup>2</sup>
 of OpenRAM. A [test RAM](https://github.com/ShonTaware/SRAM_SKY130) had
 an access time of less than 2.5ns using Google SkyWater SKY130 PDKs and
 OpenRAM memory complier.
@@ -73,6 +83,12 @@ to mount the die to a substrate that breaks out into a FCBGA.
 Hamming(26,31) can correct single-bit errors on data words as wide as 26-bit.
 Code memory can use 32-bit words with 6 parity bits to ECC code RAM.
 A 2:1 multiplexer would split the corrected data into 16-bit halves.
+
+## Multicore
+
+Multicore computers can do things faster, but why? Custom hardware is much better.
+The value proposition of multiple cores is safety-critical systems.
+You would have a supervisor core and a user core.
 
 ## Lockstep operation
 
@@ -126,4 +142,9 @@ The test result would be stored in a register that's unaffected by reset.
 Subsequent tests would run firmware to report pass/fail status on whatever I/O pin
 is convenient.
 
+## SPI flash power consumption
 
+SPI flash should be run at 30 MHz due to I/O pad limitations.
+The power dissipation of QSPI would be equivalent to three wires at 30 MHz.
+Allowing 20pF per wire at 1.8V, this is about 6 mW of power dissipation.
+The read current of a AT25XE041B is about 4 mW at 30 MHz.

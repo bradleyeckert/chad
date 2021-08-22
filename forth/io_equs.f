@@ -11,6 +11,8 @@
  6 cells equ io'cycles  \                        raw cycle count
 10 cells equ io'fnext   \ trigger next
 11 cells equ io'fread   \ start new flash read   flash read result
+12 cells equ io'boot    \                        other status: okay, ISP
+2 equ bootokay
 
 $10 cells equ io'lcmd   \ write command byte
 $11 cells equ io'ldata  \ write data byte

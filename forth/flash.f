@@ -41,12 +41,17 @@ hex
    80 _isp                      \ end read (raise CS#)
 ;
 
-\ Load a boot stream from flash starting at a specified page
+\ Load a boot stream from flash starting at a specified page.
+\ If the data is glitched, such as from an ESD hit, the CRC32 won't match
+\ so retry until it's okay.
 
 : spifload  ( page -- )
-   dup api !
-   dup 6 rshift ispnum ispnum           \ set page number
-   44 ispcmd                            \ interpret the flash stream
+   api !
+   begin
+      api @
+      dup 6 rshift ispnum ispnum \ set page number
+      44 ispcmd                  \ interpret the flash stream
+   io'boot io@ bootokay and until
 ;
 
 \ Large applications are supported by caching, which is enabled by an exception.
