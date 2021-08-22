@@ -18,7 +18,7 @@ $8000 paged!                            \ applets start here
 1 +bkey                                 \ encrypt boot record if not zero
 2 +tkey                                 \ encrypt text if not zero
 0 equ BASEBLOCK
-1 constant applets                     \ use applets to reduce code RAM usage
+1 constant applets                      \ use applets to reduce code RAM usage
 
 include ../forth/core.f
 include ../forth/coreext.f

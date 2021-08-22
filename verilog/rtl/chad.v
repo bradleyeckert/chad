@@ -1,5 +1,5 @@
-// Chad processor                                               8/16/2021 BNE
-// License: This code is a gift to the divine.
+// Chad processor                                               8/21/2021 BNE
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 module chad
 #(
@@ -17,7 +17,7 @@ module chad
   output wire [WIDTH-1:0] dout,         // Data memory & I/O out (from N)
   input  wire [WIDTH-1:0] mem_din,      // Data memory in
   input  wire [WIDTH-1:0] io_din,       // I/O data in
-  output wire [14:0] code_addr,         // Code memory address
+  output wire [12:0] code_addr,         // Code memory address
   input  wire [15:0] insn,              // Code memory data
   input  wire irq,                      // Interrupt request
   input  wire [3:0] ivec,               // Interrupt vector that goes with irq
@@ -36,11 +36,11 @@ module chad
   reg  [WIDTH-1:0] st0N;
   reg  dstkW;                           // D stack write
 
-  reg  [14:0] pc, pcN;
+  reg  [12:0] pc, pcN;
   reg  rstkW;                           // R stack write
   wire [WIDTH-1:0] rstkD;               // R stack write value
   reg  reboot;
-  wire [14:0] pc_plus_1 = pc + 15'd1;
+  wire [12:0] pc_plus_1 = pc + 13'd1;
   reg  [WIDTH-1:0] wreg;                // W and carry registers
   reg  carry, co;
 
@@ -86,8 +86,8 @@ module chad
 
   always @*
   begin // Compute the new value of st0
-    case (insn[15:13])
-    3'b000, 3'b001: begin
+    casez (insn[15:13])
+    3'b00?: begin
       case (insn[12:9])
       4'b0000: st0N = (insn[13]) ? cop : st0;           // T, COP
       4'b0001: st0N = (insn[13]) ? carry : {WIDTH{st0[WIDTH-1]}}; // 0<, C
@@ -108,7 +108,7 @@ module chad
       default: st0N = {WIDTH{1'bx}};                    // abnormal
       endcase
     end
-    3'b010:  st0N = {lex, insn[12:9], insn[7:0]};	// literal
+    3'b01?:  st0N = {lex, insn[12:9], insn[7:0]};	// literal or trap
     3'b100:  st0N = st1;          			// conditional jump
     default: st0N = st0;                                // other
     endcase
@@ -130,11 +130,11 @@ module chad
   assign io_wr =  !reboot & func_iow;
   assign io_rd =  !reboot & func_ior;
 
-  assign rstkD = isALU ? st0 : {{(WIDTH - 16){1'b0}}, pc_plus_1, 1'b0};
+  assign rstkD = isALU ? st0 : {{(WIDTH - 13){1'b0}}, pc_plus_1};
   wire return = insn[8] & ((insn[15:13] == 3'b010) | isALU & ~func_T_R);
-  //            R bit       imm                      ALU & not pushing T to R
-  wire ack = 1'b0; // irq & return & ~rst0[0]; // disable interrupts ***
-  wire exception = return & (|rst0[WIDTH-1:13]);
+  //          ( R bit       imm )                    ALU & not pushing T to R
+  wire ack =       rst0[WIDTH-1:13] ? 1'b0 : irq & return;
+  wire exception = rst0[WIDTH-1:13] ? return : 1'b0;
   assign iack = ack & ~hold;
 
   always @*
@@ -156,14 +156,14 @@ module chad
     casez ({reboot, insn[15:13], insn[8], ack, exception, |st0})
     9'b1_???_?_?_?_?: pcN = 0;
     9'b0_100_?_?_?_0, // if, jump|call
-    9'b0_11?_?_?_?_?: pcN = {2'd0, insn[12:0]};
-    9'b0_011_?_?_?_?: pcN = {14'd8, insn[8]}; // trap
+    9'b0_11?_?_?_?_?: pcN = insn[12:0];
+    9'b0_011_?_?_?_?: pcN = {12'd8, insn[8]}; // trap
     9'b0_010_1_0_0_?, // lit+ret
-    9'b0_00?_1_0_0_?: pcN = rst0[15:1]; // ret
+    9'b0_00?_1_0_0_?: pcN = rst0[12:0]; // ret
     9'b0_010_1_1_0_?, // interrupt (lit-ret or alu-ret)
     9'b0_00?_1_1_0_?: pcN = ivec;
     9'b0_010_1_?_1_?, // exception
-    9'b0_00?_1_?_1_?: pcN = 15'd18;
+    9'b0_00?_1_?_1_?: pcN = 13'd18;
     default:          pcN = pc_plus_1;
     endcase
   end

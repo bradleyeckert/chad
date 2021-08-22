@@ -48,7 +48,7 @@ module mcu
   wire [WIDTH-1:0]     din;             // Data memory & I/O in (from N)  i
   wire [WIDTH-1:0]     mem_dout;        // Data memory out                o
   wire [WIDTH-1:0]     io_dout;         // I/O data out                   o
-  wire [14:0]          code_addr;       // Code memory address            i
+  wire [12:0]          code_addr;       // Code memory address            i
   wire [15:0]          insn;            // Code memory data               o
   wire                 hold;            // Processor hold request         o
   wire                 p_reset;         // Processor reset                o

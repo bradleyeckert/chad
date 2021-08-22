@@ -29,7 +29,7 @@ module spif
   input  wire [14:0]          mem_addr, // Data memory address
   input  wire [WIDTH-1:0]     din,      // Data memory & I/O in (from N)
   output wire [WIDTH-1:0]     io_dout,  // I/O data out
-  input  wire [14:0]          code_addr,// Code memory address
+  input  wire [12:0]          code_addr,// Code memory address
   output wire                 p_hold,   // Processor hold
   output reg                  p_reset,  // Processor reset
 // Memory write ports and read/write control
