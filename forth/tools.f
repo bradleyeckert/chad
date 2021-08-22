@@ -18,27 +18,35 @@ paged applet  paged [then]
 
 \ Dump in cell and char format
 
-8 equ DumpColumns
+16 equ DumpColumns
 
-: dump  ( c-addr bytes -- )             \
-    >r [ -1 cells ] literal and r>      \ cell-align the address
-    begin dup while
-        over  2 h.x space
-        2dup  DumpColumns
-        dup >r min  r> over -
-        [ cellbits 4 / 1+ ] literal * >r \ a u addr len | padding
-        begin dup while >r              \ dump cells in 32-bit hex
-            @+ [ cellbits 4 / 1- ] literal h.x r> 1-
-        repeat  2drop  r> 1+ spaces
-        2dup  [ DumpColumns cells ] literal min
-        begin dup while >r              \ dump chars in ASCII
-            count
-            dup bl 192 within 0= if drop [char] . then
-            emit  r> 1-                 \ outside of 32 to 191 is '.'
-        repeat 2drop
-        [ DumpColumns cells ] literal /string
-        0 max  cr
-    repeat  2drop
+: udump  ( c-addr u -- padding )        \ dump in cell format
+   [ 1 cells 1- ] literal + cell/       \ round up to get all bytes
+   [ DumpColumns cell/ ] literal
+   dup>r min  r> over -                 \ cells remainder
+   [ cellbits 4 / 1+ ] literal * >r     \ addr cells | padding
+   for                                  \ 1 or more cells
+      @+ [ cellbits 4 / 1- ] literal h.x
+   next  drop
+   r>
+;
+
+: cdump  ( caddr1 u1 -- caddr2 u2 )     \ dump in char format
+   dup  DumpColumns min
+   for
+      over c@
+      dup bl 192 within 0= if drop [char] . then
+      emit  1 /string
+   next
+;
+
+: dump                                  \ 2.6292 ( c-addr bytes -- )
+   >r [ -1 cells ] literal and r>       \ cell-align the address
+   begin dup while
+      over  2 h.x space
+      2dup  udump 1+ spaces
+      cdump  cr
+   repeat  2drop
 ;
 
 applets [if] end-applet  paged swap - . [then]

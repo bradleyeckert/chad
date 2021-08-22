@@ -44,8 +44,10 @@
  flag is true if and only if n1 is greater than n2.
 =2.0160: cell+ ( a-addr1 -- a-addr2 )
  Add the size in address units of a cell to a-addr1, giving a-addr2.
-=2.0170: cells ( n -- n*2 )
+=2.0170: cells ( n1 -- n2 )
  n2 is the size in address units of n1 cells.
+=2.0171: cell/ ( n1 -- n2 )
+ n2 is the size in cells of n1 address units.
 =2.0210: @ ( addr -- x )
  `x` is the value stored at a-addr.
 =2.0200: ! ( x addr -- )
@@ -520,6 +522,8 @@ H</ul>
  List the definition names in the first word list of the search order.
 =2.6290: .s ( ? -- ? )
  Copy and display the values currently on the data stack.
+=2.6292: dump ( c-addr bytes -- )
+ Dump data memory.
 =2.6300: [ ( -- )
  Enter interpretation state. `[` is an immediate word.
 =2.6310: ] ( -- )

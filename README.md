@@ -59,13 +59,15 @@ It's a little freaky to watch in simulation if you're used to control flow
 changes having to deal with pipelines.
 
 Chad improves on the J1 to facilitate bigger apps.
+A caching mechanism supports much larger applications than fit in code RAM.
+For example, a full Forth needs as little as 4K bytes of code RAM.
 `chad` protects your software investment by targeting a very simple but
 very powerful (for its size) stack computer.
 Modern desktop computers are fast enough to simulate the CPU on the order of at-speed.
 It's like having a real CPU running in an FPGA, but without an FPGA.
 Forth should execute the code it compiles.
 Cross compiling, such as targeting ARM with code running on x86,
-adds a lot of complexity which is completely unnecessary with Chad.
+adds a lot of complexity which is avoided with Chad.
 
 You can add custom functions easily. Just edit `chad.c`, `coproc.c`, and `chaddefs.h`.
 Recompile and your simulated computer and its language have the new features.

@@ -34,6 +34,7 @@ later throw                             \ 2.0020 n --
 
 cell 4 = [if]
     : cells 2* 2* ; macro               \ 2.0170 n1 -- n2
+    : cell/ 2/ 2/ ; macro               \ 2.0171 n1 -- n2
     : _cw!  \ end a c! or w!            \ u mask addr
         >r  swap over and               \ m u' | addr
         swap invert                     \ u' mask | addr
@@ -90,6 +91,7 @@ cell 4 = [if]
   [then]
 [else] \ 16-bit or 18-bit cells
     : cells 2* ; macro                  \ 2.0170 n1 -- n2
+    : cell/ 2/ ; macro                  \ 2.0171 n1 -- n2
   check_alignment [if]
     : (ta)  over and if  22 invert throw  then ;
 	: w@  [ ;
