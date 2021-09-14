@@ -25,7 +25,7 @@ baud is an optional baud rate.
 Serial communication uses https://gitlab.com/Teuniz/RS-232/ for cross-platform
 abstraction. Ports are numbered for this. Numbering starts at 0, so COM4 is 3.
 
-Flash programming used the DEh sector erase and 02h page program commands.
+Flash programming uses the DEh sector erase and 02h page program commands.
 */
 
 #define DEFAULTBAUD 3000000L
@@ -58,8 +58,8 @@ uint8_t mem[MemorySize];                // raw data to program
 uint8_t response[1024];                 // place to put UART read data
 int portnum = DEFAULTPORT;
 
-uint8_t ISP_enable[] = { 4, 0x12, 0xA5, 0x5A, 0x42 };
-uint8_t ISP_disable[] = { 2, 0x12, 0 };
+uint8_t ISP_enable[] = { 8, 0x12, 0xA5, 0x5A, 0x11,  0x22,  0x33,  0x44, 0x42 };
+uint8_t ISP_disable[] = { 7, 0x12, 0, 0, 0, 0, 0, 0 };
 uint8_t ISP_RJID[] =  { 7, 0, 0, 0x82, 0x9F, 2, 0xC2, 0x080 };
 uint8_t ISP_RDSR[] =  { 6, 0, 0, 0x82, 0x05, 0xC2, 0x80};
 uint8_t ISP_WREN[] =  { 5, 0, 0, 0x82, 6, 0x80 };
@@ -75,6 +75,17 @@ void ISP_TX(uint8_t* cstr) {            // send counted string
     printf("ISP_TX ");  Dump(&cstr[1], cstr[0]);
     #endif
     RS232_SendBuf(portnum, &cstr[1], cstr[0]);
+}
+
+// Depending on the USB UART, chars in the USB chip's buffer may be sent
+// when the port is opened. Discard these to get a blank slate.
+void FlushRX(void) {                    // discard data in the RX buffer
+    uint8_t c;
+    int len;
+    do {
+        ms(10);
+        len = RS232_PollComport(portnum, &c, 1);
+    } while (len);
 }
 
 // SPIF replaces 10h-13h with {10h, 0-3}.
@@ -284,6 +295,7 @@ int main(int argc, char *argv[])
     }
 
     printf("Opened port %d at %d BPS\n", portnum, baudrate);
+    FlushRX();
 
 /*
 At this point, the file has been read-in and checked. The serial port is open.
@@ -306,6 +318,9 @@ SANITY       0xAA constant
 */
     if (response[6] != 0xAA) {
         printf("Ping failure\n");
+        for (int i=0; i < 7; i++) {
+            printf("%02X ", response[i]);
+        }
         ISP_TX(ISP_disable);
         return 5;
     }
@@ -325,6 +340,16 @@ Program length/4096 sectors
 */
     GetRJID();
     printf("RJID = %d, %d, %d\n", response[0], response[1], response[2]);
+    if ((response[0] == 0) || (response[0] == 255)) {
+        printf("Bad JEDEC ID, check your SPI flash connection\n");
+        printf("Polling ID, use ^C to quit.\n");
+        while (1) {
+            GetRJID();
+            FlushRX();
+        }
+//      ISP_TX(ISP_disable);
+//      return 5;
+    }
 
     int sectors = (length + 65535) >> 16;
     int errors = 0;

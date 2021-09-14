@@ -16,7 +16,7 @@ module spif_tb();
     reg	 [17:0]		 din = 0;	// Data memory & I/O in (from N)  i
     wire [17:0]		 mem_dout;	// Data memory out		  o
     wire [17:0]		 io_dout;	// I/O data out			  o
-    reg	 [14:0]		 code_addr = 0;	// Code memory address		  i
+    reg	 [12:0]		 code_addr = 0;	// Code memory address		  i
     wire [15:0]		 insn;		// Code memory data		  o
     wire		 p_hold;	// Processor hold		  o
     wire		 p_reset;	// Processor reset		  o
@@ -40,6 +40,7 @@ module spif_tb();
 
     wire [55:0]          key = 0;       // demo key
     wire [23:0]          sernum = 18;   // serial number or HW revision
+    wire [47:0]  isppass = 48'hA55A11223344;  // ISP password
 
     wire [9:0]           data_a;        // Data RAM read/write address
     wire [17:0]          data_din;      // Data RAM write data
@@ -96,7 +97,8 @@ module spif_tb();
     always #5 clk = ~clk;
 
     // spif is the SPI flash controller
-    spif #(10, 18, 10, 0, 16, 7, 0) u0 (
+    spif #(10, 18, 10, 0, 16, 7, 0)
+    u0 (
 	.clk(clk),
 	.arstn(rst_n),
 	.io_rd	  (io_rd    ),
@@ -119,6 +121,7 @@ module spif_tb();
         .code_rd  (code_rd  ),
         .key      (key      ),
         .sernum   (sernum   ),
+        .isppass  (isppass  ),
         .ISPenable (1'b1    ),
         .u_ready  (u_ready  ),
         .u_wr     (u_wr     ),
@@ -140,25 +143,72 @@ module spif_tb();
         .ack_i    (ack_i    ),
         .cyclev   (cyclev   ),
         .urxirq   (urxirq   ),
-        .utxirq   (utxirq   )
+        .utxirq   (utxirq   ),
+        .badboot  (badboot  )
     );
 
-    // flash simulator reads bytes from a file
-    flashsim #("fdata.bin") u1 (
-	.clk(clk),
-	.arstn(rst_n),
-	.ready	  (f_ready  ),
-	.wr	  (f_wr	    ),
-	.din	  (f_dout   ),
-	.format	  (f_format ),
-	.prescale (f_rate   ),
-	.dout	  (f_din    )
-    );
+//// flash simulator reads bytes from a file
+//    flashsim #("fdata.bin") u1 (
+//	.clk(clk),
+//	.arstn(rst_n),
+//	.ready	  (f_ready  ),
+//	.wr	  (f_wr	    ),
+//	.din	  (f_dout   ),
+//	.format	  (f_format ),
+//	.prescale (f_rate   ),
+//	.dout	  (f_din    )
+//    );
+
+// SPI flash connects through sflash.v
+
+  wire          sclk;
+  wire          cs_n;
+  wire  [3:0]   qdi;
+  wire  [3:0]   qdo;
+  wire  [3:0]   qoe;            // output enable for qdo
+  wire  [3:0]   qd;             // quad data bus
+
+  sflash SPIflash (
+    .clk      (clk      ),
+    .arstn    (rst_n    ),
+    .ready    (f_ready  ),
+    .wr       (f_wr     ),
+    .din      (f_dout   ),
+    .format   (f_format ),
+    .prescale (f_rate   ),
+    .dout     (f_din    ),
+    .sclk     (sclk     ),
+    .cs_n     (cs_n     ),
+    .qdi      (qdi      ),
+    .qdo      (qdo      ),
+    .oe       (qoe      )
+  );
+
+  assign qdi = qd;
+  assign qd[0] = (qoe[0]) ? qdo[0] : 1'bZ;
+  assign qd[1] = (qoe[1]) ? qdo[1] : 1'bZ;
+  assign qd[2] = (qoe[2]) ? qdo[2] : 1'bZ;
+  assign qd[3] = (qoe[3]) ? qdo[3] : 1'bZ;
+  pullup(qd[3]);                // pullup resistors on wpn and holdn
+  pullup(qd[2]);
+
+  s25fl064l #(
+    .mem_file_name ("flash.txt"),
+    .secr_file_name ("none")
+  ) memchip (
+    .SCK          (sclk ),
+    .SO           (qd[1]),
+    .CSNeg        (cs_n ),
+    .IO3_RESETNeg (qd[3]),
+    .WPNeg        (qd[2]),
+    .SI           (qd[0]),
+    .RESETNeg     (rst_n)
+  );
 
     // UART simulator reads bytes from a file
     uartsim #("udata.bin") u2 (
-	.clk(clk),
-	.arstn(uart_rst_n),
+	.clk      (clk),
+	.arstn    (~p_reset),
 	.ready	  (u_ready ),
 	.wr	  (u_wr	   ),
 	.din	  (u_dout  ),
@@ -194,15 +244,19 @@ module spif_tb();
 
     initial
     begin
-	$display("Bootup started %0t", $time);
+	$display("Bootup started at %0t", $time);
 	#7 rst_n = 1;
         @(negedge p_reset);     // wait for boot to finish
-	$display("Bootup finished %0t", $time);
+	$display("Bootup finished at %0t", $time);
         repeat(10) @(posedge clk);
         IO_WRITE(65, 0);        // send a byte to the UART
-        IO_WRITE(18'h2084, 6);  // 3-byte read setup
-        IO_WRITE(18'h2000, 11); // flash read
-        WAIT(5);
+//        IO_WRITE(18'h2084, 6);  // 3-byte read setup
+//        IO_WRITE(18'h2000, 11); // flash read
+//        WAIT(5);
+//	$display("Flash read finished at %0t", $time);
+
+        repeat (20) @(posedge clk);
+        uart_rst_n <= 1;
 
 //        IO_WRITE(4, 4);      WAIT(4);  // 5-byte sequence to flash
 //        IO_WRITE(8'h81, 4);  WAIT(4);  // start SPI sequence, single rate
@@ -214,8 +268,6 @@ module spif_tb();
 //        IO_WRITE(8'h11, 3);   // start the flash interpreter
 //        WAIT(5);              // wait until interpreter is finished
 
-        repeat (1000) @(posedge clk);
-        uart_rst_n <= 1;
 
 //	$display("status: %t done reset", $time);
 //

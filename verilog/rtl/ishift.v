@@ -59,8 +59,7 @@ module ishift
 
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    busy <= 1'b0;
-    remaining <= 6'b0;
+    {busy, format, remaining} <= 1'b0;
   end else begin
     if (remaining) begin
       remaining <= remaining - ((mode[0]) ? 6'd6 : 6'd1);

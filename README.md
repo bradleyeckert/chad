@@ -57,6 +57,11 @@ Often a return is combined with an ALU instruction to cause a return in
 zero instructions.
 It's a little freaky to watch in simulation if you're used to control flow
 changes having to deal with pipelines.
+Fetch/execute pipelines impact fine factoring by making call and return
+waste clock cycles on synchronizing the instruction stream.
+The ISA of a Forth CPU should avoid such pipelining.
+Do not not select the inputs to the ALU. They are implicit.
+That takes the decode delay out of the critical path.
 
 Chad improves on the J1 to facilitate bigger apps.
 A caching mechanism supports much larger applications than fit in code RAM.

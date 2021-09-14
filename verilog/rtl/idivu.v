@@ -1,5 +1,5 @@
-// Iterative unsigned divider                     11/5/2020 BNE
-// License: This code is a gift to the divine.
+// Iterative unsigned divider                                   11/5/2020 BNE
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 module idivu
 #(parameter WIDTH = 8
@@ -22,30 +22,29 @@ module idivu
 
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    busy <= 1'b0;
-    overflow <= 1'b0;
+    {busy, overflow} <= 1'b0;
+    {rem, quot, count} <= 1'b0;         // optional reset
   end else begin
     if (busy) begin
-        if (subtract) begin
-          quot <= {quot[WIDTH-2:0], 1'b1};
-          rem <= diff[WIDTH-1:0];
-        end else
-          {rem, quot} <= {rem[WIDTH-2:0], quot, 1'b0};
-      if (count) count <= count - 1'b1;
-      else busy <= 1'b0;
-    end else begin
+      if (subtract)
+        {rem, quot} <= {diff[WIDTH-1:0], quot[WIDTH-2:0], 1'b1};
+      else
+        {rem, quot} <= {rem[WIDTH-2:0], quot, 1'b0};
+      if (count)
+        count <= count - 1'b1;
+      else
+        busy <= 1'b0;
+    end else
       if (go) begin
         if (dividend[2*WIDTH-1:WIDTH] >= divisor) begin
           {rem, quot} <= {2*WIDTH{1'b1}};
           overflow <= 1'b1;
         end else begin
-          busy <= 1'b1;
-          overflow <= 1'b0;
-          count <= WIDTH - 1;
+          {busy, overflow} <= 2'b10;
           {rem, quot} <= dividend;
+          count <= WIDTH - 1;
         end
       end
-    end
   end
 
 endmodule

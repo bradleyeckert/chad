@@ -1,0 +1,78 @@
+# iCESugar-Pro v1.3
+# 256-pin BGA, LFE5U-25 with:
+
+# 25 MHz oscillator
+# 2-wire UART
+# RGB LED
+# QSPI flash
+
+# LSE barfs on this file, Synplify Pro thinks it's okay.
+
+COMMERCIAL;
+BLOCK RESETPATHS;
+BLOCK ASYNCPATHS;
+
+# All banks connect their VCCIO to 3.3V
+IOBUF ALLPORTS IO_TYPE=LVCMOS33;
+SYSCONFIG CONFIG_IOVOLTAGE=3.3 COMPRESS_CONFIG=ON MCCLK_FREQ=62 SLAVE_SPI_PORT=DISABLE MASTER_SPI_PORT=DISABLE SLAVE_PARALLEL_PORT=DISABLE;
+
+# The default PULLMODE mode is DOWN, which is the most important feature from
+# a PCB design standpoint. During bitstream load, pins are pulled low.
+# The pull-down is 30uA (min) sustaining low, requiring 150uA (max) to pull high.
+
+# The default drive level is 8mA. 3.3V options are 4, 8, 12, or 16 mA.
+# Autmotive device might not support 12 and 16 mA device setting.
+# The default slew rate is "slow" (SLEWRATE=SLOW).
+
+# 25 MHz oscillator
+LOCATE      COMP "clk_in"   SITE "P6";
+FREQUENCY   PORT "clk_in"   25 MHZ;
+
+# PLL multiplies 25 to 62.5 MHz
+FREQUENCY   NET  "clkgen_inst.clk" 62.5 MHZ;
+
+# UART
+LOCATE      COMP "uart_rx"  SITE "A9";
+LOCATE      COMP "uart_tx"  SITE "B9";
+IOBUF       PORT "uart_rx" PULLMODE=UP;
+
+# LED
+LOCATE      COMP "led_0"    SITE "B11";  #R
+LOCATE      COMP "led_1"    SITE "A11";  #G
+LOCATE      COMP "led_2"    SITE "A12";  #B
+LOCATE      COMP "led_3"    SITE "A8";   #P2 pin 6
+LOCATE      COMP "led_4"    SITE "A7";   #P2 pin 8
+LOCATE      COMP "led_5"    SITE "A6";   #P2 pin 10
+LOCATE      COMP "led_6"    SITE "A5";   #P2 pin 12
+LOCATE      COMP "led_7"    SITE "A4";   #P2 pin 14
+                                         
+# switches - none are on the module, use P2 pins on EXT board
+                                         
+LOCATE      COMP "sw_0"     SITE "B8";   #P2 pin 5
+LOCATE      COMP "sw_1"     SITE "B7";   #P2 pin 7
+LOCATE      COMP "sw_2"     SITE "B6";   #P2 pin 9
+LOCATE      COMP "sw_3"     SITE "B5";   #P2 pin 11
+LOCATE      COMP "sw_4"     SITE "B4";   #P2 pin 13
+
+# QSPI flash: 16Mb bitstream, 16Mb (or more) application
+LOCATE      COMP "spi_csn"  SITE "N8";
+LOCATE      COMP "spi_sclk" SITE "H4";   #unused ball
+LOCATE      COMP "spi_mosi" SITE "T8";
+LOCATE      COMP "spi_miso" SITE "T7";
+LOCATE      COMP "spi_fd2"  SITE "M7";
+LOCATE      COMP "spi_fd3"  SITE "N7";
+# Lattice ECP5U I/O capacitance is 8pF max.
+# Winbond W25Q256JV I/O capacitance is 8pF max.
+# Allowing 4pF for the PCB trace is 20pF.
+# It takes 8ns to move a 20pF load 3.3V at 8mA.
+# Compare to a 20ns cycle time (10 hi, 10 lo) at 50 MHz.
+# Note: Don't count on I/O pins to be faster than 30 MHz. The I/O pads in ASIC
+# like 130nm or 180nm process aren't that fast. The Sky130 I/O pad is 33 MHz.
+IOBUF       PORT "spi_csn"  DRIVE=8;
+IOBUF       PORT "spi_sclk" DRIVE=8;
+IOBUF       PORT "spi_mosi" DRIVE=8;
+IOBUF       PORT "spi_miso" DRIVE=8;
+# In single-rate and dual-rate mode, pull WPn and HOLDn high
+IOBUF       PORT "spi_fd2"  DRIVE=8 PULLMODE=UP;
+IOBUF       PORT "spi_fd3"  DRIVE=8 PULLMODE=UP;
+

@@ -1,5 +1,5 @@
 // Peripherals for a Wishbone Bus, Arty A7 version        12/15/2020 BNE
-// This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // This subsystem encapsulates the application's peripherals.
 // It connects to a Wishbone Bus controller such as an MCU or testbench.

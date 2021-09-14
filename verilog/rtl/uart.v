@@ -1,5 +1,5 @@
 // Unbuffered UART with FIFO-compatible interface               11/6/2020 BNE
-// License: This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 module uart
 (
@@ -22,8 +22,7 @@ module uart
   reg tick;
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    baudint <= 12'd0;  tick <= 1'b0;
-    baudfrac <= 4'd0;
+    {baudint, baudfrac, tick} <= 1'b0;
   end else begin
     tick <= 1'b0;
     if (baudint)
@@ -48,9 +47,8 @@ module uart
   reg [7:0] txstate, rxstate, txreg, rxreg;
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    txstate <= 8'd0;  txreg <= 8'd0;  tnext <= 1'b1;  txd <= 1'b1;
-    rxstate <= 8'd0;  rxreg <= 8'd0;  error <= 1'b0;  pending <= 1'b0;
-    dout <=    8'd0;  inreg <= 8'd0;  full <= 1'b0;
+    {full, error, pending, txreg, tnext, txd} <= 2'b11; 
+    {txstate, rxstate, rxreg, dout, inreg} <= 1'b0;
   end else begin
     if (tick) begin
 // Transmitter
@@ -61,8 +59,9 @@ module uart
         txstate <= txstate - 1'b1;
       end else begin
         if (pending) begin
-          pending <= 1'b0;   txreg <= inreg;
-          txstate <= 8'h9F;  tnext <= 1'b0;   // n,8,1
+          {pending, tnext} <= 1'b0;     // n,8,1
+          txreg <= inreg;
+          txstate <= 8'h9F; 
         end
       end
 // Receiver
@@ -88,7 +87,8 @@ module uart
 // to ready with the next byte to elimnate character spacing.
     if (wr)
       if (!pending) begin               // retrigger transmission
-        inreg <= din;  pending <= 1'b1;
+        inreg <= din;
+        pending <= 1'b1;
       end
   end
 endmodule

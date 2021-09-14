@@ -1,5 +1,5 @@
 // MCU based on J1-type CPU                             12/15/2020 BNE
-// This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // This is expected to be wrapped by an I/O ring that steers bidirectional
 // signals, conditions the reset signal, and supplies a clock.
@@ -96,6 +96,7 @@ module mcu
 
   wire [KEY_LENGTH*8-1:0] key = 1;      // demo key
   wire [23:0]          sernum = 0;      // serial number or HW revision
+  wire [47:0]  isppass = 48'hA55A11223344;  // ISP password
 
 // chad processor
   chad #(WIDTH) CPU (
@@ -216,6 +217,7 @@ module mcu
     .code_rd  (code_rd  ),
     .key      (key      ),
     .sernum   (sernum   ),
+    .isppass  (isppass  ),
     .ISPenable (1'b1    ),
     .badboot  (badboot  ),
     .u_ready  (u_ready  ),

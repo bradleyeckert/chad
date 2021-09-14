@@ -1,5 +1,5 @@
 // Iterative fractional multiplier                        11/30/2020 BNE
-// This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // The versatility of fractional multiply is astounding. Algorithms can tune
 // the operation to their needs by adjusting the number of iterations, trading
@@ -19,18 +19,18 @@ module imultf
 #(parameter WIDTH = 24
 )(
   input wire                clk,
-  input wire                arstn,      // async reset (active low)
+  input wire                arstn,     // async reset (active low)
   output reg                busy,     	// 0 = ready, 1 = busy
-  input wire                go,        	// trigger a multiplication
-  input wire                sign,       // signed if 1, unsigned if 0
-  input wire  [4:0]         bits,      	// bits of precision to use, less 1
-  input wire  [WIDTH-1:0]   a, b,     	// multiplier inputs
-  output wire [2*WIDTH-1:0] p      	// multiplier product
+  input wire                go,        // trigger a multiplication
+  input wire                sign,      // signed if 1, unsigned if 0
+  input wire  [4:0]         bits,     // bits of precision to use, less 1
+  input wire  [WIDTH-1:0]   a, b,     // multiplier inputs
+  output wire [2*WIDTH-1:0] p         // multiplier product
 );
 
-  reg [4:0] count;                      // enough for 32x32=64 multiply
-  reg [WIDTH-1:0] m;                    // multiplicand
-  reg [2*WIDTH-1:0] acc;                // accumulator
+  reg [4:0] count;                     // enough for 32x32=64 multiply
+  reg [WIDTH-1:0] m;                   // multiplicand
+  reg [2*WIDTH-1:0] acc;               // accumulator
   reg sgn;                              // 1 = signed, 0 = unsigned
 
   wire [WIDTH:0] sum = {(acc[2*WIDTH-1] & sgn), acc[2*WIDTH-1:WIDTH]}
@@ -40,6 +40,7 @@ module imultf
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
     busy <= 1'b0;
+	{sgn, count, acc, m} <= 1'b0;		// optional reset
   end else begin
     if (busy) begin
       acc <= (acc[0])

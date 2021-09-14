@@ -2,12 +2,13 @@
 
 The 130nm node is attractive for several reasons:
 
-- The masks are more affordable: No need for multi-layer reticles.
+- The masks are affordable: Laser-writable, no multi-layer reticles.
+- It uses 248nm lithography, also affordable.
 - It's supported by 12" fabs, which is not the case with 180nm.
 - 180nm is cheaper, but the capacity crunch is hitting 8" hard. 
-- Due to the above, 130nm is best for new designs.
+- Due to the above, 130nm is best for new designs (if it's enough oomph).
 - eFabless has FOSS chip design tools for 130 nm.
-- 130nm handles analog and mixed signal well too. 
+- 130nm handles analog and mixed signal. 
 
 Forth computers are tiny, even when used on a 130nm process like Sky130.
 It's likely your chip will be pad-limited.
@@ -46,29 +47,20 @@ Twice that would be nice if you can get it: 112 Kb.
 
 Free tools from eFabless work with the Sky130 process. There are RAM generators for
 OpenRAM and DFFRAM, whose densities are roughly 75 and 25 Kb/mm<sup>2</sup> respectively.
-The seemingly low density could have something to do with Sky130 having only 5 metal layers.
-More metal layers would put the wiring for the RAM cells on top of the cells.
-Said 56 Kb would be 0.75 mm<sup>2</sup>
-of OpenRAM. A [test RAM](https://github.com/ShonTaware/SRAM_SKY130) had
-an access time of less than 2.5ns using Google SkyWater SKY130 PDKs and
-OpenRAM memory complier.
+Normally, single port SRAM density at 130nm is 200 to 300 Kb/mm<sup>2</sup>.
+Said 56 Kb of OpenRAM would be 0.75 mm<sup>2</sup>.
+That chip area using normal industry tools would give the desired 112 Kb.
 
 SRAM dominates the design, so 0.75 mm<sup>2</sup> of RAM should allow an ASIC in
-a 48-pin package.
-
-The preferred 112 Kb of SRAM would need more area, and let's add some margin
-and say the design needs 2.5 mm<sup>2</sup>. A pad ring with 60 I/Os (15 on a side)
-and 4 power pads would fit in a 64-pin package, have an active area of 2.8 mm<sup>2</sup>,
-and have dicing lanes on a 2.37mm pitch.
-About 5K dice at $3K per 8" wafer is a die cost of $0.60.
+a 48-pin package at minimum die size.
 
 ## Packages
 
-A rule of thumb for IC packaging is a penny a pin, which means packaging dominates
-chip cost up to about 64 pins.
-
+An old VLSI guy once told me the rule of thumb for IC packaging is a penny a pin.
+If an 8" wafer costs $3K, packaging dominates chip cost up to about 64 pins.
 A 64-pin package such as 64-LFQFP (10x10) or 64-QFN (9x9) seems like a good
-target package for an ASIC. 
+target package for an ASIC. Depending on the I/O pad ring area,
+the usable logic area would be between 2 and 3 mm<sup>2</sup>.
 
 A staggered pad ring would make sense with higher pin counts than 100.
 Such a dual pad ring would add 1.2mm to a core width of 1.8mm for a $1.00 die

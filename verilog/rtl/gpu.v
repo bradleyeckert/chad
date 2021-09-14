@@ -42,6 +42,7 @@ module gpu
   always @(posedge clk or negedge rst_n)
   if (!rst_n) begin
     mbusy <= 1'b0;
+	{count, accf, accb} <= 1'b0;
   end else begin                        // dual unsigned multiply
     if (mbusy) begin
       accf <= (accf[0]) ? {sumf, accf[5:1]} : {1'b0, accf[11:1]};
@@ -75,8 +76,8 @@ module gpu
 
   always @(posedge clk or negedge rst_n)
     if (!rst_n) begin
-      busy <= 1'b0;  state <= 2'b00;
-      mtrig <= 1'b0;
+      {busy, state, mtrig} <= 1'b0;
+      {pixel, fgcolor, bgcolor, monodata, gray} <= 1'b0;
     end else begin
       mtrig <= 1'b0;
       if (state) begin
@@ -105,11 +106,11 @@ module gpu
             pixel <= (monodata[0]) ? fgcolor : bgcolor;
             monodata <= {1'b0, monodata[WIDTH-1:1]};
           end
-        2'd3:
+        default:
           begin
             gray <= {a[3:0], a[3:2]};
             mtrig <= 1'b1;
-            state <= 2'b11;
+            state <= 2'd3;
           end
         endcase
       end

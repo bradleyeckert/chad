@@ -1,5 +1,5 @@
 // SFLASH testbench                                     10/2/2020 BNE
-// License: This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // It's a rather sparse test, but it's enough to show waveforms.
 

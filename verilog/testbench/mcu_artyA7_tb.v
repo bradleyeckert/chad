@@ -1,5 +1,5 @@
-// MCU testbench                                     10/10/2020 BNE
-// License: This code is a gift to the divine.
+// MCU testbench                                            10/10/2020 BNE
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // The MCU connects to a SPI flash model from FMF.
 // Run this for 5 msec.

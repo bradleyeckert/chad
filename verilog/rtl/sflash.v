@@ -1,5 +1,5 @@
 // SPI flash interface                                          10/2/2020 BNE
-// License: This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 module sflash
 (
@@ -75,9 +75,10 @@ module sflash
 
   always @(posedge clk or negedge arstn)
   if (!arstn) begin
-    divider <= 4'd0;  qdo <= 4'd0;  phase <= 1'b0;
-    ready <= 1'b1;  state <= SPI_IDLE;
-    sr <= 8'd0;  dout <= 8'd0;  count <= 4'd8;  sclk <= 1'b1;
+    {divider, qdo, dout, sr, phase} <= 1'b0;
+    {ready, sclk} <= 2'b11;  
+    state <= SPI_IDLE;
+    count <= 4'd8;
   end else
     case (state)
     SPI_IDLE:

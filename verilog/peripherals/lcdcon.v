@@ -1,5 +1,5 @@
 // LCD controller for ST7796, etc.                 12/16/2020 BNE
-// This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // Wishbone to LCD parallel interface and bus cycle controller.
 // The maximum allowed `clk` frequency is 200 MHz.

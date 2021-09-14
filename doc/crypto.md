@@ -107,8 +107,8 @@ the ISP feature should be able to be turned off by setting the `ISPenable` wire 
 This lowers cybersecurity risk and puts it in a less onerous compliance category.
 Firmware should warn of inadvertent ISP enable.
 
-Firmware revision rollback is tricky to detect with a SPI flash that is easily cloned.
-That is beyond the scope of `spif`.
+Firmware revision rollback is tricky to detect with a SPI flash that is easily cloned
+by clip-on probe, desoldering, etc. That is beyond the scope of `spif`.
 Compliance with that part of a cybersecurity standard is more of a system problem that depends
 on what kinds of secure non-volatile memory are available.
 Startup code should ensure proper revision level before running the app.

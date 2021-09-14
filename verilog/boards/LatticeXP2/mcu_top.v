@@ -45,7 +45,8 @@ module mcu_top
   assign spi_miso = (qoe[1]) ? qdo[1] : 1'bZ;
   assign wn       = (qoe[2]) ? qdo[2] : 1'bZ;
   assign holdn    = (qoe[3]) ? qdo[3] : 1'bZ;
-  wire [7:0] ledn = ~led ;
+  wire [7:0] ledn;
+  assign led = ~ledn;
 
   // Wishbone Alice
   wire  [14:0]  adr_o;
@@ -56,13 +57,13 @@ module mcu_top
   mcu #(BASEBLOCK, BAUD_DIV, 24, 12, 10) small_mcu (
     .clk      (clk     ),
     .rst_n    (arst_n  ),
-    .sclk     (qspi_sck),
-    .cs_n     (qspi_cs ),
+    .sclk     (spi_sclk),
+    .cs_n     (spi_csn ),
     .qdi      (qdi     ),
     .qdo      (qdo     ),
     .qoe      (qoe     ),
-    .rxd      (uart_rxd),
-    .txd      (uart_txd),
+    .rxd      (uart_rx ),
+    .txd      (uart_tx ),
     .adr_o    (adr_o   ),
     .dat_o    (dat_o   ),
     .dat_i    (dat_i   ),

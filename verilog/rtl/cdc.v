@@ -1,5 +1,5 @@
 // Clock domain crossing with glitch removal                11/6/2020 BNE
-// License: This code is a gift to the divine.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 // This module is used to bring asynchronous signals into a clock domain.
 // It allows for metastable behavior in the first couple of flops, including

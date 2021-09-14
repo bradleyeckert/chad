@@ -1,5 +1,5 @@
-// Serial Flash Controller for Chad                  		7/14/2021 BNE
-// This code is a gift to the divine.
+// Serial Flash Controller for Chad                  		9/14/2021 BNE
+// This code is a gift to all mankind.
 
 // SPIF is an I/O processor that loads memories from SPI flash at boot time,
 // decrypts flash data on the fly, provides a Wishbone Bus for peripherals,
@@ -44,6 +44,7 @@ module spif
 // Boot key
   input wire [KEY_LENGTH*8-1:0] key,    // Boot code decrypt key, 0 if plaintext
   input wire [23:0]           sernum,   // Serial number or boot key ID
+  input wire [47:0]           isppass,  // ISP password, 6 bytes
 // Enable ISP
   input wire                  ISPenable,
 // UART interface
@@ -87,7 +88,7 @@ module spif
   always @(posedge clk or negedge arstn) begin
     if (!arstn) begin
       wbxi <= 0;
-      {stb_o, we_o} <= 2'b0;
+      {stb_o, we_o, dat_o, adr_o} <= 1'b0;
     end else begin
       if (stb_o) begin                  // waiting for ack_i
         if (ack_i) begin
@@ -126,8 +127,7 @@ module spif
 
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
-      uo_escaped <= 1'b0;
-      u_wr <= 1'b0;
+      {uo_escaped, u_wr, u_dout, uo_lower} <= 1'b0;
     end else begin
       u_wr <= 1'b0;
       if (uo_escaped) begin
@@ -160,13 +160,12 @@ module spif
   reg iobusy;
   wire txbusy = ~uo_ready | ispActive;  // tell CPU that TX is busy
 
-  reg [3:0] r_state;                    // UART receive state
-  localparam unlockbyte0  = 8'hA5;
-  localparam unlockbyte1  = 8'h5A;
-  localparam UART_RX_IDLE = 4'b0001;
-  localparam UART_RX_ESC  = 4'b0010;
-  localparam UART_UNLOCK  = 4'b0100;
-  localparam UART_UNLOCK1 = 4'b1000;
+  reg [2:0] r_state;                    // UART receive state
+  reg [2:0] unlock_cnt, unlock_ok;
+  reg [7:0] unlock;                     // unlock byte
+  localparam UART_RX_IDLE = 3'b001;
+  localparam UART_RX_ESC  = 3'b010;
+  localparam UART_UNLOCK  = 3'b100;
 
   wire u_rxok = u_full & ~u_rd;         // ok to get raw data from UART
   wire u_rxready = (ispActive) ? ~ISPfull : ~uartRXfull;
@@ -176,12 +175,21 @@ module spif
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
       uartRXfull <= 1'b0;     u_rd <= 1'b0;
+      {unlock_cnt, unlock_ok} <= 1'b0;
       ISPfull <= 1'b0;   ispActive <= 1'b0;
       uartRXbyte <= 8'h00;   uartRXfull_d <= 1'b0;
       ISPbyte <= 8'h00;    r_state <= UART_RX_IDLE;
     end else begin
       uartRXfull_d <= uartRXfull;
       u_rd <= 1'b0;
+      case (unlock_cnt)                 // big endian password
+      3'd0: unlock <= isppass[47:40];
+      3'd1: unlock <= isppass[46:32];
+      3'd2: unlock <= isppass[31:24];
+      3'd3: unlock <= isppass[23:16];
+      3'd4: unlock <= isppass[15:8];
+      default: unlock <= isppass[7:0];
+      endcase
       if (u_rxok)
         case (r_state)
         UART_RX_IDLE:
@@ -189,7 +197,11 @@ module spif
             u_rd <= 1'b1;
             case (u_din[1:0])
             2'b00: r_state <= UART_RX_ESC;
-            2'b10: r_state <= UART_UNLOCK;
+            2'b10: begin
+                r_state <= UART_UNLOCK;
+                {unlock_cnt, unlock_ok} <= 1'b0;
+                ispActive <= 1'b0;      // any bad unlock sequence clears this
+              end
             endcase
           end
           else if (u_rxready) begin
@@ -216,19 +228,15 @@ module spif
           end
         UART_UNLOCK:
           begin
-            ispActive <= 1'b0;          // any bad unlock sequence clears this
             u_rd <= 1'b1;
-            if (u_din == unlockbyte0)
-              r_state <= UART_UNLOCK1;
-            else
+            if (u_din == unlock) begin
+              unlock_ok <= unlock_ok + 1'd1;
+              if (unlock_ok == 3'd5)
+                ispActive <= ISPenable;
+            end
+            unlock_cnt <= unlock_cnt + 1'd1;
+            if (unlock_cnt == 3'd5)
               r_state <= UART_RX_IDLE;
-          end
-        UART_UNLOCK1:
-          begin
-            u_rd <= 1'b1;
-            if (u_din == unlockbyte1)
-              ispActive <= ISPenable;
-            r_state <= UART_RX_IDLE;
           end
         default:
           r_state <= UART_RX_IDLE;
@@ -306,6 +314,7 @@ module spif
   always @(posedge clk or negedge arstn)
     if (!arstn) begin
       key_index <= KEY_LENGTH - 1;
+	  widekey <= 1'b0;
     end else begin
       if (g_init)
         widekey <= key;
@@ -415,6 +424,8 @@ module spif
       b_bcnt <= 2'd0;     codeWr <= 1'b0;    g_next <= 1'b0;
       b_state <= 4'd1;    g_init <= 1'b1;    g_load <= 1'b0;
       p_reset <= 1'b1;    uo_wr <= 1'b0;     g_reset_n <= 1'b0;
+      {testsig, sig_last, sig_ex} <= 1'b0;
+      {rd_bytes, rd_bcnt, fr_data} <= 1'b0;
       rd_format <= BOOT_RATE;
       f_format <= 3'd0;
       rd_addr <= 0;       cold <= 1'b1;      badboot <= 1'b0;
@@ -638,7 +649,7 @@ module spif
                   end
                 end
               endcase
-              fr_data <= {fr_data[WIDTH-9:0], plain};
+              fr_data <= {fr_data[23:0], plain};
               if (rd_bcnt) begin
                 rd_bcnt <= rd_bcnt - 2'd1;
                 g_next <= 1'b1;

@@ -222,14 +222,11 @@ four bytes of the PING to make sure you are programming the expected device.
 Encryption is built into the flash image, but today's regulatory standards often
 require protection against rollback attacks.
 
-The ISP enable command starts with `12 A5 5A` by default (see `spif.v`).
-You can change the `A5 5A` to anything, so that your device only works with your
-programming utility. A 16-bit key is kind of useless since it takes maybe
-20 us to check a key with decent hardware.
-A 45-bit key would stretch that out to 20 years.
-`spif.v` should be modified for a 48-bit programming-enable key.
-The `ispActive` bit should only be resolved after the whole key is received.
-This is a to-do item.
+The ISP enable command starts with `12 [isppass]` (see `spif.v`) where
+`isppass` is a 48-bit password. The default is `a55a11223344` but
+you can change it to anything, so that your device only works with your
+programming utility. A 48-bit password may take 30 us to check with decent hardware,
+which is a brute-force search time of 270 years.
 
 To prevent rollbacks, the ISP utility would check the version number held at a fixed
 address in the flash.

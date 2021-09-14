@@ -1,5 +1,5 @@
 // Coprocessor for Chad processor               12/2/2020 BNE
-// This code is a gift to Divine Mother and all of creation.
+// License: This code is a gift to mankind and is dedicated to peace on Earth.
 
 `include "options.vh"
 
@@ -103,7 +103,7 @@ module coproc
 
   always @(posedge clk or negedge arstn)
   if (!arstn)
-    y <= 1'b0;
+    {y, sticky} <= 1'b0;
   else begin
     if (go) sticky <= sel[3:0];
     case (outsel)

@@ -33,7 +33,7 @@ parameter FILENAME = "udata.hex"
 	  ready <= 1'b0;
 	  txdelay <= CHAR_TX_PERIOD;
 	  if (ischar)
-            $display("%c", din);
+            $display("uout:%c", din);
 	  else
 	    case (din)
             8'h0A: $display("\r");
@@ -41,7 +41,7 @@ parameter FILENAME = "udata.hex"
             default: $display("[%x]", din);
 	    endcase
 	end else begin
-          $display("\nERROR: Writing to a not-ready UART");
+          $display("\nERROR: Writing to a not-ready UART at %0t", $time);
 	  $stop;
 	end
       else if (txdelay) txdelay <= txdelay - 1;
@@ -64,7 +64,7 @@ parameter FILENAME = "udata.hex"
     end else begin
       if (rd)
 	if (!full) begin
-          $display("\nERROR: UART receive underflow");
+          $display("\nERROR: UART receive underflow at %0t", $time);
 	  $stop;
 	end else begin
 	  full <= 1'b0;
@@ -81,6 +81,7 @@ parameter FILENAME = "udata.hex"
               file <= 0;
           end else begin
 	    full <= 1'b1;
+            $display("uin:%X at %0t", dout, $time);
 	    rdnext <= 0;
 	  end
 	end
