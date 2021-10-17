@@ -4,6 +4,8 @@ there
 \ make-heads needs:
 \ {noop execute compile, lit, or doLitop noCompile}
 
+: c,       here c!  1 allot ;           \ 2.0580 c --
+
 \ Compile to code RAM
 \ This might go away if compile to flash is possible.
 

@@ -15,11 +15,11 @@ module mcu_top
   input wire  [4:0]   sw,     		// test buttons
 // 6-wire connection to SPI flash chip
   output wire         spi_csn,
-  inout wire          spi_mosi, 	// io0
-  inout wire          spi_miso, 	// io1
+  inout wire          spi_mosi, 		// io0
+  inout wire          spi_miso, 		// io1
   inout wire          spi_fd2,       	// io2
-  inout wire          spi_fd3,    	// io3
-  output wire         spi_sclk,         // copy of SCLK for simulation (see USRMCLK)
+  inout wire          spi_fd3,    		// io3
+  output wire         spi_sclk,        // copy of SCLK for simulation (see USRMCLK)
 // UART connection
   input wire          uart_rx,
   output wire         uart_tx
@@ -54,7 +54,7 @@ module mcu_top
 // This kills JTAG programming of the flash so you would want direct SPI connection
 // to program the flash.
 
-// USRMCLK tends to get pruned by Synplicity (thereby losing MCLK) is you're not careful.
+// USRMCLK gets pruned by Synplicity (thereby losing MCLK) if you're not careful.
 
   wire sclk_int;
   assign spi_sclk = sclk_int;

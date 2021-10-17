@@ -150,6 +150,8 @@
  Reserve one aligned cell of data space and store `x` in the cell.
 =2.0580: c, ( c -- )
  Reserve one byte of data space and store `c` in the byte.
+=2.0590: w, ( w -- )
+ Reserve one short of data space and store `w` in the short.
 =2.0700: u< ( u1 u2 -- flag )
  flag is true if and only if u1 is less than u2.
 =2.0710: min ( n1 n2 -- n3 )

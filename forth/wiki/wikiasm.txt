@@ -39,7 +39,10 @@
 =1.5010: ;CODE ( 0 -- )
  End a code definition.
 =1.5020: RET ( n1 -- n2 )
- Set the ALU instruction `ret` bit.
+ Set the ALU instruction `ret` field. Causes PC to be popped from return stack.
+=1.5021: >B ( n1 -- n2 )
+ Set the ALU instruction `>B` field. Causes B to be popped from data stack
+ without including `T`: ( x y -- y' ) B=x. 
 =1.6000: T ( n1 -- n2 )
  No change in T.
 #
@@ -62,8 +65,10 @@ _
  T = T * 2 + carry
 =1.6080: N ( n1 -- n2 )
  T = N
-=1.6090: W ( n1 -- n2 )
- T = W
+=1.6090: A ( n1 -- n2 )
+ T = A
+=1.6091: B ( n1 -- n2 )
+ T = B
 =1.6000: T^N ( n1 -- n2 )
  T = N ^ T
 =1.6110: ~T ( n1 -- n2 )
@@ -88,10 +93,10 @@ _
  T = R
 =1.6230: R-1 ( n1 -- n2 )
  T = R - 1
-=1.6240: [T] ( n1 -- n2 )
- T = mem[RA] (see `_MEMRD_`)
-=1.6250: io[T] ( n1 -- n2 )
- T = mem[RA] (see `_IORD_`)
+=1.6240: M ( n1 -- n2 )
+ T = M (see `[T]->M`)
+=1.6250: io ( n1 -- n2 )
+ T = io (see `io[T]->io`)
 =1.6260: status ( n1 -- n2 )
  T = (rp<<8) | sp
 =1.7010: T->N ( n1 -- n2 )
@@ -100,31 +105,33 @@ _
 _
 H<h2>ALU operations</h2>
 _
+=1.7015: T->A ( n1 -- n2 )
+ A = T
 =1.7020: T->R ( n1 -- n2 )
  R = T
 =1.7030: N->[T] ( n1 -- n2 )
  Generate a memory write strobe.
 =1.7040: N->io[T] ( n1 -- n2 )
  Generate an I/O write strobe.
-=1.7050: _IORD_ ( n1 -- n2 )
+=1.7050: io[T]->io ( n1 -- n2 )
  Generate an I/O read strobe.
  RA = T.
-=1.7060: _MEMRD_ ( n1 -- n2 )
+=1.7060: [T]->M ( n1 -- n2 )
  Generate a memory read strobe.
  RA = T.
 =1.7070: CO ( n1 -- n2 )
- carry = T[0]; W = T.
-=1.8010: r+1 ( n1 -- n2 )
+ carry = carry out of adder or shifter
+=1.8010: r+ ( n1 -- n2 )
   Push to return stack.
 #
 _
 H<h2>ALU strobes</h2>
 _
-=1.8020: r-1 ( n1 -- n2 )
+=1.8020: r- ( n1 -- n2 )
   Pop from return stack.
-=1.8030: d+1 ( n1 -- n2 )
+=1.8030: s+ ( n1 -- n2 )
   Push to data stack.
-=1.8040: d-1 ( n1 -- n2 )
+=1.8040: s- ( n1 -- n2 )
   Pop from data stack.
 =1.9010: alu ( n -- 0 )
   Compile `ALU` instruction

@@ -14,8 +14,12 @@ there
 applets [if] .(     Applet bytes: { )   \ }
 paged applet  paged [then]
 
-: +carry  ( a b -- a+b carry )  +c carry ;          \ 0 tuck d+
-: -borrow ( a b -- a-b borrow ) -c carry negate ;   \ 0 tuck d-
+: +carry  ( a b -- a+b carry )          \ 0 tuck d+
+   +c carry                             \ speeds up t
+;
+: -borrow ( a b -- a-b borrow )         \ 0 tuck d-
+   swap invert +c invert carry negate   \ speeds up t-
+;
 
 : tum* ( n . mpr -- t . . ) 2>r  r@ um*  0 2r>  um* d+ ;
 : tum/ ( t . . dvr -- n . ) dup >r um/mod r> swap >r um/mod nip r> ;

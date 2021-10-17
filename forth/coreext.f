@@ -27,31 +27,30 @@ there
 \ Add a cell to a double variable and carry into the upper part
 
 : 2+!                                   \ 2.1240 n a-addr
-    cell +  tuck @ +c over !
+    cell+  tuck @ +c over !
     carry if
-        cell -  1 swap +! exit
+        -cell +  1 swap +! exit
     then  drop
 ;
 
 : d+   >r swap >r +c carry r> + r> + ;  \ 2.1130 d1 d2 -- d3
-: d-   >r swap >r -c  r> carry - r> - ; \ 2.1140 d1 d2 -- d3
+: d-   dnegate d+ ;                     \ 2.1140 d1 d2 -- d3
 : d2*  swap 2* swap 2*c ;               \ 2.1150 d1 -- d2
-: d2/  2/ swap 2/c swap ;               \ 2.1160 d1 -- d2
 : d=   d- or 0= ;                       \ 2.1170 d1 d2 -- flag
 
-: du<                                   \ 2.1180 ud1 ud2 -- flag
-    >r swap >r                          ( l1 l2 |R: h2 h1 )
-    -c drop  carry 0= 0=                \ borrow out of l1-l2
-    r> + r> -c  drop  carry 0= 0=
-;
-
 \ 2nip saves 1 inst by using w. Same trick isn't used with 2swap
-\ because carry and w are not safe across calls.
+\ because carry, a, and b are not safe across calls.
 
 : 2swap  rot >r rot r> ;                \ 2.1190 abcd -- cdab
-: 2nip   >carry nip nip w ;
+: 2nip   a! nip nip a ;
 : 2over  >r >r 2dup r> r> 2swap ;
 : 3drop  drop 2drop ;
+
+: du<                                   \ 2.1180 ud1 ud2 -- flag
+    rot  2dupxor
+    if  2nip swap u< exit
+    then    2drop u<                    \ hi part matches, test lo
+;
 
 there swap - . .( instructions used by core ext) cr
 

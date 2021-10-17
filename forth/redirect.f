@@ -4,7 +4,7 @@ there
 
 variable ScreenProfile                  \ 2.2100 -- addr
 : ExecScreen  ( n -- )
-    2 min  ScreenProfile @ execute execute
+    2 min 2*  ScreenProfile @ + w@ execute
 ;
 : emit  0 ExecScreen ;                  \ 2.2110 x --
 : cr    1 ExecScreen ;                  \ 2.2111 x --
@@ -17,13 +17,14 @@ variable ScreenProfile                  \ 2.2100 -- addr
 : esc[x  27 emit  [char] [ emit  emit ;
 : _page  [char] 2 esc[x  [char] J emit ; \ "\e[2J" for VT100/VT220
 
-11 |bits|
-: stdout_table  exec1: [                \ The xts are less than 2048
-    ' _emit | ' _cr | ' _page
-] literal ;
+here
+' _emit w,
+' _cr w,
+' _page w,
+align equ stdout_table
 
 : con   ( -- )                          \ direct to console
-   ['] stdout_table ScreenProfile !
+   stdout_table ScreenProfile !
 ; con
 
 \ I/O sometimes needs timing, so here it is.

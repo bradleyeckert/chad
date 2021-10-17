@@ -15,8 +15,8 @@ void ErrorMessage (int error, char *s); // defined in errors.c
 #if (CELLBITS == 32)
 #define cell     uint32_t
 #define CELLSIZE 5  /* log2(CELLBITS) */
-#define CELL_ADDR(x) (x >> 2)
-#define BYTE_ADDR(x) (x << 2)
+#define CELL_ADDR(x) ((x) >> 2)
+#define BYTE_ADDR(x) ((x) << 2)
 #elif (CELLBITS > 16)
 #define cell     uint32_t
 #define CELLSIZE 5  /* # of bits needed to address bits in a cell */
@@ -105,49 +105,62 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 // Assembler primitives for the ALU instruction
 // Names are chosen to not conflict with Forth or C
 
-#define alu    (0x00 << 9)
-#define cop    (0x10 << 9)
-#define less0  (0x01 << 9)
-#define carry  (0x11 << 9)
-#define shr1   (0x02 << 9)
-#define shrx   (0x12 << 9)
-#define shl1   (0x03 << 9)
-#define shlx   (0x13 << 9)
-#define NtoT   (0x04 << 9)
-#define WtoT   (0x14 << 9)
-#define eor    (0x05 << 9)
-#define com    (0x15 << 9)
-#define Tand   (0x06 << 9)
-#define swapb  (0x07 << 9)
-#define swapw  (0x17 << 9)
-#define add    (0x08 << 9)
-#define sub    (0x09 << 9)
-#define RtoT   (0x0A << 9)
-#define RM1toT (0x0B << 9)
-#define input  (0x0C << 9)
-#define read   (0x0D << 9)
-#define zeq    (0x0E << 9)
-#define who    (0x0F << 9)
+#define OPCODE(x) ((x) >> 8)
+#define T      (0x00 << 8)
+#define cop    (0x10 << 8)
+#define less0  (0x01 << 8)
+#define carry  (0x11 << 8)
+#define shr1   (0x02 << 8)
+#define shrx   (0x12 << 8)
+#define shl1   (0x03 << 8)
+#define shlx   (0x13 << 8)
+#define add    (0x04 << 8)
+#define Tand   (0x05 << 8)
+#define eor    (0x06 << 8)
+#define com    (0x16 << 8)
 
-// The insn[8] bit of the ALU enables return
+#define swapb  (0x08 << 8)
+#define swapw  (0x18 << 8)
+#define NtoT   (0x09 << 8)
+#define AtoT   (0x19 << 8)
+#define RtoT   (0x0A << 8)
+#define RM1toT (0x0B << 8)
+#define input  (0x0C << 8)
+#define read   (0x0D << 8)
+#define zeq    (0x0E << 8)
+#define who    (0x0F << 8)
 
-#define ret    (1 << 8)
+#define OPCDnames0 "T\0T0<\0T2/\0T2*\0T+N\0T^N\0T&N\0---"
+#define OPCDnames1 "><\0N\0R\0R-1\0io\0M\0T0=\0status"
+#define OPCDnames2 "COP\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"
+#define OPCDnames3 "><16\0A\0---\0---\0---\0---\0---\0---"
 
-// The insn[7:4] field of the ALU instruction is:
+// The insn[7:4] field of the ALU instruction:
 
+#define STROBE(x) ((x) >> 4)
 #define TtoN   (1 << 4)
 #define TtoR   (2 << 4)
-#define write  (3 << 4)
+#define iow    (3 << 4)
 #define memrd  (4 << 4)
-#define iow    (5 << 4)
-#define ior    (6 << 4)
-#define co     (7 << 4)
+#define memwr  (5 << 4)
+#define memwrb (6 << 4)
+#define memwrs (7 << 4)
+#define co     (10 << 4)
+#define ior    (13 << 4)
+#define TtoA   (15 << 4)
+
+#define STROBEnames0 "\0T->N\0T->R\0N->io[T]\0[T]->M\0N->[T]\0N->[T]B\0N->[T]S"
+//                      1     2     3         4        5       6        7
+#define STROBEnames1 "?\0?\0CO\0?\0?\0io[T]->io\0?\0T->A"
+//                    8  9  A   B  C  D       E  F
 
 // The insn[3:2] field of the ALU instruction is return stack control:
 
 #define rup    (1 << 2)
+#define ret    (2 << 2)
 #define rdn    (3 << 2)
 
+#define ISRET  ((inst & rdn) == ret)
 // The insn[1:0] field of the ALU instruction is data stack control:
 
 #define sup    1
@@ -155,14 +168,20 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 
 // Other instruction types
 
+#define INST(x) ((x) >> 13)
+#define alu0   (0 << 13)
+#define alu1   (1 << 13)
 #define lit    (2 << 13)
 #define trap   (3 << 13)
 #define zjump  (4 << 13)
 #define litx   (5 << 13)
-#define copop  (0x16 << 11)
-#define userop (0x17 << 11)
+#define copop  (0x16 << 11)  /* 1011000 */
+#define userop (0x17 << 11)  /* 1011100 */
 #define jump   (6 << 13)
 #define call   (7 << 13)
+
+#define trapID1 0x1000
+#define litSign 0x1000
 
 // userop operation types
 
@@ -232,3 +251,4 @@ int chadSpinFunction(void);             // external function waiting for keyboar
 #define VERBOSE_TRACE   4   // simulation trace in human readable form
 #define VERBOSE_STKMAX  8   // track and show the maximum stack depth
 #define VERBOSE_SRC     16  // display the remaining source in the TIB
+#define VERBOSE_DASM    32  // disassemble in long format

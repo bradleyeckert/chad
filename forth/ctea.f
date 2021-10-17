@@ -46,7 +46,7 @@ $179B9 equ CTdelta
 
 hwoptions 4 and [if]                    \ hardware shifter?
 : ror32                                 \ d1 u -- d2
-   >carry  [ $96 cotrig ]  )dshift      \ 32-bit rotate right, zero-extended
+   a!  [ $96 cotrig ]  )dshift          \ 32-bit rotate right, zero-extended
 ;
 [then]
 

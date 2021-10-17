@@ -44,6 +44,9 @@ So, we don't do it.
 =1.0060: cell ( -- n )
  Number of bytes in a cell.
  Used for addressing cells when address units are in bytes.
+=1.0061: -cell ( -- n )
+ Negative number of bytes in a cell.
+ Used for addressing cells when address units are in bytes.
 =1.0065: |tib| ( -- n )
  Size in bytes of the text input buffer.
 =1.0070: >in ( -- addr )
@@ -709,6 +712,10 @@ _
  Example: `for next`.
 =1.5000: asm ( -- wid )
  The wordlist used by the assembler.
+=1.5001: a{ ( -- 0 )
+ Enter the inline assembler.
+=1.5002: } ( x -- )
+ Exit the inline assembler and return to compilation mode.
 #
 _
 H<h2>Flow Control</h2>

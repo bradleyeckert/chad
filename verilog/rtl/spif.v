@@ -6,7 +6,7 @@
 // processes a UART stream, and provides ISP-over-UART functionality.
 
 // The processor interface is for J1-type CPUs. Study that if you need to port
-// SPIF to something less sexy like a RISC V.
+// SPIF to something sexy like a RISC V.
 
 `default_nettype none
 module spif
@@ -26,6 +26,7 @@ module spif
   input  wire                 io_wr,    // I/O write strobe: register din
   input  wire                 mem_rd,   // Data memory read enable
   input  wire                 mem_wr,   // Data memory write enable
+  input  wire [((WIDTH + 7) / 8) - 1:0] memlane,
   input  wire [14:0]          mem_addr, // Data memory address
   input  wire [WIDTH-1:0]     din,      // Data memory & I/O in (from N)
   output wire [WIDTH-1:0]     io_dout,  // I/O data out
@@ -37,6 +38,7 @@ module spif
   output wire [WIDTH-1:0]     data_din, // Data RAM write data
   output wire                 data_wr,  // Data RAM write enable
   output wire                 data_rd,  // Data RAM read enable
+  output wire [((WIDTH + 7) / 8) - 1:0] data_lane, // write enables
   output wire [CODE_SIZE-1:0] code_a,   // Code RAM read/write address
   output wire [15:0]          code_din, // Code RAM write data
   output wire                 code_wr,  // Code RAM write enable
@@ -750,6 +752,7 @@ module spif
   assign code_a = (codeWr) ? b_dest[CODE_SIZE-1:0] : code_addr[CODE_SIZE-1:0];
   assign data_rd = mem_rd & ~dataWr;
   assign data_wr = mem_wr | dataWr;
+  assign data_lane = (dataWr) ? ~(1'b0) : memlane;
   assign data_a = (dataWr) ? b_dest[DATA_SIZE-1:0] : mem_addr[DATA_SIZE-1:0];
   assign data_din = (dataWr) ? b_data : din;
   assign code_din = b_data[15:0];

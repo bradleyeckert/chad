@@ -93,6 +93,18 @@ module mcu_tb();
     end
   endtask // UART_TX
 
+  // Send string using SystemVerilog
+  task UART_TXS;
+    input string s;
+    begin
+      foreach (s[i]) begin
+         UART_TX(s[i]);
+      end
+      UART_TX(8'h0A);
+      $display("\"%s\" entered at %0t", s, $time);
+    end
+  endtask // UART_TXS
+
   reg prompt;
   integer okay = 0;
 
@@ -107,12 +119,7 @@ module mcu_tb();
       @(posedge prompt);
       #(CLKPERIOD * 5000)       // wait 50 us after prompt
       $display("Sending line of text to UART RXD");
-      UART_TX(8'h35);
-      UART_TX(8'h20);
-      UART_TX(8'h2E);
-      UART_TX(8'h73);
-      UART_TX(8'h0A);
-      $display("\"5 .s\" entered at %0t", $time);
+      UART_TXS("5 .s");
       @(posedge prompt);
       #(CLKPERIOD * 5000)
       // Demonstrate ISP by reading the 3-byte JDID (9F command).

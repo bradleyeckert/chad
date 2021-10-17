@@ -12,13 +12,14 @@ later irqtick
 \ space for 14 more interrupt vectors
 :noname exit exit exit exit exit ; drop \ inactive interrupt vectors
 :noname exit exit exit exit exit exit exit ; drop
-later trap0
+later trap0                             \ reserved
 later api_trap
 later api_recover                       \ RET has its address's LSB set
 
 later throw                             \ 2.0020 n --
 
 : noop  nop ;                           \ 2.0100 --
+: -     invert 1 + + ;                  \ 1.2090 n1 n2 -- n3
 
 \ The I/O is allowed to drop CKE on the processor.
 \ Allow for code memory to double-feed the instruction following the pause
@@ -127,11 +128,12 @@ cell 4 = [if]
 : 2drop  drop drop ;                    \ 2.0340 d --
 : char+ [ ;                             \ 2.0350 c-addr1 -- c-addr2
 : 1+     1 + ;  ( macro )               \ 2.0360 n -- n+1
-: 1-     1 - ;  ( macro )               \ 2.0370 n -- n-1
+: 1-    -1 + ;  ( macro )               \ 2.0370 n -- n-1
 : negate invert 1+ ;                    \ 2.0380 n -- -n
 : tuck   swap over ;  ( macro )         \ 2.0390 n1 n2 -- n2 n1 n2
 : +!     tuck @ + swap ! ;              \ 2.0400 n a-addr --
 : ?exit  if rdrop then ; no-tail-recursion \ flag --
+: d2/    2/ swap 2/c swap ;             \ 2.1160 d1 -- d2
 
 \ This really comes in handy, although there is a small (9T) time penalty.
 : times                                 \ 2.0405 n xt --
@@ -174,7 +176,7 @@ hwoptions 1 and [if]                    \ hardware multiply?
 
 hwoptions 2 and [if]                    \ hardware divide?
 : um/mod                                \ 2.0420 ud u -- ur uq
-   >carry [ $14 cotrig ]  2drop cowait
+   a! [ $14 cotrig ]  2drop cowait
    [ 5 cotrig ]  costat
    [ 4 cotrig ]  costat
 ;
@@ -186,13 +188,14 @@ hwoptions 2 and [if]                    \ hardware divide?
    carry if
       r@ -   0 >carry
    else
-      dup r@  -c drop                   \ test subtraction
-      carry 0= if  r@ -c  then          \ keep it
+      dup r@  swap invert +c invert     \ test subtraction
+      carry if drop else nip then
    then
    r> carry                             \ carry is safe on the stack
 ;
+
 : um/mod                                \ 2.0420 ud u -- ur uq
-   over over- drop carry
+   2dup swap invert +c drop carry 0=
    if  drop drop dup xor
        dup invert  exit                 \ overflow = 0 -1
    then
@@ -210,14 +213,11 @@ hwoptions 4 and [if]                    \ hardware shifter?
    [ 7 cotrig ]  costat
    [ 6 cotrig ]  costat
 ;
-: drshift                               \ ud1 u -- ud2
-   >carry  [ $16 cotrig ]  )dshift
-;
-: darshift                              \ d1 u -- d2
-   >carry  [ $56 cotrig ]  )dshift
+: drshift                               \ d1 u -- d2
+   a!  [ $56 cotrig ]  )dshift
 ;
 : dlshift                               \ d1 u -- d2
-   >carry  [ $36 cotrig ]  )dshift
+   a!  [ $36 cotrig ]  )dshift
 ;
 : lshift  over swap dlshift drop ;	\ 2.1110 x1 u -- x2
 : rshift  0 swap drshift drop ;		\ 2.1120 x1 u -- x2
@@ -227,9 +227,12 @@ hwoptions 4 and [if]                    \ hardware shifter?
     dup if  for  2*  next  exit
     then drop
 ;
-
 : rshift  				\ 2.1120 x1 u -- x2
     dup if  for  0 >carry 2/c  next  exit
+    then drop
+;
+: drshift  				\ 2.1130 d1 u -- d2
+    dup if  for  d2/  next  exit
     then drop
 ;
 [then]
@@ -262,32 +265,27 @@ hwoptions 4 and [if]                    \ hardware shifter?
 : */mod  >r m* r> m/mod ;               \ 2.0510 n1 n2 n3 -- rem quot
 : */     */mod swap drop ;              \ 2.0520 n1 n2 n3 -- n4
 
-\ In order to use CREATE DOES>, we need ',' defined here.
-
 : aligned  [ cell 1- ] literal +        \ 1.1050 addr1 -- addr2
            [ cell negate ] literal and ;
 : align    dp @ aligned dp ! ;          \ 1.1060 --
 : allot    dp +! ;                      \ 2.0550 n --
 : here     dp @ ;                       \ 2.0560 -- addr
 : ,        align here !  cell allot ;   \ 2.0570 x --
-: c,       here c!  1 allot ;           \ 2.0580 c --
+: w,       here w!  2 allot ;           \ 2.0590 c --
 
 \ Paul Bennett's recommended minimum word set is mostly present.
 \ DO, I, J, and LOOP are not included. Use for next r@ instead.
 \ CATCH is not included. THROW jumps directly to QUIT.
 \ DOES> needs a compilable CREATE.
 
-: u<     -c drop carry 0= 0= ;          \ 2.0700 u1 u2 -- flag
-: min    2dup- 0< if                    \ 2.0710 n1 n2 -- n3
+: u<  swap invert +c drop carry 0= 0= ; \ 2.0700 u1 u2 -- flag
+: min    2dup - 0< if                   \ 2.0710 n1 n2 -- n3
          drop exit then  swap drop ;
-: max    2dup- 0< if                    \ 2.0720 n1 n2 -- n3
+: max    2dup - 0< if                   \ 2.0720 n1 n2 -- n3
          swap drop exit then  drop ;
 
 CODE depth                              \ 2.0730 -- +n
-    status T->N d+1 alu   drop 31 imm   T&N d-1 RET alu
+    status T->N s+ alu   drop 31 imm   T&N s- ret alu
 ;CODE
-
-: exec2: 2* [ ;             \ 2.0740 n -- \ for list of 2-inst literals
-: exec1: r> + >r ;          \ 2.0750 n -- \ for list of 1-inst literals
 
 there . .( instructions used by core) cr

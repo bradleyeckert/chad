@@ -44,6 +44,7 @@ module mcu
   wire                 io_wr;           // I/O write strobe: register din i
   wire                 mem_rd;          // Data memory read enable        i
   wire                 mem_wr;          // Data memory write enable       i
+  wire [((WIDTH + 7) / 8) - 1:0] memlane;
   wire [14:0]          mem_addr;        // Data memory & I/O address      i
   wire [WIDTH-1:0]     din;             // Data memory & I/O in (from N)  i
   wire [WIDTH-1:0]     mem_dout;        // Data memory out                o
@@ -107,6 +108,7 @@ module mcu
     .io_wr    (io_wr    ),
     .mem_rd   (mem_rd   ),
     .mem_wr   (mem_wr   ),
+    .memlane  (memlane  ),
     .mem_addr (mem_addr ),
     .dout     (din      ),
     .mem_din  (mem_dout ),
@@ -130,6 +132,7 @@ module mcu
   wire [DATA_SIZE-1:0] data_a;          // Data RAM read/write address
   wire [DATA_SIZE-1:0] data_ax = (hold_d & data_rd) ? data_a_d : data_a;
   wire [WIDTH-1:0]     data_din;        // Data RAM write data
+  wire [((WIDTH + 7) / 8) - 1:0] data_lane; // byte write enables
 
   spram #(DATA_SIZE, WIDTH) data_ram (
     .clk      (clk      ),
@@ -137,7 +140,8 @@ module mcu
     .din      (data_din ),
     .dout     (mem_dout ),
     .we       (data_wr  ),
-    .re       (data_rd  )
+    .re       (data_rd  ),
+    .lane     (data_lane)
   );
 
   wire                 code_wr;         // Code RAM write enable
@@ -152,7 +156,8 @@ module mcu
     .din      (code_din ),
     .dout     (insn     ),
     .we       (code_wr  ),
-    .re       (code_rd  )
+    .re       (code_rd  ),
+    .lane     (2'b11    )
   );
 
 // Handle hold synchronization
@@ -201,6 +206,7 @@ module mcu
     .io_wr    (io_wr    ),
     .mem_rd   (mem_rd   ),
     .mem_wr   (mem_wr   ),
+    .memlane  (memlane  ),
     .mem_addr (mem_addr ),
     .din      (din      ),
     .io_dout  (io_dout  ),
@@ -211,6 +217,7 @@ module mcu
     .data_din (data_din ),
     .data_wr  (data_wr  ),
     .data_rd  (data_rd  ),
+    .data_lane(data_lane),
     .code_a   (code_a   ),
     .code_din (code_din ),
     .code_wr  (code_wr  ),

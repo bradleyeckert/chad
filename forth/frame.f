@@ -20,7 +20,7 @@ variable frp1                           \ temporary frame pointer
 
 : fpclear  frp0 frp ! ;                 \ 2.2900 --
 : >mem     _! cell + ;                  \ 2.2910 n a -- a'
-: mem>     cell - _@ _dup@ ;            \ 2.2920 a -- a' n
+: mem>     -cell + _@ _dup@ ;           \ 2.2920 a -- a' n
 
 \ Move data stack to memory
 \ "4 buf ds>mem" --> mem = x3 x2 x1 x0 4   trivial case: 0
@@ -51,15 +51,15 @@ variable frp1                           \ temporary frame pointer
 \                                            fp----^
 : stack(  ( ... n -- x[n-1] ... x[0] )  \ 2.2950 n --
     depth
-    2dup- 0< if
+    2dup - 0< if
         r> frp @  spstat swapb 63 and   ( RA fp rdepth )
-        1 - 0 max                       \ leave a little on the return stack
+        -1 + 0 max                      \ leave a little on the return stack
         swap over                       ( RA rdepth fp cnt | ... )
         begin  dup  while 1 -
             swap r> swap  >mem  swap    \ push return stack to frame stack
         repeat
         drop  >mem  frp !  >r           \ restore return address
-        over - 1 -  >r                  ( ... top | bottom )
+        over - -1 +  >r                 ( ... top | bottom )
         fpad ds>mem   frp1 !            \ save top of stack
         r> frp @ ds>mem  frp !          \ move bottom of data stack to frame
         frp1 @  mem>ds  drop            \ restore top of stack
@@ -72,7 +72,7 @@ variable frp1                           \ temporary frame pointer
     depth  fpad ds>mem  frp1 !          \ save whatever is on the stack
     frp @   mem>ds                      \ restore the old bottom
     r>  swap  mem>                      ( RA fp cnt )
-    begin  dup  while 1 -
+    begin  dup  while -1 +
         swap mem> >r swap               ( RA fp n | ... x )
     repeat
     drop  frp ! >r                      \ restore return address

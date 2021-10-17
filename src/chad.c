@@ -46,7 +46,7 @@ static FILE* fopenx(char* filename, char* fmt) {
 
 SI verbose = 0;
 static uint8_t sp, rp;                  // stack pointers
-CELL t, pc, cy, lex, w;                 // registers
+CELL t, pc, cy, lex, areg;              // registers
 CELL Data[DataSize];                    // data memory
 CELL DataTrc[DataSize];                 // data memory for trace comparison
 CELL Dstack[StackSize];                 // data stack
@@ -141,7 +141,7 @@ SV TraceStacks(void) {
         printf(" (R: ");  PrintReturnStack();
         printf(")");
     }
-    printf(" \\ w=%Xh, cy=%X\n", w & CELLMASK, cy);
+    printf(" \\ a=%Xh, cy=%X\n", areg & CELLMASK, cy);
 }
 
 SV TraceLine(cell pc, uint16_t insn) {
@@ -220,6 +220,28 @@ void chadToData(uint32_t addr, uint32_t x) {
 
 #include "_coproc.c"                    // include coprocessor code
 
+// Dwrite simulates a write with byte lane enables.
+// The data is expected to be aligned by software for nonzero m.
+// size is (bytes-1), used to test the size. 0 for no test.
+// m is (4-bytes), used to calculate the mask
+
+SI Dwrite(cell data, cell c_addr, int size, int m) {
+    int a_addr = CELL_ADDR(c_addr);
+    if (a_addr & ~(DataSize - 1))
+        return BAD_DATA_WRITE;
+    if (c_addr & size)
+        return BAD_ALIGNMENT;
+    uint32_t mask = ALL_ONES;
+    mask = ((mask >> (m << 3)) << ((c_addr & m) << 3));
+    //      {FF,FFFF,FFFFFFFF} << byte_count
+    cell temp = Data[a_addr] & ~mask;
+    if (verbose & VERBOSE_TRACE) {
+        printf("Storing %Xh to cell %Xh using mask %08X\n", data, a_addr, mask);
+    } 
+    Data[a_addr] = temp + (data & mask);
+    return 0;
+}
+
 SV Dpush(cell v)                        // push to on the data stack
 {
     SP = SPMASK & (SP + 1);
@@ -267,7 +289,7 @@ static uint8_t Iack(void) {             // priority encoder
 // single = 10000h + instruction: Execute instruction. Returns the instruction.
 // MoreInstrumentation (config.h) slows down the code by 40%.
 
-SI sign2b[4] = { 0, 1, -2, -1 };        /* 2-bit sign extension */
+SI sign2b[4] = { 0, 1, -1, -1 };        /* 2-bit sign extension */
 
 SI CPUsim(int single) {
     cell _t = t;                        // types are unsigned
@@ -314,14 +336,15 @@ SI CPUsim(int single) {
         cell _lex = 0;
         cell s = Dstack[SP];
         cell temp;
-        switch (insn >> 13) { // 4 to 7
-        case 0:
-        case 1:
-            if (insn & 0x100) {                                     /*  r->pc */
+        switch (INST(insn)) {
+        case INST(alu0):
+            if ((insn & 12) == 8) {                                 /*  r->pc */
                 interruptVector = Iack();
                 exception = Rstack[RP] & (~0x1FFF);
-                if (exception) _pc = ExceptionVector;
-                else if (interruptVector) _pc = interruptVector;
+                if (exception)
+                    _pc = ExceptionVector;
+                else if (interruptVector)
+                    _pc = interruptVector;
                 else {
                     _pc = Rstack[RP];
                     if (RDEPTH == mark) single = 2;
@@ -335,103 +358,93 @@ SI CPUsim(int single) {
             }
             cell _c = t & 1;
             sum_t sum;
-            cell _w = (insn & 0x800) ? t : w;
-            switch ((insn >> 9) & 0x1F) {
-            case 0x00: _t = t;                               break; /*      T */
-            case 0x10: _t = coprocRead();                    break; /*    COP */
-            case 0x01: _t = (t & MSB) ? -1 : 0;              break; /*    T<0 */
-            case 0x11: _t = cy;                              break; /*      C */
-            case 0x02: temp = (t & MSB);
+            switch (OPCODE(insn) & 0x1F) {
+            case OPCODE(T):     _t = t;                      break; /*      T */
+            case OPCODE(cop):   _t = coprocRead();           break; /*    COP */
+            case OPCODE(less0): _t = (t & MSB) ? -1 : 0;     break; /*    T<0 */
+            case OPCODE(carry): _t = cy;                     break; /*      C */
+            case OPCODE(shr1): temp = (t & MSB);
                 _t = (t >> 1) | temp;                        break; /*    T2/ */
-            case 0x12:
+            case OPCODE(shrx):
                 _t = (t >> 1) | (cy << (CELLBITS - 1));      break; /*   cT2/ */
-            case 0x03: _c = t >> (CELLBITS - 1);
+            case OPCODE(shl1): _c = t >> (CELLBITS - 1);
                 _t = t << 1;                                 break; /*    T2* */
-            case 0x13: _c = t >> (CELLBITS - 1);
+            case OPCODE(shlx): _c = t >> (CELLBITS - 1);
                 _t = (t << 1) | cy;                          break; /*   T2*c */
-            case 0x04: _t = s;                               break; /*      N */
-            case 0x14: _t = w;                               break; /*      W */
-            case 0x05: _t = s ^ t;                           break; /*    T^N */
-            case 0x15: _t = ~t;                              break; /*     ~T */
-            case 0x06: _t = s & t;                           break; /*    T&N */
-            case 0x07: _t = ((t >> 8) & 0xFF00FF) | ((t & 0xFF00FF) << 8);
+            case OPCODE(swapb): _t = ((t >> 8) & 0xFF00FF) | ((t & 0xFF00FF) << 8);
                 break;                                              /*     >< */
-            case 0x17: _t = ((t >> 16) & 0xFFFF) | ((t & 0xFFFF) << 16);
+            case OPCODE(swapw): _t = ((t >> 16) & 0xFFFF) | ((t & 0xFFFF) << 16);
                 break;                                              /*   ><16 */
-            case 0x08: sum = (sum_t)s + (sum_t)t;
+            case OPCODE(NtoT): _t = s;                       break; /*      N */
+            case OPCODE(AtoT): _t = areg;                    break; /*      A */
+            case OPCODE(RtoT): _t = Rstack[RP];              break; /*      R */
+            case OPCODE(RM1toT): _t = Rstack[RP] - 1;        break; /*    R-1 */
+            case OPCODE(add): sum = (sum_t)s + (sum_t)t;
                 _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    T+N */
-            case 0x09: sum = (sum_t)s - (sum_t)t;
-                _c = (sum >> CELLBITS) & 1;  _t = (cell)sum; break; /*    N-T */
-            case 0x0A: _t = Rstack[RP];                      break; /*      R */
-            case 0x0B: _t = Rstack[RP] - 1;                  break; /*    R-1 */
-            case 0x0C: _t = readIOmap(CELL_ADDR(t));         break; /*  io[T] */
-            case 0x0D: _t = Data[Raddr];
+            case OPCODE(eor):  _t = s ^ t;                   break; /*    T^N */
+            case OPCODE(com):  _t = ~t;                      break; /*     ~T */
+            case OPCODE(Tand): _t = s & t;                   break; /*    T&N */
+            case OPCODE(input): _t = readIOmap(CELL_ADDR(t)); break; /*    IO */
+            case OPCODE(read): _t = Data[Raddr];
                 if (verbose & VERBOSE_TRACE) {
                     printf("Reading %Xh from cell %Xh\n", _t, Raddr);
-                } break;                                            /*    [T] */
-            case 0x0E: _t = (t) ? 0 : -1;                    break; /*    T0= */
-            case 0x0F: _t = (RDEPTH << 8) + SDEPTH;          break; /* status */
+                } break;                                            /*      M */
+            case OPCODE(zeq): _t = (t) ? 0 : -1;             break; /*    T0= */
+            case OPCODE(who): _t = (RDEPTH << 8) + SDEPTH;   break; /* status */
             default:   _t = t;  single = BAD_ALU_OP;
             }
+
             SP = SPMASK & (SP + sign2b[insn & 3]);                /* dstack+- */
             if ((interruptVector == 0) && (exception == 0))
                 RP = RPMASK & (RP + sign2b[(insn >> 2) & 3]);     /* rstack+- */
-            switch ((insn >> 4) & 15) {
-            case  1: Dstack[SP] = t;                         break;   /* T->N */
-            case  2: Rstack[RP] = t;                         break;   /* T->R */
-            case  3: temp = CELL_ADDR(t);
-                if (temp & ~(DataSize - 1)) { single = BAD_DATA_WRITE; }
-                if (verbose & VERBOSE_TRACE) {
-                    printf("Storing %Xh to cell %Xh\n", s, temp);
-                } Data[temp & (DataSize - 1)] = s;           break; /* N->[T] */
-            case  4: Raddr = CELL_ADDR(t);                         /* _MEMRD_ */
-                if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
-            case  5: temp = writeIOmap(CELL_ADDR(t), s);          /* N->io[T] */
+
+            switch (STROBE(insn) & 0x0F)
+            {
+            case 0: break;
+            case STROBE(TtoN): Dstack[SP] = t;             break;     /* T->N */
+            case STROBE(TtoR): Rstack[RP] = t;             break;     /* T->R */
+            case STROBE(iow): temp = writeIOmap(CELL_ADDR(t), s); /* N->io[T] */
                 if (temp) { single = temp; }   break;
-                // 6 = IORD strobe
-            case  7: cy = _c;  w = _w;                       break;   /*   co */
-            default: break;
+            case STROBE(memrd): Raddr = CELL_ADDR(t);              /* _MEMRD_ */
+                if (Raddr & ~(DataSize - 1)) { single = BAD_DATA_READ; }  break;
+            case STROBE(memwrs): Dwrite(s, t, 1, 2);       break;  /* N->[T]S */
+            case STROBE(memwrb): Dwrite(s, t, 0, 3);       break;  /* N->[T]B */
+            case STROBE(memwr):  Dwrite(s, t, 0, 0);       break;   /* N->[T] */
+            case STROBE(co): cy = _c;                      break;     /*   co */
+            case STROBE(TtoA): areg = t;                   break;     /* T->A */
+            case STROBE(ior): break;
+            default:
+                printf("Unknown strobe %X at %X\n", STROBE(insn) & 0x0F, pc);
+                single = BAD_ALU_OP;
+                break;
             }
             t = _t & CELLMASK;
             break;
-        case 2:                                                /* literal */
-            Dpush((lex << 12) | ((insn & 0x1e00) >> 1) | (insn & 0xff));
-            if (insn & 0x100) {                                 /*  r->pc */
-                interruptVector = Iack();
-                exception = Rstack[RP] & (~0x1FFF);
-                if (exception) _pc = ExceptionVector;
-                else if (interruptVector) _pc = interruptVector;
-                else {
-                    _pc = Rstack[RP];
-                    if (RDEPTH == mark) single = 2;
-                    RP = RPMASK & (RP - 1);
-                }
-#ifdef MoreInstrumentation
-                uint16_t time = (uint16_t)cycles - retMark;
-                retMark = (uint16_t)cycles;
-                if (time > latency)
-                    latency = time;
-#endif
-            } 
+        case INST(lit):
+            if (insn & litSign)
+                Dpush((ALL_ONES & ~0xFFF) | (insn & 0xFFF));
+            else
+                Dpush((lex << 12) | (insn & 0xFFF));
             break;
-        case 3:                                                 /*   trap */
-            Dpush((lex << 12) | ((insn & 0x1e00) >> 1) | (insn & 0xff));
-            temp = ((insn >> 8) & 1);
-            RP = RPMASK & (RP + 1);
-            Rstack[RP] = _pc;
-            _pc = TrapVector + temp;
+        case INST(trap):
+            if (insn & litSign)
+                Dpush((ALL_ONES & ~0xFFF) | (insn & 0xFFF));
+            else
+                Dpush((lex << 12) | (insn & 0xFFF));
+            Rpush(_pc);
+            _pc = TrapVector + ((insn >> 12) & 1);
 #ifdef MoreInstrumentation
             if (verbose & VERBOSE_TRACE) {
                 printf("Trap to %Xh\n", _pc);
             }
 #endif
             break;
-        case 4:                                                 /*  zjump */
+        case INST(zjump):
             if (!Dpop()) { 
                 _pc = insn & 0x1fff; 
             }
             break;
-        case 5:
+        case INST(litx):
             if (insn & 0x1000) {
                 if (insn & 0x800)
                     switch (insn & 0x7FF) {
@@ -444,18 +457,17 @@ SI CPUsim(int single) {
                     }
                 else                                            /* coproc */
                     coprocGo(insn & 0x7FF,
-                        t& CELLMASK, s& CELLMASK, w& CELLMASK);
+                        t& CELLMASK, s& CELLMASK, areg& CELLMASK);
             }
             else {
                 _lex = (lex << 12) | (insn & 0xFFF);            /*   litx */
             }
             break;
-        case 6:                                                 /*   jump */
+        case INST(jump):
             _pc = insn & 0x1fff;  
             break;
-        case 7:                                                 /*   call */
-            RP = RPMASK & (RP + 1);
-            Rstack[RP] = _pc;
+        case INST(call):
+            Rpush(_pc);
             _pc = insn & 0x1fff;
 #ifdef MoreInstrumentation
                 if (verbose & VERBOSE_TRACE) {
@@ -469,8 +481,7 @@ SI CPUsim(int single) {
         if ((cycles & CELLMASK) == 0) { // raw counter overflow
             irq |= (1 << 1);            // lowest priority interrupt
         }
-        if (pc & ~(CodeSize-1))         // PC must remain within code memory
-            single = BAD_PC;
+        if (pc & ~(CodeSize-1)) single = BAD_PC;
         if (rp == RPMASK) single = BAD_RSTACKUNDER;
         if (sp == SPMASK) single = BAD_STACKUNDER;
         if (rp == RPMASK - 1) single = BAD_RSTACKOVER;
@@ -518,13 +529,11 @@ SV CompExit (void) {                    // compile an exit
     int a = (CP-1) & (CodeSize-1);
     int old = Code[a];                  // previous instruction
     if (((old & 0xC000) == 0) && (!(old & rdn))) { // ALU doesn't change rp?
-        Code[a] = rdn | old | ret;      // make the ALU instruction return
-    } else if ((old & 0xF000) == lit) { // literal?
-        Code[a] = old | ret;            // make the literal return
+        Code[a] = old | ret;            // make the ALU instruction return
     } else if ((!notail) && ((old & 0xE000) == call)) {
         Code[a] = (old & 0x1FFF) | jump; // tail recursion (call -> jump)
     } else {
-plain:  toCode(alu | ret | rdn);         // compile a stand-alone return
+plain:  toCode(alu0 | ret );              // compile a stand-alone return
     }
 }
 
@@ -539,25 +548,28 @@ SV Calign(void) {
 SV extended_lit (int k) {
     toCode(litx | (k & 0xFFF));
 }
-SI lit_field(int x) {
-    x &= 0xFFF;
-    return (x & 0xff) | (x & 0xF00) << 1;
-}
 SV Literal (cell x) {
+    cell n = (x & MSB) ? ((1 + ~x) & CELLMASK) : x;  // n = |x|
+    cell sign = (x & MSB) ? litSign : 0;
+    if (n & ~0xFFF) {                   // large unsigned literal
 #if (CELLBITS > 24)
-    if (x & 0xFF000000) {
-        extended_lit(x >> 24);
-        extended_lit(x >> 12);
-    }
-    else {
+        if (x & 0xFF000000) {
+            extended_lit(x >> 24);
+            extended_lit(x >> 12);
+        }
+        else {
+            if (x & 0x0FFF000)
+                extended_lit(x >> 12);
+        }
+#else
         if (x & 0x0FFF000)
             extended_lit(x >> 12);
-    }
-#else
-    if (x & 0x0FFF000)
-        extended_lit(x >> 12);
 #endif
-    toCode (lit | lit_field(x));
+        toCode(lit | (x & 0xFFF));
+    }
+    else {                              // small signed literal
+        toCode(lit | sign | (x & 0xFFF));
+    }
 }
 
 #ifdef HASFLOATS
@@ -631,23 +643,6 @@ SI aligned(int n) {
     return (n + (cellbytes - 1)) & (-cellbytes);
 }
 
-// Code space isn't randomly readable, so lookup tables are supported by jump
-// into a list of literals with their return bits set.
-// Use |bits| to set the size of your data. It's cellsize by default.
-// Syntax is  : tjmp 2* r> + >r ;  : mytable tjmp [ 12 | 34 | 56 ] literal ;
-
-CELL tablebits = CELLBITS;
-SV SetTableBitWidth(void) { tablebits = Dpop(); }
-SV TableEntry(void) {
-    int bits = tablebits;
-    cell x = Dpop();
-#if (CELLBITS > 22)
-    if (bits > 22) extended_lit(x >> 22);
-#endif
-    if (bits > 11) extended_lit(x >> 11);
-    toCode(ret | lit | (x & 0xFF) | (x & 0x700) << 1);
-}
-
 // Compile Control Structures
 
 CELL CtrlStack[256];                    // control stack
@@ -676,14 +671,14 @@ SV doThen(void) { ResolveFwd(); }
 SV doElse(void) { MarkFwd();  toCode(jump);  ControlSwap();  ResolveFwd(); }
 SV doWhile(void) { doIf();  ControlSwap(); }
 SV doRepeat(void) { doAgain();  doThen(); }
-SV doFor(void) { toCode(alu | NtoT | TtoR | sdn | rup);  MarkFwd(); }
+SV doFor(void) { toCode(alu0 | NtoT | TtoR | sdn | rup);  MarkFwd(); }
 SV noCompile(void) { error = BAD_NOCOMPILE; }
 SV noExecute(void) { error = BAD_NOEXECUTE; }
 
 SV doNext(void) {
-    toCode(alu | RM1toT | TtoN | sup);  /* (R-1)@ */
-    toCode(alu | zeq | TtoR);  ResolveRev(zjump);
-    toCode(alu | rdn);  latest = CP;    /* rdrop */
+    toCode(alu0 | RM1toT | TtoN | sup);  /* (R-1)@ */
+    toCode(alu0 | zeq | TtoR);  ResolveRev(zjump);
+    toCode(alu0 | rdn);  latest = CP;    /* rdrop */
 }
 
 SV CoprocInst(void) {
@@ -1103,18 +1098,21 @@ SV diss (int id, char *str) {
     if (str[0]) appendDA(str);
 }
 
-SI ALUlabel(uint16_t insn) {            // try to match to a predefined ALUinst
+SI ALUlabel(uint16_t inst) {            // try to match to a predefined ALUinst
+    int hasret = ISRET;
+    if (hasret) { inst &= ~rdn; }       // strip RET
     for (int i = 1; i < hp; i++) {
-        if (insn & ret) {               // strip RET and rdn
-            if ((insn & rdn) == rdn)
-                insn &= ~(ret | rdn);
-        }
-        if ((Header[i].isALU) && (Header[i].w == insn)) {
+        if ((Header[i].isALU) && (Header[i].w == inst)) {
             appendDA(Header[i].name);
-            return 1;
+            if (hasret) appendDA("exit");
+            if (verbose == VERBOSE_DASM) {
+                appendDA("\\");
+                return 1;
+            }
+            return 0;
         }
     }
-    return 0;
+    return 1;
 }
 
 CELL DisassembleInsn(uint16_t IR, uint16_t page) {
@@ -1127,32 +1125,34 @@ CELL DisassembleInsn(uint16_t IR, uint16_t page) {
     case 0:
     case 1:
         if (ALUlabel(IR)) {
-            if (IR & ret) appendDA("exit");
-        }
-        else {
             int id = (IR >> 9) & 7;
             switch ((IR >> 12) & 3) {
-            case 0: diss(id, "T\0T0<\0T2/\0T2*\0N\0T^N\0T&N\0mask"); break;
-            case 1: diss(id, "T+N\0N-T\0T0=\0N>>T\0N<<T\0R\0[T]\0status"); break;
-            case 2: diss(id, "COP\0C\0cT2/\0T2*c\0W\0~T\0T&W\0---"); break;
-            default: diss(id, "T+Nc\0N-Tc\0---\0---\0---\0R-1\0io[T]\0---");
+            case 0: diss(id, OPCDnames0); break;
+            case 1: diss(id, OPCDnames1); break;
+            case 2: diss(id, OPCDnames2); break;
+            case 3: diss(id, OPCDnames3); break;
             }
-            diss((IR >> 4) & 7, "\0T->N\0T->R\0N->[T]\0_MEMRD_\0N->io[T]\0_IORD_\0CO");
-            diss(IR & 3, "\0d+1\0d-2\0d-1");
-            diss((IR >> 2) & 3, "\0r+1\0r-2\0r-1");
-            if (IR & ret) appendDA("RET");
+            id = (IR >> 4) & 7;
+            if (IR & 0x80)
+                diss(id, STROBEnames1);
+            else
+                diss(id, STROBEnames0);
+            diss(IR & 3, "\0S+\0--\0S-");
+            diss((IR >> 2) & 3, "\0R+\0ret\0R-");
             appendDA("alu");
         }
         break;
     case 2:
-        target = (IR & 0xFF) | (IR & 0x1E00) >> 1;
-        appendDA(itos((lex << 12) + target, BASE, 0, 0));
+        if (IR & litSign)
+            target = (ALL_ONES & ~0xFFF) | (IR & 0xFFF);
+        else
+            target = (lex << 12) | (IR & 0xFFF);
+        appendDA(itos(target, BASE, 0, 0));
         appendDA("imm");
-        if (IR & ret) { appendDA("exit"); }
         break;
     case 3:
-        target = (lex << 12) | (IR & 0xFF) | (IR & 0x1E00) >> 1;
-        int trapnum = (IR & ret) ? 1 : 0;
+        target = (lex << 12) | (IR & 0xFFF);
+        int trapnum = (IR & trapID1) ? 1 : 0;
         if (trapnum) {
             name = TargetName((target & 0x1FFF), target >> 13);
             if (name == NULL) HexToDA(target);
@@ -1396,7 +1396,7 @@ SV DefA_Comp(void) {
     if ((id) && (isAPI != id)) {        // not in this API
         int ext = xxt();
         extended_lit(ext >> 12);
-        toCode(trap | ret | lit_field(ext));
+        toCode(trap | trapID1 | (ext & 0xFFF));
     }
     else 
         Def_Comp();
@@ -1473,8 +1473,8 @@ SV CompMacro(void) {
     int addr = my();
     for (int i=0; i<len; i++) {
         int inst = Code[addr++];
-        if ((i == (len - 1)) && (inst & ret)) { // last inst has a return?
-            inst &= ~(ret | rdn);       // strip trailing return
+        if ((i == (len - 1)) && ISRET) { // last inst has a return?
+            inst &= ~rdn;               // strip trailing return
         }
         toCode(inst);
     }
@@ -1565,7 +1565,7 @@ SV See (void) {                         // ( <name> -- )
 }
 
 SV Cold(void) {                         // cold boot and run forever
-    pc = t = sp = rp = w = lex = cy = 0;
+    pc = t = sp = rp = areg = lex = cy = 0;
     while (1) {
         Dpush(CPUsim(-1));
         pc = Ctick("throw");
@@ -1613,7 +1613,9 @@ SV SkipToPar(void) {
 }
 SV irqStore  (void) { irq = Dpop(); }
 SV Nothing   (void) { }
-SV BeginCode (void) { Colon();  toImmediate();  OrderPush(asm_wid);  Dpush(0);}
+SV CodeBegin (void) { toImmediate();  OrderPush(asm_wid);  Dpush(0);}
+SV CodeEnd   (void) { OrderPop();  Dpop();  toCompile(); }
+SV BeginCode (void) { Colon();  CodeBegin();}
 SV EndCode   (void) { EndDefinition();  OrderPop();  Dpop();  sane();}
 SV Recurse   (void) { CompCall(Header[DefMarkID].target); }
 SV Bye       (void) { error = BYE; }
@@ -1943,7 +1945,12 @@ SV fcHalf(void) { flashC16(Dpop()); }   // ( n16 -- )
 SV fcCell(void) { flashCC(Dpop()); }    // ( n -- )
 
 SV fc32(void) {                         // ( d -- )
-    uint32_t w = Dpop() << CELLBITS;
+    uint32_t w = Dpop();
+#if (CELLBITS < 32)
+    w = w << CELLBITS;
+#else
+    w = 0;
+#endif
     w |= Dpop();
     flashC16(w >> 16);  flashC16(w);
 }
@@ -2250,6 +2257,7 @@ SV LoadKeywords(void) {
     AddEquate("dm-cache",     "1.0040 -- n",          BYTE_ADDR(DataCache));
     AddEquate("cellbits",     "1.0050 -- n",          CELLBITS);
     AddEquate("cell",         "1.0060 -- n",          CELLS);
+    AddEquate("-cell",        "1.0061 -- n",          -CELLS);
     AddEquate("|tib|",        "1.0065 -- n",          MaxLineLength);
     AddEquate(">in",          "1.0070 -- addr",       BYTE_ADDR(toin));
     AddEquate("#tib",         "1.0071 -- addr",       BYTE_ADDR(tibs));
@@ -2265,7 +2273,13 @@ SV LoadKeywords(void) {
     AddEquate("api",          "1.0081 -- addr",       BYTE_ADDR(api));
     AddKeyword("stats",       "1.0090 --",            Stats,         noCompile);
     AddKeyword("locate",      "1.0091 <name> --",     Locate,        noCompile);
-    AddKeyword("verbosity",   "1.0092 flags --",      Verbosity,     noCompile);
+    AddKeyword("verbosity",   "1.0092 flags --",      Verbosity,     noCompile); 
+    AddEquate("~source",      "1.0201 -- bits",       VERBOSE_SOURCE);
+    AddEquate("~token",       "1.0202 -- bits",       VERBOSE_TOKEN);
+    AddEquate("~trace",       "1.0203 -- bits",       VERBOSE_TRACE);
+    AddEquate("~depth",       "1.0204 -- bits",       VERBOSE_STKMAX);
+    AddEquate("~/source",     "1.0205 -- bits",       VERBOSE_SRC);
+    AddEquate("~see",         "1.0206 -- bits",       VERBOSE_DASM);
     AddKeyword("+bkey",       "1.0093 u --",          AddBootKey,    noCompile);
     AddKeyword("+tkey",       "1.0094 u --",          AddTextKey,    noCompile);
     AddKeyword("tkey",        "1.0095 -- ud",         ExecTextKey, CompTextKey);
@@ -2351,6 +2365,7 @@ SV LoadKeywords(void) {
     AddKeyword(";",           "1.1240 --",            Semicolon,     SemiComp);
     AddKeyword("recurse",     "1.1245 --",            noExecute,     Recurse);
     AddKeyword("CODE",        "1.1250 <name> -- 0",   BeginCode,     noCompile);
+    AddKeyword("a{",          "1.5001 -- 0",          noExecute,     CodeBegin);
     AddKeyword("literal",     "1.1260 x --",          noExecute,     doLITERAL);
     AddKeyword("immediate",   "1.1270 --",            Immediate,     noCompile);
     AddKeyword("marker",      "1.1280 <name> --",     Marker,        noCompile);
@@ -2363,8 +2378,6 @@ SV LoadKeywords(void) {
     AddKeyword("macro",       "1.1330 --",            Macro,         noCompile);
     AddKeyword("write-protect", "1.1340 --",          WrProtect,     noCompile);
     AddKeyword("no-tail-recursion", "1.1350 --",    NoTailRecursion, noCompile);
-    AddKeyword("|bits|",      "1.1360 n --",       SetTableBitWidth, noCompile);
-    AddKeyword("|",           "1.1370 x --",          TableEntry,    noCompile);
     AddKeyword("irq!",        "1.1380 x --",          irqStore,      noCompile);
     AddKeyword("gendoc",      "1.1390 --",            GenerateDoc,   noCompile);
     AddKeyword("cotrig",      "1.1400 sel --",        CoprocInst,    noCompile);
@@ -2383,7 +2396,6 @@ SV LoadKeywords(void) {
     AddALUinst("xor",     "1.2060 n1 n2 -- n3",       eor   |        sdn);
     AddALUinst("and",     "1.2070 n1 n2 -- n3",       Tand  |        sdn);
     AddALUinst("+",       "1.2080 n1 n2 -- n3",       add   |        sdn);
-    AddALUinst("-",       "1.2090 n1 n2 -- n3",       sub   |        sdn);
     AddALUinst("dup",     "1.2100 x -- x x",          TtoN  |        sup);
     AddALUinst("over",    "1.2110 x1 x2 -- x1 x2 x1", NtoT  | TtoN | sup);
     AddALUinst("swap",    "1.2120 x1 x2 -- x2 x1",    NtoT  | TtoN);
@@ -2397,26 +2409,24 @@ SV LoadKeywords(void) {
 //  AddALUinst("rshift",  "1.2200 x1 u -- x2",        shr          | sdn);
 //  AddALUinst("lshift",  "1.2210 x1 u -- x2",        shl          | sdn);
     AddALUinst("carry",   "1.2500 -- n",              carry | TtoN | sup);
-    AddALUinst("w",       "1.2510 -- x",              WtoT  | TtoN | sup);
+    AddALUinst("a",       "1.2510 -- x",              AtoT  | TtoN | sup);
+    AddALUinst("a!",      "1.2511 n --",              NtoT  | TtoA | sdn);
     AddALUinst(">carry",  "1.2520 n --",              NtoT  | co   | sdn);
     AddALUinst("+c",      "1.2530 n1 n2 -- n3",       add   | co   | sdn);
-    AddALUinst("-c",      "1.2531 n1 n2 -- n3",       sub   | co   | sdn);
     AddALUinst("_@",      "1.2540 addr -- addr",              memrd);  // start
     AddALUinst("_@_",     "1.2550 addr -- x",         read);        // end read
-    AddALUinst("_!",      "1.2560 x addr -- x",              write | sdn);
+    AddALUinst("_!",      "1.2560 x addr -- x",              memwr | sdn);
     AddALUinst("_io!",    "1.2570 x addr -- x",               iow  | sdn);
     AddALUinst("_io@",    "1.2580 addr -- addr",              ior);    // start
     AddALUinst("_io@_",   "1.2590 addr -- x",         input);    // end io read
     AddALUinst("2dupand", "1.2600 u v -- u v u&v",    Tand  | TtoN | sup);
     AddALUinst("2dupxor", "1.2610 u v -- u v u^v",    eor   | TtoN | sup);
     AddALUinst("2dup+",   "1.2620 u v -- u v u+v",    add   | TtoN | sup);
-    AddALUinst("2dup-",   "1.2630 u v -- u v u-v",    sub   | TtoN | sup);
     AddALUinst("swapb",   "1.2640 x -- y",            swapb);
     AddALUinst("swapw",   "1.2650 x -- y",            swapw);
     AddALUinst("overand", "1.2660 u v -- u u&v",      Tand);
     AddALUinst("overxor", "1.2670 u v -- u u^v",      eor);
     AddALUinst("over+",   "1.2680 u v -- u u+v",      add   | co);
-    AddALUinst("over-",   "1.2690 u v -- u u-v",      sub   | co);
     AddALUinst("dup>r",   "1.2700 x -- x | -- x",     TtoR               | rup);
     AddALUinst("rdrop",   "1.2710 -- | x --",                              rdn);
     AddALUinst("_dup@",   "1.2730 addr -- addr x",    read  | TtoN | sup);
@@ -2446,6 +2456,7 @@ SV LoadKeywords(void) {
     asm_wid = AddWordlist("asm");
     AddEquate("asm",        "1.5000 -- wid", asm_wid);
     CURRENT = asm_wid;
+    AddKeyword("}",         "1.5002 --",  CodeEnd,   noCompile);
     AddKeyword("begin",     "1.5100 --",  doBegin,   noCompile);
     AddKeyword("again",     "1.5110 --",  doAgain,   noCompile);
     AddKeyword("until",     "1.5120 --",  doUntil,   noCompile);
@@ -2455,8 +2466,8 @@ SV LoadKeywords(void) {
     AddKeyword("while",     "1.5160 --",  doWhile,   noCompile);
     AddKeyword("repeat",    "1.5170 --",  doRepeat,  noCompile);
     AddKeyword(";CODE",     "1.5010 0 --",  EndCode,  noCompile);
-    AddModifier("RET",      "1.5020 n1 -- n2",  ret | rdn );  // return bit
-    AddModifier("T",        "1.6000 n1 -- n2",  alu  );  // Instruction fields
+    AddModifier("ret",      "1.5020 n1 -- n2",  ret  );
+    AddModifier("T",        "1.6000 n1 -- n2",  T    );
     AddModifier("COP",      "1.6010 n1 -- n2",  cop  );
     AddModifier("T0<",      "1.6020 n1 -- n2",  less0);
     AddModifier("C",        "1.6030 n1 -- n2",  carry);
@@ -2465,34 +2476,34 @@ SV LoadKeywords(void) {
     AddModifier("T2*",      "1.6060 n1 -- n2",  shl1 );
     AddModifier("T2*c",     "1.6070 n1 -- n2",  shlx );
     AddModifier("N",        "1.6080 n1 -- n2",  NtoT );
-    AddModifier("W",        "1.6090 n1 -- n2",  WtoT );
+    AddModifier("A",        "1.6090 n1 -- n2",  AtoT);
     AddModifier("T^N",      "1.6100 n1 -- n2",  eor  );
     AddModifier("~T",       "1.6110 n1 -- n2",  com  );
     AddModifier("T&N",      "1.6120 n1 -- n2",  Tand );
     AddModifier("><",       "1.6130 n1 -- n2",  swapb );
     AddModifier("><16",     "1.6140 n1 -- n2",  swapw );
     AddModifier("T+N",      "1.6150 n1 -- n2",  add  );
-    AddModifier("N-T",      "1.6170 n1 -- n2",  sub  );
     AddModifier("T0=",      "1.6190 n1 -- n2",  zeq );
-//  AddModifier("N>>T",     "1.6200 n1 -- n2",  shr  );
-//  AddModifier("N<<T",     "1.6210 n1 -- n2",  shl  );
     AddModifier("R",        "1.6220 n1 -- n2",  RtoT );
     AddModifier("R-1",      "1.6230 n1 -- n2",  RM1toT );
-    AddModifier("[T]",      "1.6240 n1 -- n2",  read );
-    AddModifier("io[T]",    "1.6250 n1 -- n2",  input);
+    AddModifier("M",        "1.6240 n1 -- n2",  read );
+    AddModifier("io",       "1.6250 n1 -- n2",  input);
     AddModifier("status",   "1.6260 n1 -- n2",  who);
     AddModifier("T->N",     "1.7010 n1 -- n2",  TtoN );  // strobe field
+    AddModifier("T->A",     "1.7015 n1 -- n2",  TtoA);
     AddModifier("T->R",     "1.7020 n1 -- n2",  TtoR );
-    AddModifier("N->[T]",   "1.7030 n1 -- n2",  write);
+    AddModifier("N->[T]",   "1.7030 n1 -- n2",  memwr);
+    AddModifier("N->[T]B",  "1.7031 n1 -- n2",  memwrb);
+    AddModifier("N->[T]S",  "1.7032 n1 -- n2",  memwrs);
     AddModifier("N->io[T]", "1.7040 n1 -- n2",  iow  );
-    AddModifier("_IORD_",   "1.7050 n1 -- n2",  ior);
-    AddModifier("_MEMRD_",  "1.7060 n1 -- n2",  memrd);
+    AddModifier("io[T]->io","1.7050 n1 -- n2",  ior);
+    AddModifier("[T]->M",   "1.7060 n1 -- n2",  memrd);
     AddModifier("CO",       "1.7070 n1 -- n2",  co  );
-    AddModifier("r+1",      "1.8010 n1 -- n2",  rup  );  // stack pointer field
-    AddModifier("r-1",      "1.8020 n1 -- n2",  rdn  );
-    AddModifier("d+1",      "1.8030 n1 -- n2",  sup  );
-    AddModifier("d-1",      "1.8040 n1 -- n2",  sdn  );
-    AddLitOp("alu",         "1.9010 n -- 0",  alu );
+    AddModifier("r+",       "1.8010 n1 -- n2",  rup  );  // stack pointer field
+    AddModifier("r-",       "1.8020 n1 -- n2",  rdn  );
+    AddModifier("s+",       "1.8030 n1 -- n2",  sup  );
+    AddModifier("s-",       "1.8040 n1 -- n2",  sdn  );
+    AddLitOp("alu",         "1.9010 n -- 0",  alu0 );
     AddLitOp("branch",      "1.9020 n -- 0",  jump );
     AddLitOp("0branch",     "1.9030 n -- 0",  zjump);
     AddLitOp("scall",       "1.9040 n -- 0",  call );

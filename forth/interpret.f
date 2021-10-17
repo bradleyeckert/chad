@@ -26,7 +26,8 @@ paged applet  paged [then]
    32 and -
 ;
 : digit?                                \ 2.6010 c base -- n flag
-   >r  toupper  [char] 0 -              \ char to digit, return `ok` flag
+   >r  toupper
+   [ char 0 negate ] literal +          \ char to digit, return `ok` flag
    dup 10 17 within or
    dup 9 > 7 and -
    dup r> u<
@@ -405,12 +406,12 @@ applets [if] end-applet  paged swap - . [then]
    state !  decimal
    \ If stacks are more than 8 deep, limit them to 8
    begin spstat $18 and while drop repeat
-   begin spstat 8 rshift $18 and while rdrop repeat
+   begin spstat swapb $18 and while rdrop repeat
    state @  postpone [  .error cr
    depth if  ." Data stack -> "
       begin spstat 7 and while . repeat  cr
    then
-   spstat 8 rshift $1F and  ( rdepth )
+   spstat swapb $1F and  ( rdepth )
    dup 1 > if  ." Return stack -> "         hex
       begin 1- dup while  r> .  repeat  cr  decimal
    then drop

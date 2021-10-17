@@ -21,7 +21,7 @@ frp0 equ numbuf                         \ buffer for numeric conversion
 \ when the stacks have significant content. Since `d.r` ia typically at the
 \ end of a definition, its tail call doesn't increase the stack.
 
-: digit   dup 10 - 0< 6 invert and      \ 2.3180 n -- char
+: digit   dup -10 + 0< -7 and           \ 2.3180 n -- char
           + [char] 7 + ;
 : <#      numbuf  hld ! ;               \ 2.3190 ud1 -- ud1
 : hold    hld dup >r @ 1- dup r> ! c! ; \ 2.3200 char --

@@ -9,7 +9,8 @@ module spram
   input wire  [DATA_WIDTH-1:0] din,
   output reg  [DATA_WIDTH-1:0] dout,
   input wire                   we,
-  input wire                   re
+  input wire                   re,
+  input wire  [((DATA_WIDTH + 7) / 8) - 1:0] lane
 );
 
   reg [DATA_WIDTH-1:0] 	mem [2**ADDR_WIDTH-1:0];

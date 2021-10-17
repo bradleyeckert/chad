@@ -31,7 +31,7 @@ module demo_io
   reg [3:0] wbstb;
   always @*
     casez (adr_i[7:2])
-    6'b000101: {wbstb, ack_o} <= {3'b000, stb_i, 1'b1};
+    6'b000101: {wbstb, ack_o} <= {3'b000, stb_i, 1'b1}; // 40 io!
     default:   {wbstb, ack_o} <= {4'b0000, 1'b1};
     endcase
 

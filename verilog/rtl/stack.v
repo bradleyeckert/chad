@@ -11,13 +11,13 @@ module stack
   input wire  hold,
   output wire [WIDTH-1:0] rd,
   input wire  we,
-  input wire  [1:0] delta,
+  input wire  [1:0] delta, // {none, up, down, down}
   input wire  [WIDTH-1:0] wd
 );
 
   localparam BITS = (WIDTH * DEPTH) - 1;
   localparam EMPTY = 32'h55AA55AA;
-  wire move = delta[0];
+  wire move = delta[0] | delta[1];
 
   reg  [WIDTH-1:0] head;
   reg  [BITS:0] tail;

@@ -39,7 +39,7 @@ For example,
 ok>see s>d
 s>d
 166 0011              dup
-167 030c          0< exit
+167 0208          0< exit
 ok>
 ```
 

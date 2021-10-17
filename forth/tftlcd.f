@@ -78,16 +78,15 @@ hwoptions 8 and [if]                    \ TFT support?
    get-colors nip _grayX
 ;
 
-16 |bits|
-: bitcmd_table  exec1: [  \ index is a multiple of 2
-    ' _nopix  | ' _nopix  | ' _mono9  | ' _mono9  |
-    ' _run01  | ' _nopix  | ' _gray0  | ' _gray1  |
-    ' _mono15 | ' _mono15 | ' _mono15 | ' _mono15 |
-    ' _mono15 | ' _mono15 | ' _mono15 | ' _mono15
-] literal ;
+here
+    ' _nopix  w, ' _nopix  w, ' _mono9  w, ' _mono9  w,
+    ' _run01  w, ' _nopix  w, ' _gray0  w, ' _gray1  w,
+    ' _mono15 w, ' _mono15 w, ' _mono15 w, ' _mono15 w,
+    ' _mono15 w, ' _mono15 w, ' _mono15 w, ' _mono15 w,
+equ bitcmd_table
 
 : g_bitcmd  ( n16 -- )
-   dup  swapb 2/ 2/ 2/ $1E and bitcmd_table execute
+   dup  swapb 2/ 2/ 2/ $1E and  bitcmd_table + w@ execute
 ;
 
 : LCDrowcol  ( z0 z1 cmd -- )           \ set row or column entry limits
@@ -226,14 +225,15 @@ variable FontID                         \ 0 = main font
    then  cursorX !                      \ bump cursor
 ;
 
-: lcdout_table  exec2: [
-    ' g_emit | ' g_cr | ' g_page
-] literal ;
+here
+' g_emit w,
+' g_cr w,
+' g_page w,
+align equ lcdout_table
 
 : lcd  ( -- )                           \ direct to LCD
-   ['] lcdout_table ScreenProfile !
+   lcdout_table ScreenProfile !
 ;
-
 
 : qq  \ test dump 10 digits 9 to 0
    g_page
