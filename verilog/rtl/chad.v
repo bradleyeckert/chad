@@ -1,8 +1,6 @@
 // Chad processor                                               10/17/2021 BNE
 // License: This code is a gift to mankind and is dedicated to peace on Earth.
 
-// memlane is byte lane enables, currently not used but will be phased in
-
 module chad
 #(
   parameter WIDTH = 18,                 // cell size, can be 16 to 32
@@ -131,30 +129,26 @@ module chad
   assign io_wr =  !reboot & func_iow;
   assign io_rd =  !reboot & func_ior;
 
-  reg mem_err;
-
   always @*
   begin
     if (WIDTH == 32) begin
       casez({insn[7:4], st1[1:0], isALU})
-      7'b????_??_0: {memlane, mem_err} = 5'b1111_0;
-      7'b0101_00_1: {memlane, mem_err} = 5'b1111_0;
-      7'b0110_00_1: {memlane, mem_err} = 5'b0001_0;
-      7'b0110_01_1: {memlane, mem_err} = 5'b0010_0;
-      7'b0110_10_1: {memlane, mem_err} = 5'b0100_0;
-      7'b0110_11_1: {memlane, mem_err} = 5'b1000_0;
-      7'b0111_00_1: {memlane, mem_err} = 5'b0011_0;
-      7'b0111_10_1: {memlane, mem_err} = 5'b1100_0;
-      default:      {memlane, mem_err} = 5'b1111_1;
+      7'b????_??_0: memlane = 4'b1111;
+      7'b0110_00_1: memlane = 4'b0001;
+      7'b0110_01_1: memlane = 4'b0010;
+      7'b0110_10_1: memlane = 4'b0100;
+      7'b0110_11_1: memlane = 4'b1000;
+      7'b0111_00_1: memlane = 4'b0011;
+      7'b0111_10_1: memlane = 4'b1100;
+      default:      memlane = 4'b1111;
       endcase
     end else begin
       casez({insn[7:4], st1[0], isALU})
-      6'b????_?_0: {memlane, mem_err} = 5'b1111_0;
-      6'b0101_0_1: {memlane, mem_err} = 5'b1111_0;
-      6'b0110_0_1: {memlane, mem_err} = 5'b0001_0;
-      6'b0110_1_1: {memlane, mem_err} = 5'b0010_0;
-      6'b0111_0_1: {memlane, mem_err} = 5'b0011_0;
-      default:     {memlane, mem_err} = 5'b1111_1;
+      6'b????_?_0: memlane = 4'b1111;
+      6'b0110_0_1: memlane = 4'b0001;
+      6'b0110_1_1: memlane = 4'b0010;
+      6'b0111_0_1: memlane = 4'b0011;
+      default:     memlane = 4'b1111;
       endcase
     end
   end

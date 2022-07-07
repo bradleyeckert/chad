@@ -1,4 +1,7 @@
-// Generic synchronous read/write single-port RAM               8/16/2021 BNE
+// Generic synchronous read/write single-port RAM               10/16/2021 BNE
+
+// To do: Add byte lane write enables.
+// For now, they are not used. c! and w! use RMW.
 
 module spram
 #(parameter ADDR_WIDTH = 10,
